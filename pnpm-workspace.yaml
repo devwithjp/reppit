@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  '@electric-sql/pglite': true
+  esbuild: true
+  sharp: true
+minimumReleaseAgeExclude:
+  - '@anthropic-ai/sdk@0.132.0'

@@ -1,0 +1,21 @@
+{
+  "name": "gitit",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Reddit for repos and agent skills, with the front page delivered into your agent.",
+  "license": "MIT",
+  "packageManager": "pnpm@12.9.1",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "pnpm --filter @gitit/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "seed": "pnpm --filter @gitit/web seed"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0",
+    "@types/node": "^20.0.0"
+  }
+}
