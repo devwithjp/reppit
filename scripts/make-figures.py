@@ -740,8 +740,8 @@ def f1_the_moment(rng):
                     color=AMBER, amp=2.0, step=30.0)
 
     # person's thought bubble
-    g += thought_bubble(314, 250, ["...is that good?"], rng, size=56,
-                        family=CAVEAT, tail_to=(364, 512), lobes=11)
+    g += thought_bubble(374, 250, ["...is that good?"], rng, size=52,
+                        family=CAVEAT, tail_to=(384, 512), lobes=11)
     return g
 
 
@@ -1061,6 +1061,421 @@ def f9_the_loop(rng):
     return g
 
 
+# --------------------------------------------------------------------------
+# data-figure primitives
+#
+# These nine panels are charts rather than scenes, so the rule is that the
+# number has to BE the picture. Bars and dots are drawn with the same rough
+# primitives as everything else -- never a neat rectangle -- and anything
+# compared in one frame is drawn at true relative scale, because the ratio is
+# the whole point.
+# --------------------------------------------------------------------------
+
+
+def halo(x, y, w, h):
+    """Invisible white backing, so lettering never collides with plotted data."""
+    return ('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="%s"/>'
+            % (x, y, w, h, WHITE))
+
+
+def hatch_rect(x, y, w, h, rng, gap=24, sw=2.0, color=INK, opacity=0.9):
+    """Diagonal hand shading clipped to a rectangle -- reads as filled, stays light."""
+    g = ""
+    k = x - (y + h)
+    kmax = x + w - y
+    while k <= kmax:
+        ylo = max(y, x - k)
+        yhi = min(y + h, x + w - k)
+        if yhi - ylo > 3:
+            g += rough_line(ylo + k, ylo, yhi + k, yhi, rng, sw=sw, color=color,
+                            amp=0.9, step=34.0, opacity=opacity)
+        k += gap
+    return g
+
+
+def rough_bar(x, y, w, h, rng, shaded=False, gap=24, sw=3.0, color=INK):
+    """A hand-drawn bar. Never a neat rectangle."""
+    g = ""
+    if shaded:
+        g += hatch_rect(x, y, w, h, rng, gap=gap, color=color, opacity=0.85)
+    g += rough_rect(x, y, w, h, rng, r=0, sw=sw, color=color, amp=1.4,
+                    step=38.0, smooth=False)
+    return g
+
+
+def dot(cx, cy, r, rng, color=INK):
+    return rough_ellipse(cx, cy, r, r * rng.uniform(0.92, 1.08), rng, n=9,
+                         sw=2.4, color=color, amp=0.7, fill=color,
+                         fill_opacity=1.0)
+
+
+def bracket_h(x1, x2, y, rng, depth=18, sw=3.0, color=INK):
+    """Square bracket spanning a horizontal range, drawn by hand."""
+    return rough_path([(x1, y + depth), (x1, y), (x2, y), (x2, y + depth)], rng,
+                      sw=sw, color=color, amp=1.2, step=40.0)
+
+
+def brace_v(x, y1, y2, rng, dirn=1, w=24, sw=3.0, color=INK):
+    """Hand-drawn curly brace spanning a vertical range."""
+    ym = (y1 + y2) / 2.0
+    d = dirn * w
+    top = [(x, y1), (x + d, y1 + (ym - y1) * 0.22), (x + d, ym - 18),
+           (x + 2 * d, ym)]
+    bot = [(x + 2 * d, ym), (x + d, ym + 18), (x + d, y2 - (y2 - ym) * 0.22),
+           (x, y2)]
+    return (rough_path(top, rng, sw=sw, color=color, amp=1.0, step=26.0)
+            + rough_path(bot, rng, sw=sw, color=color, amp=1.0, step=26.0))
+
+
+def clock(cx, cy, r, rng, minute_ang=30.0, sw=3.0, color=INK):
+    """Timer face. Iconography, not data -- the labels carry the numbers."""
+    g = rough_ellipse(cx, cy, r, r, rng, n=26, sw=sw, color=color, amp=1.2,
+                      fill=WHITE, fill_opacity=1.0)
+    for i in range(12):
+        a = math.radians(i * 30)
+        r0 = r * (0.84 if i % 3 else 0.76)
+        g += rough_line(cx + r0 * math.sin(a), cy - r0 * math.cos(a),
+                        cx + r * 0.94 * math.sin(a), cy - r * 0.94 * math.cos(a),
+                        rng, sw=2.2, color=color, amp=0.6, step=14.0)
+    a = math.radians(minute_ang)
+    g += rough_line(cx, cy, cx + r * 0.78 * math.sin(a),
+                    cy - r * 0.78 * math.cos(a), rng, sw=3.0, color=color,
+                    amp=0.8, step=22.0)
+    g += rough_line(cx, cy, cx + r * 0.46 * math.sin(math.radians(minute_ang * 0.3)),
+                    cy - r * 0.46 * math.cos(math.radians(minute_ang * 0.3)),
+                    rng, sw=3.2, color=color, amp=0.8, step=22.0)
+    g += '<circle cx="%.1f" cy="%.1f" r="4.5" fill="%s"/>' % (cx, cy, color)
+    return g
+
+
+def square_block(x, y, n, cols, cell, gap, rng, sw=2.2, color=INK):
+    """A block of n tiny hand-drawn squares, row-major."""
+    g = ""
+    pitch = cell + gap
+    for i in range(n):
+        cx = x + (i % cols) * pitch
+        cy = y + (i // cols) * pitch
+        g += rough_rect(cx, cy, cell, cell, rng, r=0, sw=sw, color=color,
+                        amp=0.7, step=cell / 3.0, smooth=False)
+    return g
+
+
+# the same scatter serves f10 and f11, so the second really is the first
+# picture with one dot circled
+SCATTER_X0, SCATTER_X1 = 300.0, 1040.0
+SCATTER_Y0, SCATTER_Y1 = 270.0, 690.0
+OUTLIER = (1272.0, 666.0)
+
+
+def star_cloud():
+    """Shapeless cloud: x and y drawn independently, so there is no trend."""
+    r = Rng(0x5EED10)
+    pts = []
+    for _ in range(72):
+        u, v = r.next(), r.next()
+        x = SCATTER_X0 + (SCATTER_X1 - SCATTER_X0) * (u ** 1.45)
+        y = SCATTER_Y1 - (SCATTER_Y1 - SCATTER_Y0) * (v ** 1.25)
+        pts.append((x, y, 6.5 + 3.5 * r.next()))
+    return pts
+
+
+def scatter_axes(rng):
+    g = rough_arrow([(250, 720), (1420, 720)], rng, sw=3.2, size=22, amp=1.6,
+                    step=60.0)
+    g += rough_arrow([(250, 720), (250, 228)], rng, sw=3.2, size=22, amp=1.6,
+                     step=60.0)
+    g += text(840, 790, "stars", rng, size=46, anchor="middle")
+    g += text(176, 476, "maintained", rng, size=42, anchor="middle", rot=-90)
+    return g
+
+
+def f10_the_cloud(rng):
+    g = title("Stars vs whether it is maintained", rng, size=54)
+    g += scatter_axes(rng)
+    for x, y, r in star_cloud():
+        g += dot(x, y, r, rng)
+    g += dot(OUTLIER[0], OUTLIER[1], 9.0, rng)
+    # the almost-flat trend line is the joke: a reader looks for it and it says nothing
+    g += rough_line(300, 524, 1104, 503, rng, sw=2.6, amp=1.2, step=46.0,
+                    dash="14 13", opacity=0.75)
+    g += halo(1086, 258, 346, 164)
+    g += text(1424, 324, "ρ = 0.10", rng, size=66, anchor="end",
+              upper=False)
+    g += text(1424, 396, "\"very weak\"", rng, size=46, anchor="end")
+    g += rough_arrow(curve_pts((1280, 428), (1226, 476), (1138, 500)), rng,
+                     sw=3.0, size=22, amp=1.6)
+    return g
+
+
+def f11_fifty_thousand_stars(rng):
+    g = title("One real project", rng)
+    g += scatter_axes(rng)
+    for x, y, r in star_cloud():
+        g += dot(x, y, r, rng)
+    ox, oy = OUTLIER
+    g += dot(ox, oy, 10.0, rng)
+    g += circle_emphasis(ox, oy, 54, 50, rng, color=INK, sw=3.4)
+    g += halo(920, 262, 512, 170)
+    g += text(1424, 328, "50,034 stars", rng, size=56, anchor="end")
+    g += text(1424, 396, "maintenance: 8 out of 100", rng, size=38,
+              anchor="end")
+    g += rough_arrow(curve_pts((1300, 424), (1346, 540), (1300, 604)), rng,
+                     sw=3.0, size=22, amp=1.6)
+    return g
+
+
+def f12_weakest_signal(rng):
+    g = title("Stars are the weakest thing they tested", rng, size=52)
+    x0 = 452
+    scale = 900.0 / 0.44
+    rows = [("contributors", 0.44), ("project size", 0.38),
+            ("core contributors", 0.15), ("stars", 0.10)]
+    g += rough_line(x0, 258, x0, 714, rng, sw=3.0, amp=1.4, step=46.0)
+    for i, (lab, val) in enumerate(rows):
+        yy = 288 + i * 112
+        w = val * scale
+        g += rough_bar(x0, yy, w, 66, rng, shaded=(i == 3), gap=20)
+        g += text(x0 - 30, yy + 48, lab, rng, size=42, anchor="end")
+        g += text(x0 + w + 26, yy + 48, "%.2f" % val, rng, size=46)
+    # only the stars bar gets a star on it
+    sy = 288 + 3 * 112
+    g += star(x0 + 352, sy + 30, 28, rng, color=INK, sw=2.6)
+    g += text(684, sy + 136, "the one everyone uses", rng, size=44, rot=-1.0)
+    g += rough_arrow(curve_pts((668, sy + 120), (590, sy + 104), (520, sy + 78)),
+                     rng, sw=3.0, size=20, amp=1.4)
+    return g
+
+
+def f13_never_worked(rng):
+    g = title("This predates ai", rng)
+    ty = 498
+    g += rough_arrow([(140, ty), (1506, ty)], rng, sw=3.4, size=24, amp=1.8,
+                     step=60.0)
+
+    g += rough_line(330, ty - 24, 330, ty + 24, rng, sw=3.2, amp=1.2, step=20.0)
+    g += text(330, ty + 86, "nov 2017", rng, size=50, anchor="middle")
+    g += text(330, 352, "this was measured here", rng, size=44, anchor="middle")
+    g += rough_arrow([(330, 376), (330, ty - 40)], rng, sw=3.0, size=20,
+                     amp=1.4, step=40.0)
+
+    years = [(1030, "2022"), (1130, "2023"), (1230, "2024"), (1340, "2025"),
+             (1450, "2026")]
+    for mxp, lab in years:
+        g += rough_line(mxp, ty - 18, mxp, ty + 18, rng, sw=2.8, amp=1.1,
+                        step=18.0)
+        g += text(mxp, ty + 76, lab, rng, size=34, anchor="middle")
+    g += bracket_h(1010, 1462, 400, rng, depth=20, sw=3.0)
+    g += text(1236, 364, "ai coding tools", rng, size=44, anchor="middle")
+
+    # the gap is the image: nobody standing in it
+    g += stick_figure(690, 742, rng, s=0.74, pose="shrugging", rot=-1.0,
+                      sw=3.2)
+
+    g += text(800, 836, "the signal was already broken. nobody was looking.",
+              rng, size=44, anchor="middle", rot=-0.5)
+    return g
+
+
+def f14_repos_per_minute(rng):
+    g = title("New repos per minute vs one person looking at one", rng, size=48)
+    g += square_block(104, 300, 230, 23, 26, 7, rng)
+    g += text(476, 684, "new repos in one minute", rng, size=44,
+              anchor="middle")
+
+    g += rough_line(966, 272, 966, 706, rng, sw=2.6, amp=1.6, step=56.0,
+                    dash="16 14", opacity=0.75)
+
+    g += rough_rect(1196, 496, 26, 26, rng, r=0, sw=2.6, amp=0.7, step=9.0,
+                    smooth=False)
+    g += stick_figure(1296, 626, rng, s=0.78, pose="slumped", rot=1.0, sw=3.2)
+    g += text(1232, 706, "what one person", rng, size=42, anchor="middle")
+    g += text(1232, 752, "can read", rng, size=42, anchor="middle")
+    return g
+
+
+def f15_three_registries(rng):
+    g = title("Packages you could install today", rng)
+    base = 742
+    top = 560.0
+    rows = [("npm", 4464731, 400), ("pypi", 907001, 760),
+            ("crates.io", 347256, 1120)]
+    big = float(rows[0][1])
+    g += rough_line(220, base, 1490, base, rng, sw=2.8, amp=1.4, step=60.0)
+    for name, n, cx in rows:
+        h = top * n / big
+        g += rough_bar(cx - 100, base - h, 200, h, rng, sw=3.2)
+        # internal rules, so each bar reads as a stack rather than a block
+        yy = base - 46
+        while yy > base - h + 14:
+            g += rough_line(cx - 92, yy, cx + 92, yy, rng, sw=2.0, amp=0.9,
+                            step=40.0, opacity=0.7)
+            yy -= 46
+        g += text(cx, 796, name, rng, size=42, anchor="middle")
+        g += text(cx, 850, "{:,}".format(n), rng, size=46, anchor="middle")
+    # a person at the foot of it, for scale
+    g += stick_figure(1396, base, rng, s=0.95, pose="standing", rot=-1.0)
+    return g
+
+
+def f16_zombie_bar(rng):
+    """Two bars, NOT one split bar.
+
+    93% is a share of codebases and 7% is a share of components -- different
+    denominators. A single split bar would imply they are parts of one whole,
+    which is exactly the detail a hostile reader uses to throw out the rest.
+    So: two bars, a common 0-100 axis, each denominator spelled out, and a
+    divider between them so nobody reads them as a stacked pair.
+    """
+    g = title("What is already in your build", rng)
+
+    x0, span = 180, 1240.0          # shared 0-100 axis
+    g += rough_line(x0, 312, x0, 716, rng, sw=3.0, amp=1.2, step=52.0)
+    g += rough_line(x0 + span, 312, x0 + span, 716, rng, sw=2.4, amp=1.2,
+                    step=46.0, dash="14 13", opacity=0.8)
+    g += text(x0 + span, 286, "100%", rng, size=36, anchor="middle")
+
+    rows = [(0.93, "93%", "of codebases have a component dead 2+ years", 302,
+             326, True),
+            (0.07, "7%", "of components in use are the latest version", 584,
+             608, False)]
+    for frac, pct, lab, ty, byy, shade in rows:
+        g += text(x0 + 10, ty, pct, rng, size=66)
+        # the label reads on from the percentage, so sit it right after it
+        g += text(x0 + 10 + tw(pct, 66) + 26, ty - 2, lab, rng, size=40)
+        g += rough_bar(x0, byy, span * frac, 96, rng, shaded=shade, gap=26,
+                       sw=3.2)
+
+    # the separation has to be unmistakable
+    g += rough_line(140, 484, 1336, 484, rng, sw=2.4, amp=1.4, step=56.0,
+                    dash="18 15", opacity=0.75)
+
+    g += text(800, 806, "audit of 947 real codebases", rng, size=44,
+              anchor="middle", rot=-0.5)
+    return g
+
+
+def f17_five_minutes(rng):
+    g = title("What actually changed", rng)
+    g += rough_line(800, 186, 800, 726, rng, sw=2.6, amp=1.6, step=56.0,
+                    dash="16 14", opacity=0.75)
+
+    # the human, five minutes, three tabs open
+    g += clock(420, 282, 86, rng, minute_ang=30.0)
+    g += text(420, 424, "5 minutes", rng, size=58, anchor="middle")
+    g += text(420, 474, "of looking around", rng, size=38, anchor="middle")
+    for i in range(3):
+        g += rough_rect(306, 486 + i * 58, 228, 46, rng, r=5, sw=2.6, amp=1.0,
+                        step=26.0)
+    g += stick_figure(196, 712, rng, s=0.80, pose="standing", rot=-1.0)
+
+    # the agent, two seconds, one tab, already done
+    g += clock(1180, 282, 86, rng, minute_ang=4.0)
+    g += text(1180, 424, "2 seconds", rng, size=58, anchor="middle")
+    g += text(1180, 474, "already done", rng, size=38, anchor="middle")
+    g += rough_rect(1066, 486, 228, 46, rng, r=5, sw=2.6, amp=1.0, step=26.0)
+    g += robot(1180, 726, rng, s=0.82, rot=1.2)
+
+    # the same weak number sits under both of them
+    g += rough_line(110, 760, 1490, 760, rng, sw=2.6, amp=1.4, step=60.0)
+    for cx in (420, 1180):
+        g += rough_bar(cx - 100, 788, 200, 34, rng, sw=2.8)
+    g += text(800, 816, "same weak number", rng, size=42, anchor="middle",
+              rot=-0.6)
+    return g
+
+
+def f18_the_flat_line(rng):
+    g = title("The line did not bend", rng)
+    pts = [(268, 694), (626, 560), (984, 430), (1342, 294)]
+    g += rough_line(220, 740, 1420, 740, rng, sw=2.8, amp=1.4, step=60.0)
+    for i, (px, lab) in enumerate(zip([p[0] for p in pts],
+                                      ("2022", "2023", "2024", "2025"))):
+        g += rough_line(px, 740, px, 758, rng, sw=2.4, amp=0.8, step=16.0)
+        g += text(px, 804, lab, rng, size=38, anchor="middle")
+    g += rough_path(pts, rng, sw=3.4, amp=1.3, step=52.0)
+    for p in pts:
+        g += dot(p[0], p[1], 8.0, rng)
+    for i, lab in enumerate(("+22%", "+17%", "+19%")):
+        mx = (pts[i][0] + pts[i + 1][0]) / 2
+        my = (pts[i][1] + pts[i + 1][1]) / 2
+        g += halo(mx - 70, my - 92, 140, 56)
+        g += text(mx, my - 50, lab, rng, size=46, anchor="middle")
+    # where a bend would have been, had there been one
+    g += rough_arrow([(880, 712), (880, 508)], rng, sw=3.0, size=22, amp=1.4,
+                     step=44.0)
+    g += text(908, 650, "ai arrives here", rng, size=44)
+    return g
+
+
+def f19_clones_before_ai(rng):
+    g = title("The pile was mostly copies already", rng, size=52)
+    bx, by, cell, gap, cols = 110, 244, 38, 7, 10
+    pitch = cell + gap
+    g += hatch_rect(bx, by, cols * pitch - gap, 7 * pitch - gap, rng, gap=29)
+    g += square_block(bx, by, 100, cols, cell, gap, rng, sw=2.4)
+    g += text(bx + (cols * pitch - gap) / 2, 744, "428 million files", rng,
+              size=36, anchor="middle")
+
+    g += text(636, 398, "70%", rng, size=140)
+    g += text(636, 476, "files that were", rng, size=46)
+    g += text(636, 526, "already copies", rng, size=46)
+    g += text(636, 648, "2017", rng, size=88)
+    g += underline(638, 672, 190, rng, sw=3.4, amp=1.8)
+
+    g += rough_arrow([(900, 636), (1282, 636)], rng, sw=3.0, size=22, amp=1.4,
+                     step=52.0, dash="16 14")
+    g += robot(1376, 700, rng, s=0.58, rot=1.5)
+    g += text(1376, 764, "ai shows up", rng, size=42, anchor="middle")
+    return g
+
+
+def f20_the_number_that_got_better(rng):
+    g = title("The number that got better", rng)
+    base = 700
+    scale = 440.0 / 19.7
+    bars = [(440, 19.7, "19.7%", "2025 study"),
+            (1060, 4.6, "4.6%", "2026, current models")]
+    g += rough_line(220, base, 1400, base, rng, sw=2.8, amp=1.4, step=60.0)
+    for cx, val, lab, sub in bars:
+        h = val * scale
+        g += rough_bar(cx - 108, base - h, 216, h, rng, sw=3.2)
+        g += text(cx, base - h - 28, lab, rng, size=62, anchor="middle")
+        g += text(cx, base + 62, sub, rng, size=42, anchor="middle")
+    # good news, drawn as good news
+    g += rough_arrow(curve_pts((596, 232), (840, 326), (928, 560)), rng,
+                     sw=3.4, size=26, amp=1.6)
+    g += text(840, 292, "got better", rng, size=46, anchor="middle", rot=-1.0)
+    g += text(800, 842, "packages models suggest that do not exist", rng,
+              size=44, anchor="middle", rot=-0.5)
+    return g
+
+
+def f21_use_vs_trust(rng):
+    g = title("Use vs trust", rng)
+    base = 724
+    scale = 490.0 / 83.0
+    h1, h2 = 83.0 * scale, 6.6 * scale
+    g += rough_line(176, base, 1510, base, rng, sw=2.8, amp=1.4, step=60.0)
+
+    g += rough_bar(300, base - h1, 240, h1, rng, sw=3.4)
+    g += text(420, base - h1 - 26, "83%", rng, size=74, anchor="middle")
+    g += text(420, 778, "use ai coding tools", rng, size=34, anchor="middle")
+
+    g += rough_bar(1060, base - h2, 240, h2, rng, sw=3.4)
+    g += text(1180, base - h2 - 26, "6.6%", rng, size=74, anchor="middle")
+    g += text(1180, 778, "would trust it for an important decision", rng,
+              size=34, anchor="middle")
+
+    # the empty space between the two tops is the whole picture
+    g += brace_v(648, base - h1, base - h2, rng, dirn=1, w=34, sw=3.2)
+    g += text(730, 448, "76 points", rng, size=50)
+    g += stick_figure(890, base, rng, s=0.80, pose="standing", rot=-1.0)
+
+    g += text(800, 846, "we use it constantly. we believe it almost never.",
+              rng, size=42, anchor="middle", rot=-0.5)
+    return g
+
+
 FIGURES = [
     ("f1-the-moment", f1_the_moment),
     ("f2-the-only-check", f2_the_only_check),
@@ -1071,6 +1486,18 @@ FIGURES = [
     ("f7-number-vs-sentence", f7_number_vs_sentence),
     ("f8-the-agent-grid", f8_the_agent_grid),
     ("f9-the-loop", f9_the_loop),
+    ("f10-the-cloud", f10_the_cloud),
+    ("f11-fifty-thousand-stars", f11_fifty_thousand_stars),
+    ("f12-weakest-signal", f12_weakest_signal),
+    ("f13-never-worked", f13_never_worked),
+    ("f14-repos-per-minute", f14_repos_per_minute),
+    ("f15-three-registries", f15_three_registries),
+    ("f16-zombie-bar", f16_zombie_bar),
+    ("f17-five-minutes-two-seconds", f17_five_minutes),
+    ("f18-the-flat-line", f18_the_flat_line),
+    ("f19-clones-before-ai", f19_clones_before_ai),
+    ("f20-the-number-that-got-better", f20_the_number_that_got_better),
+    ("f21-use-vs-trust", f21_use_vs_trust),
 ]
 
 
