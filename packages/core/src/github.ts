@@ -53,6 +53,14 @@ export async function ingestRepo(gh: GitHubClient, owner: string, name: string):
   return repoToItem(r, readme, release?.published_at ? new Date(release.published_at) : null);
 }
 
+/**
+ * KNOWN BUG, measured 2026-10-08: `r.open_issues_count` from the REST API counts open pull
+ * requests as issues. vercel/next.js reports 3,566 there, which is 1,072 real issues plus
+ * 2,494 open PRs. That inflates the issue-load term in healthScore and penalises any repo
+ * with an active PR queue, which is the opposite of what the signal is meant to reward.
+ * The fix is the GraphQL migration in docs/architecture/data-sources.md, where
+ * `issues(states:OPEN)` returns the correct count. Until then this number is wrong.
+ */
 export function repoToItem(r: GhRepo, readme: string | null, lastReleaseAt: Date | null): NewItem {
   const pushedAt = new Date(r.pushed_at);
   const license = r.license?.spdx_id ?? null;
