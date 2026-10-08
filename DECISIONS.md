@@ -16,3 +16,12 @@ A downvote without a reason tag is rejected by the API. Reason tags (`unmaintain
 
 ## 2026-10-08 Single app for web and API
 Next.js route handlers serve the HTTP API; no separate API server in v1. The MCP server and CLI are thin HTTP clients. Reason: one deploy, one auth session model, and the plan allowed either Hono or route handlers.
+
+## 2026-10-08 Name is reppit
+Checked 12 single-word English candidates on npm; 11 were taken, which killed the dictionary-word direction outright. reppit wins on the namespace that matters, because the CLI and MCP server both ship as npm packages and `reppit` is free there. Ships on reppit.dev since .com and .app are gone. GitHub username is held by a dormant 2015 account, so the org is reppit-dev. Register repit.dev as a typo redirect; the double p is the name's only real weakness. Rejected repit (npm name held by a dormant 2022 package) and repvote (clean namespace but names one feature and would age badly).
+
+## 2026-10-08 Beachhead is individual agent-first developers, not platform teams
+The money is in platform teams buying dependency governance, but they buy through procurement from a vendor with references, and none of that exists. Individual developers who use agents daily are reachable today on the same channel we build in public on, and they produce the votes. Stated plainly: the free tier is the data acquisition cost, and the expansion segment's product cannot exist until the beachhead has voted.
+
+## 2026-10-08 Ranking must be useful at zero users
+A community-ranked site with no community ranks nothing. Every signal that can be computed without a human is computed: maintenance recency, archived and deprecated flags, open security advisories, issue load, license clarity, popularity. Votes adjust that baseline rather than constituting it. This moves deprecation and advisory ingestion above comments in priority, and it is why threaded comments are cut from v1: an empty comment section looks worse than no comment section.
