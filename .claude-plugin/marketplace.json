@@ -1,0 +1,8 @@
+{
+  "name": "gitit",
+  "owner": { "name": "gitit contributors" },
+  "metadata": { "description": "gitit: community-ranked repos and agent skills, delivered into your agent." },
+  "plugins": [
+    { "name": "gitit", "source": "./packages/skill", "description": "Find the best repo or skill for a task using community votes, health and agent compatibility." }
+  ]
+}

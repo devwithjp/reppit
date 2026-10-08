@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "gitit": {
+      "command": "npx",
+      "args": ["-y", "@gitit/mcp-server"],
+      "env": { "GITIT_API_URL": "${GITIT_API_URL:-https://gitit.dev}", "GITIT_API_KEY": "${GITIT_API_KEY:-}" }
+    }
+  }
+}
