@@ -1,181 +1,175 @@
-# Build in public — posts
+# Launch thread — reppit
 
-Product: **reppit** (reppit.dev)
+Product: **reppit** (reppit.dev). A community-ranked directory of GitHub repos and agent
+skills.
 
-Voice rules I'm holding to: short lines, plain words, one idea per post. No emoji, no
-hashtags, no "excited to announce", no thread numbering, no em dashes. Every post carries
-a number I actually measured or an image. State the thing and stop.
+Voice rules: short words, short lines, one idea per post. No emoji, no hashtags, no em
+dashes, no thread numbering. Each post has to stand up alone.
 
-Images live in `docs/screenshots/`. The filename each post needs is listed under it.
+Illustrations live in `docs/figures/`. The filename each post needs is listed under it.
 
 ---
 
-## Phase 1 — Naming
-
-### Thread: the name search
+## Thread: why stars stopped working
 
 **1**
-> I needed a name.
+> You are building something. Your agent says "I'll use quickxml-parse for this."
 >
-> I had 12 good ones. Short, real English words. Vouch. Tally. Verdict. Quorum.
+> You say sure.
 >
-> I checked all 12 on npm.
->
-> 11 were taken.
-
-`p1-npm-check.png` — terminal showing the 12 results
+> You have no idea if that library is any good. Neither does your agent. It saw the name a lot in training, so it said the name.
+`f1-the-moment.png`
 
 **2**
-> The one that was free was "dependably".
+> So you do the one check everyone does.
 >
-> Three syllables. Nobody is typing that.
+> Open the repo. Look at the number in the corner. 12,000 stars. Fine. Good enough.
 >
-> So the whole dictionary is gone. If you're naming a dev tool in 2026, you're making a
-> word up. That's not a style choice anymore.
-
-no image
+> That is the entire quality bar for code you are about to ship to users.
+`f2-the-only-check.png`
 
 **3**
-> Landed on reppit.
+> Here is what a star actually is.
 >
-> Rep is the whole product. Reputation, from people who actually used the thing.
+> 2019: someone sees a link on their lunch break and clicks a button.
+> 2021: the project stops getting commits.
+> 2026: the star is still there.
 >
-> And it rhymes with reddit, which saves me a sentence of explaining.
-
-`p1-reppit.png` — the name in the logotype
+> Nobody goes back and un-stars a dead repo.
+`f3-what-a-star-is.png`
 
 **4**
-> Nearly took repit instead. Cleaner word.
+> So the ranking is wrong in both directions.
 >
-> Then I looked up who owns it on npm. Some guy's DOM helper from 2022. Two downloads a
-> week. Dormant, but his.
+> 40,000 stars, archived, last commit 2023.
+> 300 stars, updated Tuesday, maintainer replies in a day.
 >
-> My CLI ships as an npm package. A name I can't publish under isn't a name.
-
-`p1-repit-npm.png` — the npm view output
+> Guess which one your search puts first. Guess which one your agent reaches for.
+`f4-the-mismatch.png`
 
 **5**
-> Checked domains with RDAP, not DNS.
+> Stars also only go up. There is no button for "this broke my build."
 >
-> A domain someone owns and parks doesn't resolve. DNS makes it look free. It isn't.
+> The things you want to know:
 >
-> Cost me ten minutes to learn. Would have cost me a name.
-
-no image
+> Does it still work?
+> Did it break for anyone?
+> Does it work in my setup?
+>
+> A star answers none of those.
+`f5-what-you-want.png`
 
 **6**
-> reppit.dev. npm name claimed.
+> Fix one: upvotes and downvotes, like Reddit.
 >
-> Also bought repit.dev and pointed it at reppit.dev, because the double p is the one
-> thing people will get wrong.
+> But a downvote makes you pick a reason. Unmaintained. Insecure. Breaks on an agent. Misleading. Low quality.
 >
-> Fix the typo before anyone makes it.
+> The reason is the product. The vote is just how you get at it.
+`f6-the-reason-tag.png`
 
-`p1-reppit.png`
-
-### Standalone
-
-**On naming**
-> Pick the name after you check npm, not before.
+**7**
+> Watch the difference that makes.
 >
-> You will fall in love with a word that is already somebody's abandoned package, and
-> then you will spend a week trying to talk yourself into it.
-
-no image
-
-**On the .com**
-> reppit.com is taken. I'm shipping on .dev anyway.
+> "347 people downvoted this" is a mood. You can't do anything with it.
 >
-> For a developer tool nobody has cared about the .com in years. They care whether
-> `npx reppit` works.
+> "9 people say it is unmaintained" is a claim you can check in ten seconds.
 >
-> That one I own.
+> One is a number. The other is a sentence.
+`f7-number-vs-sentence.png`
 
+**8**
+> Fix two: people report which coding agent a thing actually works in.
+>
+> Works in Claude Code. Breaks in Codex. Fine in Cursor.
+>
+> Right now that gets said once in an issue thread and then lost. It should be a column, not folklore.
+`f8-the-agent-grid.png`
+
+**9**
+> It is called reppit, I'm building it, and the point is that you never open it.
+>
+> You ask your agent for a library. Your agent asks reppit. reppit ranks. Your agent installs the one that isn't dead.
+>
+> reppit.dev
+`f9-the-loop.png`
+
+**10**
+> Where it honestly is: the search quality test scores 19 out of 30.
+>
+> That is bad. The test was also broken: 5 of the 30 questions had no right answer in the index at all, so the real ceiling was 25.
+>
+> Both get fixed. Posting the number when it moves.
 no image
 
 ---
 
-## Phase 0 — The prototype that came first
-Posts from the build that proved the mechanics. Hold these until the product is named
-and designed, then post the strongest two.
-
-**On the idea**
-> Stars tell you a repo was popular once.
->
-> They don't tell you if it still works.
->
-> So I started building a different signal.
-
-`01-search.png`
-
-**On the reason tag**
-> I made downvotes require a reason.
->
-> Unmaintained. Insecure. Broken. Misleading. Low quality.
->
-> Took ten minutes to build. It's the whole product.
->
-> "347 people disliked this" is noise. "9 people say it's unmaintained" is a decision.
-
-`02-downvote-reasons.png`
-
-**On the bad number**
-> First real test of search: 19 out of 30.
->
-> Then I looked closer. 5 of those questions had no right answer in my index at all. The
-> best I could have scored was 25.
->
-> So the number is bad and the test was broken too. Both get fixed.
-
-`05-eval.png`
+## Standalone
 
 **On stars**
-> Every directory ranks by stars because stars are easy to count.
+> A GitHub star is a bookmark someone made once, maybe in 2019, possibly on a phone, about a project that has since died.
 >
-> Easy to count and true are not the same thing.
+> We rank the entire software supply chain on that.
+`f3-what-a-star-is.png`
 
-`01-search.png`
-
-**On ads**
-> Sponsored slots will pay for this one day.
+**On the reason tag**
+> "347 downvotes" tells you nothing.
 >
-> They sit in their own box and the ranking code cannot read them. Not a policy. A wall
-> in the code.
+> "9 people say it is unmaintained" tells you what to do next.
 >
-> The day money moves the rankings is the day the votes are worth nothing.
+> Any voting system that doesn't ask why is just a mood ring with a count on it.
+`f7-number-vs-sentence.png`
 
-`07-sponsored.png`
-
-**On the math**
-> Being wrong about a library costs you a week.
+**On the cost**
+> Being wrong about a library costs you a week. Sometimes a rewrite.
 >
-> Asking ten people who already used it costs you a minute.
+> Reading what ten people said after they used it costs you a minute.
 >
-> That's the whole idea. Nothing clever underneath.
+> That gap is the whole reason reppit exists. There is nothing clever under it.
+no image
 
-`03-item.png`
+**On old praise**
+> Votes on reppit lose half their weight every six months.
+>
+> A library people loved in 2021 has to be loved again to keep ranking.
+>
+> Praise should expire. Code does.
+no image
+
+**On day one**
+> A community site with no community ranks nothing. So reppit also scores what needs no human: last commit, release pace, archived or deprecated, open security advisories, issue load, license clarity.
+>
+> Votes make it sharper. They aren't the floor.
+no image
 
 ---
 
 ## Posting notes
 
-- Phase 1 thread is ready now. The "11 of 12 were taken" opener is the strongest hook
-  I have, because it is a specific number and it is useful to anyone naming anything.
-- Space standalones one a day between threads.
-- "On the bad number" is the one that builds trust. Post it before the fixed number, not
-  after, or it reads as a victory lap.
-- When search goes from 19 to 25, reply to that post with the new number. The correction
-  is worth more than either number on its own.
+- Post the thread in order 1 to 10. Posts 1 through 9 carry the figures. Post 10 ships
+  without one on purpose: after nine drawn posts, a plain post of bad numbers reads as
+  the author dropping the pitch voice, which is the effect I want.
+- Strongest hook is post 1. It is the only post that is purely the reader's own week,
+  with no product in it, and the last line ("it saw the name a lot in training, so it
+  said the name") is the part people will quote without needing the rest.
+- Second strongest is post 3. It works alone, it is about something everyone already
+  uses, and nobody has to agree with me about reppit to agree with it. That is why it is
+  also a standalone.
+- Space the standalones out, one a day, a few days apart. "On stars" first, then "On the
+  cost", then "On the reason tag". Keep "On day one" for whenever someone asks how it
+  ranks anything before it has users.
+- When the search score moves off 19, reply to post 10 with the new number rather than
+  posting it fresh. The correction is worth more attached to the admission.
 
-## Images still to capture
+## Figures needed
 
 | File | What it shows |
 |---|---|
-| `p1-npm-check.png` | Terminal: 12 names checked, 11 taken |
-| `p1-repit-npm.png` | `npm view repit` output with the 2022 date |
-| `p1-reppit.png` | reppit logotype, once Phase 4 designs it |
-| `01-search.png` | Search results with reasons |
-| `02-downvote-reasons.png` | The downvote reason picker open |
-| `03-item.png` | Item page, comments and agent compatibility |
-| `05-eval.png` | Terminal: the 19/30 eval run |
-| `07-sponsored.png` | Feed with a labelled sponsored row |
+| `f1-the-moment.png` | Laptop, robot says "I'll use quickxml-parse", person thinks "...is that good?" |
+| `f2-the-only-check.png` | Squinting at "12,000 stars". "Fine. Good enough." |
+| `f3-what-a-star-is.png` | Timeline: starred 2019, repo dies 2021, star still there 2026 |
+| `f4-the-mismatch.png` | Two repo cards: 40,000 and archived vs 300 and updated Tuesday |
+| `f5-what-you-want.png` | Thought bubble with the three questions |
+| `f6-the-reason-tag.png` | Downvote opening the five-reason menu |
+| `f7-number-vs-sentence.png` | "347 people downvoted this" next to "9 people say it is unmaintained" |
+| `f8-the-agent-grid.png` | Agent grid, ticks and crosses for works and breaks |
+| `f9-the-loop.png` | You, agent, reppit, ranked answer, agent installs it |
