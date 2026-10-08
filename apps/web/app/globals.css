@@ -1,0 +1,57 @@
+:root {
+  --bg: #fafaf9; --fg: #1c1917; --muted: #78716c; --card: #ffffff; --line: #e7e5e4; --accent: #c2410c; --accent-fg: #fff;
+  --up: #16a34a; --down: #dc2626; --sponsor: #fef3c7; --sponsor-fg: #92400e; --code: #f5f5f4;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0c0a09; --fg: #f5f5f4; --muted: #a8a29e; --card: #1c1917; --line: #292524; --accent: #fb923c; --accent-fg: #1c1917; --sponsor: #292524; --sponsor-fg: #fcd34d; --code: #1c1917; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+a { color: inherit; }
+main { max-width: 960px; margin: 0 auto; padding: 16px; }
+header.site { border-bottom: 1px solid var(--line); background: var(--card); }
+header.site .in { max-width: 960px; margin: 0 auto; padding: 10px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+header.site .brand { font-weight: 800; text-decoration: none; font-size: 18px; color: var(--accent); }
+header.site nav a { margin-right: 12px; text-decoration: none; color: var(--muted); }
+header.site .spacer { flex: 1; }
+button, .btn { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer; text-decoration: none; }
+button.primary, .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+input, select, textarea { font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--fg); width: 100%; }
+.search { display: flex; gap: 8px; margin: 12px 0 20px; }
+.search input { flex: 1; font-size: 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+.row { display: flex; gap: 14px; align-items: flex-start; }
+.row .body { flex: 1; min-width: 0; }
+.title { font-weight: 600; text-decoration: none; }
+.meta { color: var(--muted); font-size: 13px; margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap; }
+.desc { margin: 4px 0 0; }
+.vote { display: flex; flex-direction: column; align-items: center; min-width: 44px; gap: 2px; }
+.vote button { padding: 2px 8px; line-height: 1; }
+.vote .n { font-weight: 700; }
+.vote button.up.on { color: var(--up); border-color: var(--up); }
+.vote button.down.on { color: var(--down); border-color: var(--down); }
+.tabs a { margin-right: 12px; text-decoration: none; color: var(--muted); }
+.tabs a.on { color: var(--fg); font-weight: 600; border-bottom: 2px solid var(--accent); }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); }
+.badge.flag { border-color: var(--down); color: var(--down); }
+.badge.ok { border-color: var(--up); color: var(--up); }
+.badge.kind { background: var(--code); }
+.sponsored { background: var(--sponsor); color: var(--sponsor-fg); border-color: transparent; }
+.sponsored .label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.why { margin: 6px 0 0; font-style: italic; }
+pre, code { font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code); border-radius: 6px; }
+pre { padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+code { padding: 1px 5px; }
+.readme { max-height: 420px; overflow: auto; }
+.comment { border-left: 2px solid var(--line); padding: 6px 12px; margin: 8px 0 8px 0; }
+.comment .who { color: var(--muted); font-size: 13px; }
+.comment.reply { margin-left: 20px; }
+form.inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+form.inline input, form.inline select, form.inline textarea { width: auto; flex: 1; min-width: 160px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+.muted { color: var(--muted); }
+.score { font-variant-numeric: tabular-nums; }
+h1 { font-size: 22px; margin: 8px 0; } h2 { font-size: 17px; margin: 18px 0 8px; }
+.note { border-left: 3px solid var(--accent); padding: 6px 12px; color: var(--muted); font-size: 14px; }
