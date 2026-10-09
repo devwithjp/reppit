@@ -1,0 +1,126 @@
+{
+ "about": "The desk session's schedule. Post text lives in docs/tweets.md. Nothing posts unless its slot is approved by the user.",
+ "timezone_note": "Slots are 08:00 US Eastern (EDT, UTC-4) = 23:00 Sydney (AEDT), so the user is awake for the first hour.",
+ "slots": [
+  {
+   "name": "day-1",
+   "at_utc": "2026-10-13T12:00:00Z",
+   "posts": [
+    "thread-1",
+    "thread-2",
+    "thread-3",
+    "thread-4",
+    "thread-5",
+    "thread-6",
+    "thread-7"
+   ],
+   "kind": "thread",
+   "approved": false
+  },
+  {
+   "name": "day-2",
+   "at_utc": "2026-10-14T12:00:00Z",
+   "posts": [
+    "thread-8",
+    "thread-9",
+    "thread-10",
+    "thread-11",
+    "thread-12",
+    "thread-13",
+    "thread-14",
+    "thread-15"
+   ],
+   "kind": "thread",
+   "approved": false,
+   "reply_link_to": "day-1"
+  },
+  {
+   "name": "day-3",
+   "at_utc": "2026-10-15T12:00:00Z",
+   "posts": [
+    "thread-16",
+    "thread-17",
+    "thread-18",
+    "thread-19",
+    "thread-20",
+    "thread-21",
+    "thread-22",
+    "thread-23"
+   ],
+   "kind": "thread",
+   "approved": false,
+   "reply_link_to": "day-2"
+  },
+  {
+   "name": "standalone-1",
+   "at_utc": "2026-10-16T12:00:00Z",
+   "posts": [
+    "standa-1"
+   ],
+   "kind": "single",
+   "approved": false
+  },
+  {
+   "name": "standalone-2",
+   "at_utc": "2026-10-19T12:00:00Z",
+   "posts": [
+    "standa-2"
+   ],
+   "kind": "single",
+   "approved": false
+  },
+  {
+   "name": "standalone-3",
+   "at_utc": "2026-10-20T12:00:00Z",
+   "posts": [
+    "standa-3"
+   ],
+   "kind": "single",
+   "approved": false
+  },
+  {
+   "name": "standalone-4",
+   "at_utc": "2026-10-21T12:00:00Z",
+   "posts": [
+    "standa-4"
+   ],
+   "kind": "single",
+   "approved": false
+  },
+  {
+   "name": "standalone-5",
+   "at_utc": "2026-10-22T12:00:00Z",
+   "posts": [
+    "standa-5"
+   ],
+   "kind": "single",
+   "approved": false
+  }
+ ],
+ "tags": {
+  "thread-1": "scene",
+  "thread-2": "scene",
+  "thread-3": "scene",
+  "thread-4": "scene",
+  "thread-5": "evidence",
+  "thread-6": "evidence",
+  "thread-7": "evidence",
+  "thread-9": "evidence",
+  "thread-10": "evidence",
+  "thread-11": "evidence",
+  "thread-12": "evidence",
+  "thread-13": "evidence",
+  "thread-14": "evidence",
+  "thread-15": "evidence",
+  "thread-8": "recap",
+  "thread-16": "recap",
+  "thread-17": "concession",
+  "thread-18": "concession",
+  "thread-19": "concession",
+  "thread-20": "trust-gap",
+  "thread-21": "trust-gap",
+  "thread-22": "questions",
+  "thread-23": "hook"
+ },
+ "posted": {}
+}

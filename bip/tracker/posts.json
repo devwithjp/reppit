@@ -1,0 +1,219 @@
+[
+ {
+  "id": "thread-1",
+  "section": "Thread: day 1",
+  "label": "1",
+  "text": "You are building something. Your agent says \"I'll use quickxml-parse for this.\"\n\nYou say sure.\n\nYou have no idea if that library is any good. Neither does your agent. It saw the name a lot in training, so it said the name.",
+  "image": "f1-the-moment.png"
+ },
+ {
+  "id": "thread-2",
+  "section": "Thread: day 1",
+  "label": "2",
+  "text": "So you do the one check everyone does.\n\nOpen the repo. Look at the number in the corner. 12,000 stars. Fine. Good enough.\n\nThat is the whole quality bar for code you are about to ship to other people.",
+  "image": "f2-the-only-check.png"
+ },
+ {
+  "id": "thread-3",
+  "section": "Thread: day 1",
+  "label": "3",
+  "text": "Here is what a star actually is.\n\n2019: someone sees a link on a lunch break and clicks a button.\n2021: the project stops getting commits.\n2026: the star is still there.\n\nNobody goes back and un-stars a dead repo.",
+  "image": "f3-what-a-star-is.png"
+ },
+ {
+  "id": "thread-4",
+  "section": "Thread: day 1",
+  "label": "4",
+  "text": "So you get pairs like this.\n\n40,000 stars, archived, last commit 2023.\n300 stars, updated Tuesday, maintainer replies in a day.\n\nThe first one wins every search box you own, and every suggestion your agent makes.",
+  "image": "f4-the-mismatch.png"
+ },
+ {
+  "id": "thread-5",
+  "section": "Thread: day 1",
+  "label": "5",
+  "text": "This part is measured, not a hunch.\n\nResearchers correlated star counts against how actively projects were maintained. Spearman rho of 0.10. Their own word for it is \"very weak.\"\n\nStars and maintenance are close to unrelated.",
+  "image": "f10-the-cloud.png"
+ },
+ {
+  "id": "thread-6",
+  "section": "Thread: day 1",
+  "label": "6",
+  "text": "From the same study, one project: 50,034 stars, maintenance activity level of 8.\n\nFifty thousand people said nice. Almost nobody was fixing anything.\n\nBoth things were true at the same time, and only one of them was on the page.",
+  "image": "f11-fifty-thousand-stars.png"
+ },
+ {
+  "id": "thread-7",
+  "section": "Thread: day 1",
+  "label": "7",
+  "text": "The same paper scored other signals against maintenance.\n\nTotal contributors: 0.44.\nProject size: 0.38.\nStars: 0.10.\n\nOf everything they tested, the number we all actually look at came last.",
+  "image": "f12-weakest-signal.png"
+ },
+ {
+  "id": "thread-8",
+  "section": "Thread: day 2",
+  "label": "1",
+  "text": "Yesterday I showed that stars and whether a repo is maintained barely line up. 0.10. Stars came last of everything tested.\n\nToday: how long that has been true, and how big the pile has gotten since.",
+  "image": null
+ },
+ {
+  "id": "thread-9",
+  "section": "Thread: day 2",
+  "label": "2",
+  "text": "Worth saying plainly: that dataset is GitHub as of November 2017.\n\nSo this is not something AI broke. Stars never tracked maintenance. They were never built to.\n\nWe kept using them because the number was already on the screen.",
+  "image": "f13-never-worked.png"
+ },
+ {
+  "id": "thread-10",
+  "section": "Thread: day 2",
+  "label": "3",
+  "text": "Now the size of the pile.\n\nGitHub added 121 million repositories in the year to August 2025. About 230 a minute.\n\nReview one a minute, no sleep, no weekends, and you fall 229 further behind every minute.",
+  "image": "f14-repos-per-minute.png"
+ },
+ {
+  "id": "thread-11",
+  "section": "Thread: day 2",
+  "label": "4",
+  "text": "Pulled from the registries this week.\n\nnpm: 4,464,731 packages.\nPyPI: 907,001.\ncrates.io: 347,256.\n\nThere is no version of \"I'll have a quick look around\" that covers that.",
+  "image": "f15-three-registries.png"
+ },
+ {
+  "id": "thread-12",
+  "section": "Thread: day 2",
+  "label": "5",
+  "text": "And nothing is curating it. There is no editor, no shelf, no buyer deciding what gets stocked.\n\nThe awesome-whatever list in your bookmarks was maintained by one person who got busy.\n\nHand curation lost years ago. Nothing replaced it.",
+  "image": null
+ },
+ {
+  "id": "thread-13",
+  "section": "Thread: day 2",
+  "label": "6",
+  "text": "This is already inside your own codebase.\n\nAn audit of 947 commercial codebases found 93% contained at least one component with no development activity in two years.\n\nYou did not abandon it. It was abandoned under you.",
+  "image": "f16-zombie-bar.png"
+ },
+ {
+  "id": "thread-14",
+  "section": "Thread: day 2",
+  "label": "7",
+  "text": "Same audit: 7% of the components in use were the latest version.\n\nSeven. Everything else is running behind, and some of it is behind because there is nothing ahead of it. The project stopped.",
+  "image": null
+ },
+ {
+  "id": "thread-15",
+  "section": "Thread: day 2",
+  "label": "8",
+  "text": "Here is the thing that actually changed, and it is not the amount of code.\n\nPicking a dependency used to cost a human five minutes of looking around.\n\nYour agent picks in two seconds, off the same weak number, and cannot tell that it is weak.",
+  "image": "f17-five-minutes-two-seconds.png"
+ },
+ {
+  "id": "thread-16",
+  "section": "Thread: day 3",
+  "label": "1",
+  "text": "So far: stars never measured upkeep, 230 new repos land every minute, and your agent now picks off the star count in two seconds.\n\nToday I argue against my own case. Then the part I can't stop thinking about.",
+  "image": null
+ },
+ {
+  "id": "thread-17",
+  "section": "Thread: day 3",
+  "label": "2",
+  "text": "I want to be careful, because blaming AI would be easy and it would be wrong.\n\nGitHub's public repo growth, year on year: plus 22%, then about plus 17%, then plus 19%.\n\nAI went from niche to everywhere across that window. The line did not bend.",
+  "image": "f18-the-flat-line.png"
+ },
+ {
+  "id": "thread-18",
+  "section": "Thread: day 3",
+  "label": "3",
+  "text": "Duplication is not new either.\n\nA 2017 study of 428 million files found 70% of files on GitHub were copies of files that already existed.\n\n2017. The pile was mostly copies before any of this started.",
+  "image": "f19-clones-before-ai.png"
+ },
+ {
+  "id": "thread-19",
+  "section": "Thread: day 3",
+  "label": "4",
+  "text": "One more against my own case.\n\nA 2025 study found 19.7% of packages suggested by models did not exist. That is the number everyone still quotes.\n\nA 2026 rerun on current models: 4.6% to 6.1%. It got better. Use the new one.",
+  "image": "f20-the-number-that-got-better.png"
+ },
+ {
+  "id": "thread-20",
+  "section": "Thread: day 3",
+  "label": "5",
+  "text": "So this is the spot developers are standing in.\n\n83% use AI tools. 73% of assistant users use them every day.\n\n6.6% would trust the output for an important decision.\n\nWe use it constantly. We believe it almost never.",
+  "image": "f21-use-vs-trust.png"
+ },
+ {
+  "id": "thread-21",
+  "section": "Thread: day 3",
+  "label": "6",
+  "text": "That gap is not developers being irrational. It is developers being right.\n\nThe tool is fast, often correct, and has no way to tell you which time this is. So you check it.\n\nChecking a dependency means looking at a star count. See above.",
+  "image": null
+ },
+ {
+  "id": "thread-22",
+  "section": "Thread: day 3",
+  "label": "7",
+  "text": "Which leaves three questions, and no quick way to answer any of them.\n\nDoes it still work?\nDid it break for anyone?\nDoes it work in my setup?\n\nThey are not hard questions. There is just nowhere to look them up.",
+  "image": "f5-what-you-want.png"
+ },
+ {
+  "id": "thread-23",
+  "section": "Thread: day 3",
+  "label": "8",
+  "text": "I'm building the place where those three have answers.\n\nIt has one rule that fixes most of what this thread is about. The rule is one sentence long.\n\nI'll show it the day reppit launches. Follow if you want to see it first.",
+  "image": null
+ },
+ {
+  "id": "standa-1",
+  "section": "Standalone",
+  "label": "On stars",
+  "text": "A GitHub star is a bookmark someone made once, maybe in 2019, possibly on a phone, about a project that has since died.\n\nWe rank the software supply chain on that.",
+  "image": "f3-what-a-star-is.png"
+ },
+ {
+  "id": "standa-2",
+  "section": "Standalone",
+  "label": "On the weakest signal",
+  "text": "Someone measured which signals actually track whether a project is still maintained.\n\nContributors: 0.44.\nSize: 0.38.\nStars: 0.10.\n\nThe one we print in big numbers at the top of the page finished last.",
+  "image": "f12-weakest-signal.png"
+ },
+ {
+  "id": "standa-3",
+  "section": "Standalone",
+  "label": "On the cost",
+  "text": "Being wrong about a library costs you a week. Sometimes a rewrite.\n\nThe check we run before taking that risk is reading a number that someone clicked in 2019 and never thought about again.\n\nThat is the entire system.",
+  "image": null
+ },
+ {
+  "id": "standa-4",
+  "section": "Standalone",
+  "label": "On zombies",
+  "text": "93% of commercial codebases contain a component with nobody developing it for two years.\n\nNobody picked a dead dependency. They picked a live one, and then nothing told them.",
+  "image": "f16-zombie-bar.png"
+ },
+ {
+  "id": "standa-5",
+  "section": "Standalone",
+  "label": "On the number that got better",
+  "text": "The 19.7% package hallucination figure is out of date.\n\nCurrent frontier models sit at 4.6% to 6.1%. The thing people are scared of got roughly four times less common while they were sharing the old screenshot.",
+  "image": "f20-the-number-that-got-better.png"
+ },
+ {
+  "id": "laterp-1",
+  "section": "Later: product posts, do not post with thread one",
+  "label": "On the reason tag",
+  "text": "\"347 downvotes\" tells you nothing.\n\n\"9 people say it is unmaintained\" tells you what to do next.\n\nAny voting system that does not ask why is a mood ring with a count on it.",
+  "image": "f7-number-vs-sentence.png"
+ },
+ {
+  "id": "laterp-2",
+  "section": "Later: product posts, do not post with thread one",
+  "label": "On old praise",
+  "text": "Votes lose half their weight every six months.\n\nA library people loved in 2021 has to be loved again to keep ranking.\n\nPraise should expire. Code does.",
+  "image": null
+ },
+ {
+  "id": "laterp-3",
+  "section": "Later: product posts, do not post with thread one",
+  "label": "On day one",
+  "text": "A community site with no community ranks nothing. So there is also a score built from what needs no human: last commit, release pace, archived or deprecated, open security advisories, issue load, license clarity.",
+  "image": null
+ }
+]

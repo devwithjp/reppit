@@ -1,0 +1,317 @@
+<title>reppit Launch Posts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: one working column, a sticky progress strip, then posts as dense rows grouped by thread. Zero radius, no shadows (reppit system). */
+:root{
+  --paper:#FBFAF6; --surface:#FFFFFF; --sunk:#F2EFE7; --rule:#E2DCD0; --rule-hard:#C8BFAD;
+  --ink:#16150F; --ink-2:#4A463C; --ink-3:#6B6557;
+  --rust:#B4441C; --rust-ink:#8E3514; --rust-tint:#F7E8E1; --rust-rule:#E8C7B7;
+  --steel:#1D5B85; --steel-tint:#E3EDF4; --steel-rule:#BBD2E1; --amber:#87620F;
+  --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --paper:#131210; --surface:#191714; --sunk:#201D19; --rule:#2F2B25; --rule-hard:#4A443A;
+  --ink:#EFE9DC; --ink-2:#B5AD9D; --ink-3:#8E8777;
+  --rust:#E67A4F; --rust-ink:#F09166; --rust-tint:#2C1C14; --rust-rule:#5A3524;
+  --steel:#6FB3DC; --steel-tint:#121E27; --steel-rule:#2A4558; --amber:#D8A93F; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --paper:#131210; --surface:#191714; --sunk:#201D19; --rule:#2F2B25; --rule-hard:#4A443A;
+  --ink:#EFE9DC; --ink-2:#B5AD9D; --ink-3:#8E8777;
+  --rust:#E67A4F; --rust-ink:#F09166; --rust-tint:#2C1C14; --rust-rule:#5A3524;
+  --steel:#6FB3DC; --steel-tint:#121E27; --steel-rule:#2A4558; --amber:#D8A93F; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font:15px/1.55 var(--sans)}
+.wrap{max-width:980px;margin:0 auto;padding-inline:16px;padding-block:20px 64px}
+.mono{font-family:var(--mono)}
+a{color:var(--steel)}
+:focus-visible{outline:2px solid var(--rust);outline-offset:2px}
+
+.mast{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--rule-hard);padding-bottom:12px}
+.logo{display:flex;align-items:center;gap:8px;font:700 17px/1 var(--mono);color:var(--ink)}
+.logo i{width:12px;height:12px;background:var(--rust);display:inline-block}
+.mast h1{font:500 17px/1.2 var(--mono);margin:0;color:var(--ink-2);text-wrap:balance}
+.save{margin-left:auto;font:500 12px/1 var(--mono);color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}
+.save.err{color:var(--rust-ink)}
+
+.strip{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);padding-block:14px;border-bottom:1px solid var(--rule)}
+.prog{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:center}
+.prog .n{font:700 28px/1 var(--mono);font-variant-numeric:tabular-nums}
+.prog .n small{font-size:15px;color:var(--ink-3);font-weight:500}
+.cells{display:grid;grid-template-columns:repeat(23,1fr);gap:3px}
+.cells span{height:12px;background:var(--sunk);border:1px solid var(--rule)}
+.cells span.posted{background:var(--steel);border-color:var(--steel)}
+.cells span.skipped{background:var(--rule-hard);border-color:var(--rule-hard)}
+.cells span.upnext{border-color:var(--rust);border-width:2px}
+.totals{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 18px;font:500 12px/1.4 var(--mono);color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em}
+.totals b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+
+.next{margin-top:22px;border:1px solid var(--rust-rule);background:var(--surface)}
+.next header{display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--rust-tint);border-bottom:1px solid var(--rust-rule);font:700 12px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--rust-ink)}
+.next .body{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;padding:14px}
+.next p.text{font-size:16px}
+.done{padding:18px 14px;color:var(--ink-2)}
+
+.tabs{display:flex;gap:4px;margin-top:28px;border-bottom:1px solid var(--rule-hard);flex-wrap:wrap}
+.tabs button{font:500 13px/1 var(--mono);background:none;border:0;border-bottom:2px solid transparent;color:var(--ink-3);padding:10px 10px;cursor:pointer}
+.tabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--rust)}
+.tabs button span{font-variant-numeric:tabular-nums;color:var(--ink-3);margin-left:4px}
+
+section.group{margin-top:26px}
+section.group h2{font:700 12px/1.3 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin:0 0 8px;display:flex;gap:10px;flex-wrap:wrap}
+section.group h2 em{font-style:normal;color:var(--rust-ink)}
+.list{border:1px solid var(--rule-hard);background:var(--surface)}
+.post{display:grid;grid-template-columns:44px minmax(0,1fr) 200px;gap:14px;padding:14px;border-top:1px solid var(--rule)}
+.post:first-child{border-top:0}
+.post.posted{background:var(--paper)}
+.post.posted .text{color:var(--ink-2)}
+.post.skipped .text{color:var(--ink-3);text-decoration:line-through;text-decoration-color:var(--rule-hard)}
+.num{font:700 15px/1 var(--mono);color:var(--ink-3);padding-top:2px;font-variant-numeric:tabular-nums}
+.post.is-next .num{color:var(--rust)}
+.text{white-space:pre-wrap;margin:0 0 10px;overflow-wrap:anywhere}
+.meta{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font:500 12px/1.4 var(--mono);color:var(--ink-3)}
+.chip{font:600 11px/1 var(--mono);letter-spacing:.05em;text-transform:uppercase;padding:4px 6px;border:1px solid var(--rule-hard);color:var(--ink-3);background:var(--sunk)}
+.chip.posted{color:var(--steel);border-color:var(--steel-rule);background:var(--steel-tint)}
+.chip.skipped{color:var(--ink-3)}
+.chip.draft{color:var(--amber);border-color:var(--rule-hard);background:var(--surface)}
+.thumb{display:block;width:100%;aspect-ratio:16/9;max-width:100%;border:1px solid var(--rule);background:#fff;object-fit:cover}
+.noimg{display:grid;place-items:center;aspect-ratio:16/9;border:1px dashed var(--rule-hard);font:500 11px/1.3 var(--mono);color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;text-align:center;padding:8px}
+.file{font:400 11px/1.3 var(--mono);color:var(--ink-3);margin-top:4px;overflow-wrap:anywhere}
+
+.actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.btn{font:500 13px/1 var(--mono);padding:8px 10px;border:1px solid var(--rule-hard);background:var(--surface);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--sunk)}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.primary:hover{background:var(--ink-2)}
+.btn.rust{border-color:var(--rust);color:var(--rust-ink)}
+
+details.log{margin-top:10px;border-top:1px dashed var(--rule);padding-top:8px}
+details.log summary{cursor:pointer;font:500 12px/1.4 var(--mono);color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em}
+.fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.fields .wide{grid-column:1/-1}
+.fields label{display:flex;flex-direction:column;gap:3px;font:500 11px/1.2 var(--mono);color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;min-width:0}
+.fields input,.fields select{font:400 14px/1.3 var(--mono);padding:7px 8px;border:1px solid var(--rule-hard);background:var(--surface);color:var(--ink);width:100%;border-radius:0}
+.foot{margin-top:36px;font:400 12px/1.6 var(--mono);color:var(--ink-3);max-width:70ch}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);font:500 13px/1 var(--mono);padding:10px 14px}
+
+@media (max-width:720px){
+  .post{grid-template-columns:32px minmax(0,1fr)}
+  .post .side{grid-column:2}
+  .next .body{grid-template-columns:1fr}
+  .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cells{gap:2px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="mast">
+    <div class="logo"><i></i>reppit</div>
+    <h1>launch posts</h1>
+    <div class="save" id="save" aria-live="polite"></div>
+  </div>
+
+  <div class="strip">
+    <div class="prog">
+      <div class="n" id="count">0<small>/23</small></div>
+      <div class="cells" id="cells" aria-label="Thread progress"></div>
+      <div class="totals" id="totals"></div>
+    </div>
+  </div>
+
+  <div id="next"></div>
+
+  <div class="tabs" role="toolbar" aria-label="Filter posts" id="tabs">
+    <button type="button" data-f="all" aria-pressed="true">All<span id="c-all"></span></button>
+    <button type="button" data-f="todo" aria-pressed="false">To post<span id="c-todo"></span></button>
+    <button type="button" data-f="posted" aria-pressed="false">Posted<span id="c-posted"></span></button>
+  </div>
+
+  <div id="groups"></div>
+
+  <p class="foot">Open in X fills the compose box with the post text. X cannot attach images from a link, so attach the figure named under each post from <span class="mono">docs/screenshots/</span>. Paste each post's link after it goes up: the next post in the thread then opens as a reply to it, so the thread chains on its own. Progress saves to this page.</p>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script type="application/json" id="posts">__POSTS__</script>
+<script>
+(function(){
+  const POSTS = JSON.parse(document.getElementById('posts').textContent);
+  const isThread = p => p.section.startsWith('Thread:');
+  const GROUPS = [
+    {key:'Thread: day 1', name:'Day 1 · The star', note:'Tue 8:00am ET, one thread'},
+    {key:'Thread: day 2', name:'Day 2 · The pile', note:'Wed 8:00am ET, new thread, link day 1 in a reply'},
+    {key:'Thread: day 3', name:'Day 3 · The gap', note:'Thu 8:00am ET, new thread, ends on the hook'},
+    {key:'Standalone', name:'Standalones', note:'one a day, after the thread'},
+    {key:'Later: product posts, do not post with thread one', name:'Held for later', note:'product posts, not with thread 1'}
+  ];
+  const STATUSES = ['draft','posted','skipped'];
+  const LS_KEY = 'reppit-launch-state';
+  let state = {version:1, posts:{}};
+  let filter = 'all';
+  let artifact = null, canSave = false, saveTimer = null, saving = false, pending = false;
+
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const rec = id => (state.posts[id] ||= {status:'draft', url:'', postedAt:'', views:'', likes:'', reposts:'', replies:'', notes:''});
+  const thread = POSTS.filter(isThread);
+  const tweetId = url => (String(url||'').match(/status(?:es)?\/(\d+)/)||[])[1] || '';
+  const num = v => { const n = parseInt(String(v).replace(/[^\d]/g,''),10); return isNaN(n) ? 0 : n; };
+  const xlen = t => t.replace(/https?:\/\/\S+/g,'x'.repeat(23)).length;
+
+  function prevInThread(p){
+    const list = POSTS.filter(q => q.section === p.section);
+    if (!isThread(p)) return null;
+    const i = list.indexOf(p);
+    return i > 0 ? list[i-1] : null;
+  }
+  function intentUrl(p){
+    let u = 'https://x.com/intent/post?text=' + encodeURIComponent(p.text);
+    const prev = prevInThread(p);
+    const id = prev && tweetId(rec(prev.id).url);
+    if (id) u += '&in_reply_to=' + id;
+    return u;
+  }
+  function nextPost(){ return thread.find(p => rec(p.id).status === 'draft'); }
+  function label(p){
+    if (isThread(p)) return String(POSTS.filter(q => q.section === p.section).indexOf(p) + 1);
+    return '·';
+  }
+
+  function renderSummary(){
+    const done = thread.filter(p => rec(p.id).status === 'posted').length;
+    $('#count').innerHTML = done + '<small>/' + thread.length + '</small>';
+    const nx = nextPost();
+    $('#cells').innerHTML = thread.map(p => {
+      const s = rec(p.id).status;
+      const cls = s === 'draft' ? (p === nx ? 'upnext' : '') : s;
+      return '<span class="'+cls+'" title="'+p.section.replace('Thread: ','')+', post '+label(p)+': '+s+'"></span>';
+    }).join('');
+    let v=0,l=0,r=0,rp=0;
+    POSTS.forEach(p => { const x = rec(p.id); if (x.status==='posted'){ v+=num(x.views); l+=num(x.likes); r+=num(x.reposts); rp+=num(x.replies); }});
+    const all = POSTS.filter(p => rec(p.id).status === 'posted').length;
+    $('#totals').innerHTML =
+      '<span>posted overall <b>'+all+'</b></span><span>views <b>'+v.toLocaleString()+'</b></span>'+
+      '<span>likes <b>'+l.toLocaleString()+'</b></span><span>reposts <b>'+r.toLocaleString()+'</b></span><span>replies <b>'+rp.toLocaleString()+'</b></span>';
+    const todo = POSTS.filter(p => rec(p.id).status === 'draft').length;
+    $('#c-all').textContent = POSTS.length; $('#c-todo').textContent = todo; $('#c-posted').textContent = all;
+  }
+
+  function imageBlock(p){
+    if (!p.image) return '<div class="noimg">no image<br>on purpose</div>';
+    return '<img class="thumb" src="img/'+esc(p.image)+'" alt="Figure for this post: '+esc(p.image.replace(/^f\d+-|\.png$/g,'').replace(/-/g,' '))+'" loading="lazy">'+
+           '<div class="file">'+esc(p.image)+'</div>';
+  }
+
+  function renderNext(){
+    const p = nextPost();
+    if (!p){ $('#next').innerHTML = '<div class="next"><header>Thread 1</header><div class="done">All '+thread.length+' thread posts are marked posted or skipped. Standalones go out one a day from here.</div></div>'; return; }
+    const prev = prevInThread(p);
+    const chained = prev && tweetId(rec(prev.id).url);
+    const hint = !prev ? 'First post of '+p.section.replace('Thread: ','')+'. Starts a new thread.' : chained ? 'Opens as a reply to post '+label(prev)+'.' : 'Paste the link to post '+label(prev)+' in its log first, so this one opens as a reply.';
+    $('#next').innerHTML =
+      '<div class="next"><header>Next up · '+esc(p.section.replace('Thread: ',''))+', post '+label(p)+'<span style="margin-left:auto;font-weight:500">'+xlen(p.text)+' / 280</span></header>'+
+      '<div class="body"><div style="min-width:0"><p class="text">'+esc(p.text)+'</p>'+
+      '<div class="meta">'+esc(hint)+'</div>'+
+      '<div class="actions"><a class="btn primary" href="'+esc(intentUrl(p))+'" target="_blank" rel="noopener">Open in X</a>'+
+      '<button type="button" class="btn" data-act="copy" data-id="'+esc(p.id)+'">Copy text</button>'+
+      '<button type="button" class="btn rust" data-act="mark" data-id="'+esc(p.id)+'">Mark posted</button></div></div>'+
+      '<div>'+imageBlock(p)+'</div></div></div>';
+  }
+
+  function postRow(p){
+    const r = rec(p.id); const nx = nextPost();
+    const f = s => p.id + '-' + s;
+    const opts = STATUSES.map(s => '<option value="'+s+'"'+(r.status===s?' selected':'')+'>'+s+'</option>').join('');
+    return '<article class="post '+r.status+(p===nx?' is-next':'')+'" data-id="'+esc(p.id)+'">'+
+      '<div class="num">'+label(p)+'</div>'+
+      '<div style="min-width:0">'+
+        (!isThread(p) ? '<div class="meta" style="margin-bottom:6px;color:var(--ink-2)">'+esc(p.label)+'</div>' : '')+
+        '<p class="text">'+esc(p.text)+'</p>'+
+        '<div class="meta"><span class="chip '+r.status+'">'+r.status+'</span><span>'+xlen(p.text)+'/280</span>'+
+          (r.url ? '<a href="'+esc(r.url)+'" target="_blank" rel="noopener">view on X</a>' : '')+
+          (r.postedAt ? '<span>'+esc(r.postedAt)+'</span>' : '')+'</div>'+
+        '<div class="actions"><a class="btn" href="'+esc(intentUrl(p))+'" target="_blank" rel="noopener">Open in X</a>'+
+          '<button type="button" class="btn" data-act="copy" data-id="'+esc(p.id)+'">Copy text</button></div>'+
+        '<details class="log"'+(r.status==='posted'?' open':'')+'><summary>Log</summary><div class="fields">'+
+          '<label for="'+f('status')+'">Status<select id="'+f('status')+'" data-k="status">'+opts+'</select></label>'+
+          '<label for="'+f('postedAt')+'">Posted on<input id="'+f('postedAt')+'" data-k="postedAt" type="date" value="'+esc(r.postedAt)+'"></label>'+
+          '<label class="wide" for="'+f('url')+'">Link to post<input id="'+f('url')+'" data-k="url" type="url" inputmode="url" placeholder="https://x.com/you/status/…" value="'+esc(r.url)+'"></label>'+
+          ['views','likes','reposts','replies'].map(k => '<label for="'+f(k)+'">'+k+'<input id="'+f(k)+'" data-k="'+k+'" inputmode="numeric" value="'+esc(r[k])+'"></label>').join('')+
+          '<label class="wide" for="'+f('notes')+'">Notes<input id="'+f('notes')+'" data-k="notes" value="'+esc(r.notes)+'" placeholder="what landed, replies worth answering"></label>'+
+        '</div></details>'+
+      '</div>'+
+      '<div class="side">'+imageBlock(p)+'</div>'+
+    '</article>';
+  }
+
+  function renderGroups(){
+    const keep = p => filter==='all' || (filter==='todo' ? rec(p.id).status==='draft' : rec(p.id).status==='posted');
+    $('#groups').innerHTML = GROUPS.map(g => {
+      const items = POSTS.filter(p => p.section === g.key && keep(p));
+      if (!items.length) return '';
+      return '<section class="group"><h2>'+esc(g.name)+' <em>'+esc(g.note)+'</em></h2><div class="list">'+items.map(postRow).join('')+'</div></section>';
+    }).join('') || '<p class="done">Nothing here.</p>';
+  }
+  function renderAll(){ renderSummary(); renderNext(); renderGroups(); }
+
+  function toast(msg){ const t=$('#toast'); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,1800); }
+  function setSave(msg, err){ const s=$('#save'); s.textContent=msg; s.classList.toggle('err', !!err); }
+
+  function scheduleSave(){ pending = true; setSave(canSave ? 'unsaved' : 'saved in this browser'); writeLocal(); if(!canSave) return; clearTimeout(saveTimer); saveTimer=setTimeout(flush, 2500); }
+  function writeLocal(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }
+  async function flush(){
+    if (!canSave || saving || !pending) return;
+    saving = true; pending = false; setSave('saving…');
+    try{
+      await artifact.publish({'data/state.json': {content: JSON.stringify(state, null, 1), contentType:'application/json'}});
+      setSave('saved');
+    }catch(e){
+      const c = e && e.code;
+      if (c === 'conflict'){ setSave('newer copy loading…'); }
+      else if (c === 'not_writer' || c === 'not_granted' || c === 'capability_disabled' || c === 'not_declared' || c === 'consent_required'){ canSave=false; setSave('read-only here · saved in this browser'); }
+      else if (c === 'rate_limited'){ pending = true; setSave('waiting to save'); setTimeout(flush, 15000); }
+      else { pending = true; setSave('could not save · will retry', true); setTimeout(flush, 8000 + Math.random()*4000); }
+    } finally { saving = false; if (pending && canSave) { clearTimeout(saveTimer); saveTimer=setTimeout(flush,2500); } }
+  }
+
+  async function copy(text, btn){
+    try{ await navigator.clipboard.writeText(text); toast('Copied'); }
+    catch(e){ const r=document.createRange(); const p=btn.closest('.post,.next').querySelector('.text'); r.selectNodeContents(p); const s=getSelection(); s.removeAllRanges(); s.addRange(r); toast('Selected. Press Ctrl+C'); }
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (b){
+      const p = POSTS.find(x => x.id === b.dataset.id);
+      if (b.dataset.act === 'copy') copy(p.text, b);
+      if (b.dataset.act === 'mark'){ const r=rec(p.id); r.status='posted'; if(!r.postedAt) r.postedAt=new Date().toISOString().slice(0,10); renderAll(); scheduleSave(); toast('Marked posted. Paste its link in the log.'); }
+      return;
+    }
+    const t = e.target.closest('#tabs button'); if (t){ filter=t.dataset.f; document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-pressed', String(x===t))); renderGroups(); }
+  });
+  document.addEventListener('input', e => {
+    const el = e.target; const k = el.dataset && el.dataset.k; if (!k) return;
+    const id = el.closest('.post').dataset.id; const r = rec(id); r[k] = el.value;
+    if (k === 'status' && el.value === 'posted' && !r.postedAt) r.postedAt = new Date().toISOString().slice(0,10);
+    if (k === 'status'){ renderAll(); } else { renderSummary(); renderNext(); }
+    scheduleSave();
+  });
+
+  async function boot(){
+    try{ const raw = localStorage.getItem(LS_KEY); if (raw) state = JSON.parse(raw); }catch(e){}
+    try{
+      const res = await fetch('data/state.json', {cache:'no-store'});
+      if (res.ok){ const s = await res.json(); if (s && s.posts) state = s; }
+    }catch(e){}
+    renderAll();
+    try{
+      artifact = window.claude && window.claude.use ? await window.claude.use('artifact') : null;
+    }catch(e){ artifact = null; }
+    canSave = !!artifact;
+    setSave(canSave ? 'saved' : 'saved in this browser');
+  }
+  renderAll(); boot();
+})();
+</script>
