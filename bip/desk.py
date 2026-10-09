@@ -76,7 +76,7 @@ def items(q: dict):
 
 
 def fmt_slot(slot: dict) -> str:
-    t = datetime.fromisoformat(slot["at_utc"].replace("Z", "+00:00"))
+    t = datetime.fromisoformat(slot.get("post_at_utc", slot["at_utc"]).replace("Z", "+00:00"))
     et = t - timedelta(hours=4)  # EDT, valid until US DST ends on 1 Nov 2026
     syd = t + timedelta(hours=11)  # AEDT
     return f"{et:%a %d %b %H:%M} ET / {syd:%a %H:%M} Sydney"
@@ -88,8 +88,8 @@ def cmd_status(q: dict) -> None:
     for slot in q["slots"]:
         state = "posted" if all(p in posted for p in slot["posts"]) else (
             "APPROVED" if slot.get("approved") else "awaiting approval")
-        t = datetime.fromisoformat(slot["at_utc"].replace("Z", "+00:00"))
-        late = " (slot has passed)" if t <= now() and state == "APPROVED" else ""
+        t = datetime.fromisoformat(slot.get("post_at_utc", slot["at_utc"]).replace("Z", "+00:00"))
+        late =" (slot has passed)" if t <= now() and state == "APPROVED" else ""
         print(f"{slot['name']:<16} {fmt_slot(slot)}  {len(slot['posts'])} post(s)  {state}{late}")
     due = list(cmd_checkpoints(q, quiet=True))
     print(f"\nmetric snapshots due: {len(due)}")
@@ -99,7 +99,7 @@ def cmd_due(q: dict) -> None:
     posted = q.get("posted", {})
     found = False
     for slot in q["slots"]:
-        t = datetime.fromisoformat(slot["at_utc"].replace("Z", "+00:00"))
+        t = datetime.fromisoformat(slot.get("post_at_utc", slot["at_utc"]).replace("Z", "+00:00"))
         if slot.get("approved") and t <= now():
             todo = [p for p in slot["posts"] if p not in posted]
             if todo:
@@ -110,13 +110,19 @@ def cmd_due(q: dict) -> None:
 
 
 def cmd_approve(q: dict, key: str) -> None:
+    import random
     hit = False
     for slot in q["slots"]:
-        if slot["name"] == key or key in slot["posts"]:
+        if key in ("all", slot["name"]) or key in slot["posts"]:
             slot["approved"] = True
             slot["approved_at"] = now().isoformat(timespec="seconds")
+            # Irregular but consistent: each slot lands somewhere between 25 minutes early and
+            # 40 minutes late, so posts never go out on the same round minute.
+            if "post_at_utc" not in slot:
+                base = datetime.fromisoformat(slot["at_utc"].replace("Z", "+00:00"))
+                slot["post_at_utc"] = (base + timedelta(minutes=random.randint(-25, 40))).strftime("%Y-%m-%dT%H:%M:%SZ")
             hit = True
-            print(f"approved: {slot['name']}")
+            print(f"approved: {slot['name']:<14} posts at {fmt_slot(slot)}")
     if not hit:
         sys.exit(f"no slot or post named {key}")
     save_queue(q)
