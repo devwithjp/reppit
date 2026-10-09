@@ -128,7 +128,7 @@ def find(posts: list[Post], pid: str) -> Post:
 def thread_of(posts: list[Post], section: str) -> list[Post]:
     key = section.lower().replace(" ", "")
     key = re.sub(r"phase(\d+)", r"p\1", key)
-    out = [p for p in posts if p.section.lower().replace(" ", "").startswith(key)]
+    out = [p for p in posts if key in p.section.lower().replace(" ", "")]
     if not out:
         sys.exit(f"no posts in a section matching {section!r}")
     return out

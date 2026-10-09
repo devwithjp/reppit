@@ -14,7 +14,9 @@ Figures live in `docs/figures/`. The filename each post needs is on the line und
 
 ---
 
-## Thread: the case
+## Thread: day 1
+
+Tuesday, 9:30am US Eastern. The moment, the star, the proof.
 
 **1**
 > You are building something. Your agent says "I'll use quickxml-parse for this."
@@ -77,7 +79,18 @@ Figures live in `docs/figures/`. The filename each post needs is on the line und
 > Of everything they tested, the number we all actually look at came last.
 `f12-weakest-signal.png`
 
-**8**
+
+## Thread: day 2
+
+Wednesday, 9:30am US Eastern. How long it has been true, and the size of the pile. Put a link to day 1 in a reply, not in a post.
+
+**1**
+> Yesterday I showed that stars and whether a repo is maintained barely line up. 0.10. Stars came last of everything tested.
+>
+> Today: how long that has been true, and how big the pile has gotten since.
+no image
+
+**2**
 > Worth saying plainly: that dataset is GitHub as of November 2017.
 >
 > So this is not something AI broke. Stars never tracked maintenance. They were never built to.
@@ -85,7 +98,7 @@ Figures live in `docs/figures/`. The filename each post needs is on the line und
 > We kept using them because the number was already on the screen.
 `f13-never-worked.png`
 
-**9**
+**3**
 > Now the size of the pile.
 >
 > GitHub added 121 million repositories in the year to August 2025. About 230 a minute.
@@ -93,7 +106,7 @@ Figures live in `docs/figures/`. The filename each post needs is on the line und
 > Review one a minute, no sleep, no weekends, and you fall 229 further behind every minute.
 `f14-repos-per-minute.png`
 
-**10**
+**4**
 > Pulled from the registries this week.
 >
 > npm: 4,464,731 packages.
@@ -103,7 +116,7 @@ Figures live in `docs/figures/`. The filename each post needs is on the line und
 > There is no version of "I'll have a quick look around" that covers that.
 `f15-three-registries.png`
 
-**11**
+**5**
 > And nothing is curating it. There is no editor, no shelf, no buyer deciding what gets stocked.
 >
 > The awesome-whatever list in your bookmarks was maintained by one person who got busy.
@@ -111,7 +124,7 @@ Figures live in `docs/figures/`. The filename each post needs is on the line und
 > Hand curation lost years ago. Nothing replaced it.
 no image
 
-**12**
+**6**
 > This is already inside your own codebase.
 >
 > An audit of 947 commercial codebases found 93% contained at least one component with no development activity in two years.
@@ -119,13 +132,13 @@ no image
 > You did not abandon it. It was abandoned under you.
 `f16-zombie-bar.png`
 
-**13**
+**7**
 > Same audit: 7% of the components in use were the latest version.
 >
 > Seven. Everything else is running behind, and some of it is behind because there is nothing ahead of it. The project stopped.
 no image
 
-**14**
+**8**
 > Here is the thing that actually changed, and it is not the amount of code.
 >
 > Picking a dependency used to cost a human five minutes of looking around.
@@ -133,7 +146,18 @@ no image
 > Your agent picks in two seconds, off the same weak number, and cannot tell that it is weak.
 `f17-five-minutes-two-seconds.png`
 
-**15**
+
+## Thread: day 3
+
+Thursday, 9:30am US Eastern. The concessions, the trust gap, the questions, and the hook. Link day 2 in a reply.
+
+**1**
+> So far: stars never measured upkeep, 230 new repos land every minute, and your agent now picks off the star count in two seconds.
+>
+> Today I argue against my own case. Then the part I can't stop thinking about.
+no image
+
+**2**
 > I want to be careful, because blaming AI would be easy and it would be wrong.
 >
 > GitHub's public repo growth, year on year: plus 22%, then about plus 17%, then plus 19%.
@@ -141,7 +165,7 @@ no image
 > AI went from niche to everywhere across that window. The line did not bend.
 `f18-the-flat-line.png`
 
-**16**
+**3**
 > Duplication is not new either.
 >
 > A 2017 study of 428 million files found 70% of files on GitHub were copies of files that already existed.
@@ -149,7 +173,7 @@ no image
 > 2017. The pile was mostly copies before any of this started.
 `f19-clones-before-ai.png`
 
-**17**
+**4**
 > One more against my own case.
 >
 > A 2025 study found 19.7% of packages suggested by models did not exist. That is the number everyone still quotes.
@@ -157,7 +181,7 @@ no image
 > A 2026 rerun on current models: 4.6% to 6.1%. It got better. Use the new one.
 `f20-the-number-that-got-better.png`
 
-**18**
+**5**
 > So this is the spot developers are standing in.
 >
 > 83% use AI tools. 73% of assistant users use them every day.
@@ -167,7 +191,7 @@ no image
 > We use it constantly. We believe it almost never.
 `f21-use-vs-trust.png`
 
-**19**
+**6**
 > That gap is not developers being irrational. It is developers being right.
 >
 > The tool is fast, often correct, and has no way to tell you which time this is. So you check it.
@@ -175,7 +199,7 @@ no image
 > Checking a dependency means looking at a star count. See above.
 no image
 
-**20**
+**7**
 > Which leaves three questions, and no quick way to answer any of them.
 >
 > Does it still work?
@@ -185,7 +209,15 @@ no image
 > They are not hard questions. There is just nowhere to look them up.
 `f5-what-you-want.png`
 
+**8**
+> I'm building the place where those three have answers.
+>
+> It has one rule that fixes most of what this thread is about. The rule is one sentence long.
+>
+> I'll show it the day reppit launches. Follow if you want to see it first.
+no image
 ---
+
 
 ## Standalone
 
