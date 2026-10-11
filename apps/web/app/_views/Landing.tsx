@@ -24,7 +24,7 @@ export async function Landing() {
     d.select(rowColumns).from(items)
       .where(and(eq(items.kind, "repo"), eq(items.archived, false), isNotNull(items.advisoriesOpen)))
       .orderBy(desc(items.stars)).limit(200),
-    d.select({ slug: items.slug, stars: items.stars }).from(items).where(eq(items.archived, true)).orderBy(desc(items.stars)).limit(1),
+    d.select({ slug: items.slug, stars: items.stars }).from(items).where(and(eq(items.archived, true), eq(items.kind, "repo"))).orderBy(desc(items.stars)).limit(1),
   ]);
 
   const reasonTotal = reasons.reduce((a, r) => a + r.n, 0);
@@ -83,10 +83,10 @@ export async function Landing() {
         <div className="wrap">
           <div className="args">
             <div className="arg"><span className="no">01</span>
-              <h2 className="h3">A score that works on day one</h2>
+              <h2 className="h3">Measured, not voted</h2>
               <p>Last push, release cadence, the archived and deprecated flags, open advisories and issue load.
-                Six measurements, no human input. It is useful before anybody has voted, which is the part every
-                community directory gets wrong.</p>
+                Six measurements of the repo itself, no human input. When too few of them can be measured, the page
+                says &ldquo;not enough data&rdquo; instead of guessing a number.</p>
               {example && (
                 <div className="evidence">
                   <Strip cells={signalCells(example)} />
@@ -126,7 +126,7 @@ export async function Landing() {
           <p>Stars are easy to count. <u>Easy to count is not the same as true.</u></p>
           <div className="attr">
             {archivedStar
-              ? <>In this index right now: <Link className="inline-link" href={itemHref(archivedStar.slug)}>{archivedStar.slug}</Link> has {compact(archivedStar.stars)} stars and is archived. Its trust score knows; its star count does not.</>
+              ? <>In this index right now: <Link className="inline-link" href={itemHref(archivedStar.slug)}>{archivedStar.slug}</Link> has {compact(archivedStar.stars)} stars. It is also archived, and reppit flags that next to its name. The star count does not.</>
               : <>An archived repo with 40,000 stars outranks a maintained one with 300, almost everywhere, today.</>}
           </div>
         </div></section>

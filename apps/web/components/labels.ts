@@ -51,6 +51,28 @@ export function installCommand(i: { kind: string; slug: string; url: string; pac
   return `git clone ${i.url}.git`;
 }
 
+/**
+ * The one-line reason, minus anything the UI should not repeat:
+ * - the "Strong/Good/Partial match" label (a fixed threshold on similarity, not a judgement we stand behind);
+ * - for skills, star counts, which belong to the parent repo, not the skill.
+ * Returns null when nothing useful is left.
+ */
+export function cleanWhy(why: string | undefined, kind: string): string | null {
+  if (!why) return null;
+  let s = why.replace(/^\s*(strong|good|partial|weak)\s+match\s*[:.\u2014-]?\s*/i, "");
+  if (kind === "skill") s = s.replace(/,?\s*\b\d+(?:[.,]\d+)?k?\s+stars\b/gi, "");
+  s = s.replace(/^[\s,;:.]+/, "").replace(/\s+,/g, ",").replace(/,\s*\./g, ".").trim();
+  if (!s || /^[.]$/.test(s)) return null;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** The repo a skill lives in: "owner/repo" from "owner/repo/path/to/skill". Null for anything else. */
+export function parentRepo(kind: string, slug: string): string | null {
+  if (kind !== "skill") return null;
+  const parts = slug.split("/");
+  return parts.length > 2 ? `${parts[0]}/${parts[1]}` : null;
+}
+
 /** Split "owner/name" (or "owner/repo/path/name" for skills) into a muted prefix and the name. */
 export function splitSlug(slug: string): { owner: string; name: string } {
   const i = slug.lastIndexOf("/");

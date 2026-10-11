@@ -25,8 +25,8 @@ export default async function TrustPage() {
       <main className="wrap" id="main">
         <div className="head">
           <h1>How the trust score works</h1>
-          <p className="sub">Six measurements of the repo itself, taken from its own record. No human sets the score, and it
-            is there before anybody has voted.</p>
+          <p className="sub">Six measurements of the repo itself, taken from its own record. No human sets the score. When
+            too few of the six can be measured, it says &ldquo;not enough data&rdquo; instead of guessing.</p>
         </div>
         <div className="cols">
           <div>

@@ -69,6 +69,12 @@ export async function recentReasons(d: Db, days = 30): Promise<{ reason: string;
   return rows.filter((r) => r.reason).map((r) => ({ reason: r.reason as string, n: Number(r.n) })).sort((a, b) => b.n - a.n);
 }
 
+/** How many MCP servers are indexed. The MCP tab and link appear only when this is above zero. */
+export async function mcpCount(d: Db): Promise<number> {
+  const [r] = await d.select({ n: sql<number>`count(*)::int` }).from(items).where(eq(items.kind, "mcp"));
+  return Number(r?.n ?? 0);
+}
+
 export interface IndexCounts { repo: number; skill: number; mcp: number; total: number; unvoted: number }
 
 export async function indexCounts(d: Db): Promise<IndexCounts> {

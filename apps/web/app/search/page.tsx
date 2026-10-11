@@ -18,6 +18,25 @@ import { rowColumns, loadExtras, indexCounts, type RowItem } from "../_data/item
 export const dynamic = "force-dynamic";
 
 const EXAMPLES = ["pull tables out of a pdf in python", "transcribe audio locally", "end-to-end browser tests", "structured logging in go"];
+/**
+ * Search may flag that nothing cleared its relevance floor (`notIndexed: true`), either on the result
+ * array or on the results themselves, or return { results, notIndexed }. Read all three shapes so the
+ * page keeps working whichever lands in @gitit/core; zero results count as not indexed too.
+ */
+function normalizeSearch(raw: unknown): { results: SearchResult[]; notIndexed: boolean } {
+  if (Array.isArray(raw)) {
+    const arr = raw as SearchResult[] & { notIndexed?: boolean };
+    const flagged = arr.notIndexed === true || (arr.length > 0 && arr.every((r) => (r as { notIndexed?: boolean }).notIndexed === true));
+    return { results: flagged ? [] : arr, notIndexed: flagged || arr.length === 0 };
+  }
+  if (raw && typeof raw === "object") {
+    const o = raw as { results?: SearchResult[]; notIndexed?: boolean };
+    const results = Array.isArray(o.results) ? o.results : [];
+    return { results: o.notIndexed ? [] : results, notIndexed: o.notIndexed === true || results.length === 0 };
+  }
+  return { results: [], notIndexed: true };
+}
+
 const KINDS = [
   { key: "", label: "All" },
   { key: "repo", label: "Repos" },
@@ -40,11 +59,12 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const counts = await indexCounts(d);
 
   let results: SearchResult[] = [];
+  let notIndexed = false;
   let failed = false;
   if (q.length >= 3) {
     try {
       // One search across every kind, so the tabs can show honest counts; the tab then filters.
-      results = await search(d, embedder(), q, { limit: 30 });
+      ({ results, notIndexed } = normalizeSearch(await search(d, embedder(), q, { limit: 30 })));
     } catch (e) {
       console.error("[search] failed:", (e as Error).message);
       failed = true;
@@ -54,7 +74,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   for (const r of results) byKind[r.item.kind] = (byKind[r.item.kind] ?? 0) + 1;
   let shown = kind ? results.filter((r) => r.item.kind === kind) : results;
   shown = shown.slice(0, 10);
-  shown = await explainWithClaude(q, shown);
+  if (shown.length) shown = await explainWithClaude(q, shown);
 
   // The search result carries a subset of columns; fetch the full row data the trust score needs.
   const ids = shown.map((r) => r.item.id);
@@ -81,8 +101,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         <div className="parsed">
           {q.length >= 3 && !failed ? (
             <>
-              <span>Ranked by match, votes, maintenance and popularity.</span>
-              <span className="parsed-r">{counts.total.toLocaleString("en-US")} indexed &middot; {results.length} close matches</span>
+              <span>{notIndexed ? "Nothing in the index is close enough to show." : "Ranked by match, votes, maintenance and popularity."}</span>
+              <span className="parsed-r">{counts.total.toLocaleString("en-US")} indexed{notIndexed ? "" : <> &middot; {results.length} result{results.length === 1 ? "" : "s"}</>}</span>
             </>
           ) : (
             <>
@@ -106,11 +126,19 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             <p>The index did not respond. Nothing is wrong with your query. Try again in a minute, or{" "}
               <Link className="inline-link" href="/?sort=top">browse the directory</Link> meanwhile.</p>
           </div>
+        ) : notIndexed ? (
+          <div className="nothing" style={{ marginTop: 20 }} data-testid="not-indexed">
+            <h3>Not in the index yet.</h3>
+            <p>Nothing among the {counts.total.toLocaleString("en-US")} entries is close to &ldquo;{q}&rdquo;. We would rather say
+              that than show you weak matches. If you know the repo that does this,{" "}
+              <Link className="inline-link" href="/submit">submit it</Link> and it will be measured like the rest. Or{" "}
+              <Link className="inline-link" href="/?sort=top">browse the directory</Link>.</p>
+          </div>
         ) : (
           <>
             <div className="toolbar">
               <nav className="tabs" aria-label="Kind">
-                {KINDS.map((k) => (
+                {KINDS.filter((k) => k.key !== "mcp" || counts.mcp > 0 || kind === "mcp").map((k) => (
                   <Link key={k.key} href={qs({ kind: k.key })} {...(kind === k.key ? { "aria-current": "page" as const } : {})}>
                     {k.label} <span className="tab-n">{k.key ? byKind[k.key] ?? 0 : results.length}</span>
                   </Link>
@@ -127,11 +155,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
 
             {ordered.length === 0 ? (
               <div className="nothing">
-                <h3>{results.length === 0 ? "Nothing indexed matches that yet." : `No ${KINDS.find((k) => k.key === kind)?.label.toLowerCase()} match that.`}</h3>
-                <p>{results.length === 0
-                  ? <>The index has {counts.total.toLocaleString("en-US")} entries and none of them is close. Try different words, or{" "}
-                      <Link className="inline-link" href="/submit">submit the repo you end up using</Link> so the next person finds it.</>
-                  : <><Link className="inline-link" href={qs({ kind: "" })}>Show all {results.length} matches</Link> instead.</>}</p>
+                <h3>{`No ${KINDS.find((k) => k.key === kind)?.label.toLowerCase()} in these results.`}</h3>
+                <p><Link className="inline-link" href={qs({ kind: "" })}>Show all {results.length}</Link> instead.</p>
               </div>
             ) : (
               <div className="list">

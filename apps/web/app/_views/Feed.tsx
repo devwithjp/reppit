@@ -8,7 +8,7 @@ import { Footer } from "@/components/Footer";
 import { ItemRow } from "@/components/ItemRow";
 import { StripKey } from "@/components/marks";
 import { REASON_LABEL, KIND_LABEL } from "@/components/labels";
-import { rowColumns, loadExtras, recentReasons, type RowItem } from "../_data/items";
+import { rowColumns, loadExtras, recentReasons, mcpCount, type RowItem } from "../_data/items";
 
 const PAGE = 30;
 const SORTS = [
@@ -48,7 +48,9 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
   ]);
   const total = Number(n);
 
-  const [extras, reasons] = await Promise.all([loadExtras(d, rows.map((r) => r.id), viewer?.id ?? null), recentReasons(d, 30)]);
+  const [extras, reasons, mcps] = await Promise.all([loadExtras(d, rows.map((r) => r.id), viewer?.id ?? null), recentReasons(d, 30), mcpCount(d)]);
+  // Hide the MCP tab while the index has none, unless someone is already on it (keep the URL working).
+  const kinds = KINDS.filter((k) => k.key !== "mcp" || mcps > 0 || kind === "mcp");
   const from = (page - 1) * PAGE;
   const hereHref = href(sort, kind, page);
   const noun = kind ? KIND_LABEL[kind] : "repos and skills";
@@ -66,7 +68,7 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
         <h1 className="sr-only">Browse {noun}</h1>
         <div className="toolbar">
           <nav className="tabs" aria-label="Kind">
-            {KINDS.map((k) => (
+            {kinds.map((k) => (
               <Link key={k.key} href={href(sort, k.key)} {...(kind === k.key ? { "aria-current": "page" as const } : {})}>{k.label}</Link>
             ))}
           </nav>
@@ -93,7 +95,7 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
             <h3>{page > 1 ? "Nothing on this page." : kind === "mcp" ? "No MCP servers indexed yet." : `No ${noun} indexed yet.`}</h3>
             <p>{page > 1
               ? <>The list ends earlier than that. <Link className="inline-link" href={href(sort, kind)}>Back to the first page</Link>.</>
-              : <>When one is submitted it shows up here with a trust score straight away. <Link className="inline-link" href="/submit">Submit one</Link>.</>}</p>
+              : <>When one is submitted it shows up here, measured from its own record. <Link className="inline-link" href="/submit">Submit one</Link>.</>}</p>
           </div>
         ) : (
           <div className="list">

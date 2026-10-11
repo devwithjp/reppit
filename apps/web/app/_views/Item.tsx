@@ -13,7 +13,7 @@ import { AgentChip, agentState } from "@/components/marks";
 import { flags, ago, compact, band } from "@/components/trust";
 import { trustScore, VOTE_ADJUST_MAX, MAX_UNKNOWN, type SignalCell } from "@/components/score";
 import { ScoreNum } from "@/components/marks";
-import { REASONS, REASON_LABEL, CORE_AGENTS, KIND_LABEL, MCP_INSTALL, installCommand, splitSlug, itemHref } from "@/components/labels";
+import { REASONS, REASON_LABEL, CORE_AGENTS, KIND_LABEL, MCP_INSTALL, installCommand, splitSlug, itemHref, parentRepo } from "@/components/labels";
 import { rowColumns, indexCounts } from "../_data/items";
 
 const HALF_LIFE_DAYS = 180;
@@ -63,7 +63,9 @@ export async function ItemView({ slug }: { slug: string }) {
   const [item] = await d.select({ ...rowColumns, readme: items.readme, forks: items.forks }).from(items).where(eq(items.slug, slug)).limit(1);
   if (!item) notFound();
 
-  const [voteRows, compatRows, mineRows, neighbours, counts] = await Promise.all([
+  // A skill's stars are its parent repo's. Link the parent instead of showing them as the skill's own.
+  const parent = parentRepo(item.kind, item.slug);
+  const [voteRows, compatRows, mineRows, neighbours, counts, parentRows] = await Promise.all([
     d.select({ login: users.login, direction: votes.direction, reason: votes.reason, weight: votes.weight, createdAt: votes.createdAt })
       .from(votes).innerJoin(users, eq(users.id, votes.userId)).where(eq(votes.itemId, item.id)).orderBy(desc(votes.createdAt)).limit(50),
     d.select({ id: agentCompatReports.id, agent: agentCompatReports.agent, status: agentCompatReports.status, note: agentCompatReports.note, login: users.login, createdAt: agentCompatReports.createdAt })
@@ -76,7 +78,9 @@ export async function ItemView({ slug }: { slug: string }) {
       .limit(4)
       .catch(() => []),
     indexCounts(d),
+    parent ? d.select({ slug: items.slug }).from(items).where(and(eq(items.slug, parent), eq(items.kind, "repo"))).limit(1) : Promise.resolve([]),
   ]);
+  const parentHref = parent ? (parentRows.length ? itemHref(parent) : `https://github.com/${parent}`) : null;
 
   const t = trustScore(item);
   const fl = flags(item);
@@ -121,7 +125,11 @@ export async function ItemView({ slug }: { slug: string }) {
               {item.kind !== "repo" && <span className="tag plain">{item.kind === "skill" ? "agent skill" : "MCP server"}</span>}
               {item.language && <span className="tag plain">{item.language}</span>}
               {item.license && item.license !== "NOASSERTION" && <span className="tag plain">{item.license}</span>}
-              {item.stars > 0 && <span className="tag plain">{compact(item.stars)} stars</span>}
+              {parent && parentHref ? (
+                parentHref.startsWith("/")
+                  ? <Link className="tag plain src" href={parentHref}>in {parent}</Link>
+                  : <a className="tag plain src" href={parentHref} target="_blank" rel="noreferrer">in {parent} &#8599;</a>
+              ) : item.stars > 0 && <span className="tag plain">{compact(item.stars)} stars</span>}
               {fl.map((f) => <span key={f.label} className={`flag${f.warn ? " warn" : ""}`}>{f.label}</span>)}
               <span className="tag plain">{item.lastReleaseAt ? `last release ${ago(item.lastReleaseAt)}` : "no release data"}</span>
               {cold && <span className="tag plain">added to reppit {ago(item.createdAt)}</span>}
@@ -140,7 +148,7 @@ export async function ItemView({ slug }: { slug: string }) {
                   <a className="v-dn" href="#vote"><svg width="13" height="8" viewBox="0 0 15 9" fill="currentColor" aria-hidden="true"><path d="M7.5 9 0 0h15z" /></svg> Report</a>
                   <span className="tot none" data-testid="vote-count">no votes yet</span>
                 </div>
-                <p className="meta" style={{ margin: "7px 0 0" }}>Nobody has voted on this one yet. The score below does not wait for them.</p>
+                <p className="meta" style={{ margin: "7px 0 0" }}>Nobody has voted on this one yet. The measurements below do not wait for them.</p>
               </>
             ) : (
               <>
@@ -164,8 +172,10 @@ export async function ItemView({ slug }: { slug: string }) {
                   <div className={`big${t.score === null ? " is-nd" : ""}`}><ScoreNum score={t.score} /><s>Trust{t.score === null ? "" : ", of 100"}</s></div>
                   <div className="txt">
                     <h2>Nobody has voted. Here is what the repo is doing.</h2>
-                    <p>Computed from the repo&rsquo;s own record. No human has touched this number and none of it is a star
-                      count. If every vote on reppit vanished tonight, this page would read the same tomorrow.</p>
+                    <p>{t.score === null
+                      ? <>Measured from the repo&rsquo;s own record. Too little of it can be measured yet to give a fair number, so there isn&rsquo;t one. What is known is in the table below.</>
+                      : <>Computed from the repo&rsquo;s own record. No human has touched this number and none of it is a star count.</>}{" "}
+                      If every vote on reppit vanished tonight, this page would read the same tomorrow.</p>
                     {unknownNote && <p>{unknownNote}</p>}
                     <p className="fine">Votes adjust the score by at most &plusmn;{VOTE_ADJUST_MAX} points, and they halve in weight every six months.</p>
                   </div>
@@ -323,14 +333,14 @@ export async function ItemView({ slug }: { slug: string }) {
               <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>Ask from your agent</span></div>
               <div className="panel-b">
                 <InstallCmd command={MCP_INSTALL} compact />
-                <p className="meta" style={{ margin: "10px 0 0" }}>Your agent gets this score whether or not anybody has voted.{" "}
+                <p className="meta" style={{ margin: "10px 0 0" }}>Your agent gets these measurements whether or not anybody has voted.{" "}
                   <Link className="inline-link" href="/agent">See what it returns</Link></p>
               </div>
             </div>
 
             {neighbours.length > 0 && (
               <div className="panel" style={{ marginTop: 18 }}>
-                <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>{cold ? "Scored, not voted" : "Considered instead"}</span></div>
+                <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>{cold ? "Measured, not voted" : "Considered instead"}</span></div>
                 <table className="kv kv-rel"><tbody>
                   {neighbours.map((n) => {
                     const s = trustScore(n).score;

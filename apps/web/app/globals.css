@@ -660,3 +660,20 @@ a.btn{text-decoration:none}
 .ttl{min-width:0}
 .ttl .repo{overflow-wrap:anywhere;min-width:0}
 .row{min-width:0}
+
+/* Phone masthead: logo + account on row one, full-width search, then the three primary links as tabs.
+   .mast-right becomes display:contents so its children can be ordered with the rest of the bar. */
+@media (max-width:520px){
+  .mast-in{flex-wrap:wrap;height:auto;gap:8px 10px;padding-block:8px 0}
+  .mast .logo{order:0;margin-right:auto;min-height:30px;align-items:center}
+  .mast-right{display:contents}
+  .mast-right > a,.mast-right > form.mast-out{order:1}
+  .mast-right .searchbox{order:4;flex:1 1 100%;width:100%;height:36px}
+  .mast-right .searchbox input{height:34px;font-size:15px}
+  .mast-right .searchbox .go{height:34px;padding:0 10px}
+  .mast-nav{display:flex;order:5;flex:1 1 100%;margin:0 -14px;gap:0;border-top:1px solid var(--rule)}
+  .mast-nav a{flex:1 1 0;text-align:center;padding:10px 4px 9px;font-size:12px;white-space:nowrap}
+  .mast-link.who{max-width:12ch}
+}
+.tail > *{min-width:0}
+@media(max-width:700px){.tail{grid-template-columns:minmax(0,1fr)}}

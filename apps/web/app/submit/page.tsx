@@ -69,8 +69,9 @@ export default async function SubmitPage({ searchParams }: { searchParams: Promi
       <main className="wrap" id="main">
         <div className="auth wide">
           <h1>Submit a repo</h1>
-          <p className="auth-lede">Give it a GitHub repo. It gets a trust score as soon as it is indexed, from its own record,
-            before anybody votes. If it is already here you go straight to its page.</p>
+          <p className="auth-lede">Give it a GitHub repo. Once it is indexed it is measured from its own record, before anybody
+            votes. Where too little can be measured, its page says so rather than show a number. If it is already here
+            you go straight to its page.</p>
           {!viewer && (
             <p className="auth-msg bad" role="status">You need to be signed in to submit.{" "}
               <Link className="inline-link" href="/login?next=%2Fsubmit">Sign in</Link></p>

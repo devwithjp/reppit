@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { RowItem, RowExtras } from "@/app/_data/items";
 import { flags, ago } from "./trust";
 import { trustScore, signalCells, type SignalCell } from "./score";
-import { itemHref, splitSlug, installCommand } from "./labels";
+import { itemHref, splitSlug, installCommand, cleanWhy } from "./labels";
 import { Strip, ScoreNum, ReasonLine, AgentLine, NoOpinions } from "./marks";
 import { RailVote } from "./RailVote";
 import { InstallCmd } from "./InstallCmd";
@@ -63,8 +63,8 @@ export function ItemRow({
           {item.license && item.license !== "NOASSERTION" && <span className="tag plain">{item.license}</span>}
           {fl.map((f) => <span key={f.label} className={`flag${f.warn ? " warn" : ""}`}>{f.label}</span>)}
         </h2>
-        {variant === "search" && why ? (
-          <p className="matched" data-testid="result-why">{why}</p>
+        {variant === "search" && (cleanWhy(why, item.kind) ?? item.description) ? (
+          <p className="matched" data-testid="result-why">{cleanWhy(why, item.kind) ?? item.description}</p>
         ) : item.description ? (
           <p className="desc">{item.description}</p>
         ) : (
