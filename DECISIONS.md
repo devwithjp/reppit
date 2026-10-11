@@ -37,3 +37,15 @@ ecosyste.ms is CC-BY-SA 4.0. Share-alike on a ranking input would reach into the
 
 ## 2026-10-08 Never render a missing advisory count as zero
 Every security advisory source is keyed by package; the ranking is keyed by repository, and many repos ship no package at all. The repo-keyed GitHub endpoint is correct but costs one un-batchable call per repo, and the ecosyste.ms reverse lookup returns fuzzy string matches (psf/requests returns "reqesst"). Until a forward package-to-repo join is materialised, the advisory signal is present-or-absent for the packaged subset only. Showing "0 advisories" for a repo we never checked would be a fabricated safety claim, which matters because DECISIONS.md already makes this signal load-bearing at zero users.
+
+## 2026-10-11 Supabase for database and auth
+Production runs on Supabase: Postgres with pgvector for the index, Supabase Auth for accounts. The app talks to Postgres server-side through Drizzle, and Row Level Security is on for every table with no policies for the public roles, so the browser-facing API exposes nothing. Local development keeps embedded PGlite, so contributors still need no database install. Auth in v1 is email and password plus magic link; GitHub sign-in waits for an OAuth app.
+
+## 2026-10-11 Email accounts earn vote weight with age
+Vote weight was built entirely from GitHub history, which left every email account at 0.2 forever while a throwaway email costs nothing. Accounts with no GitHub history now ramp from 0.2 to 1.0 over 60 days of reppit account age, capped at 1.0. GitHub-backed accounts keep their curve up to 2.0. Sock puppets stay cheap to ignore and real users are not punished indefinitely.
+
+## 2026-10-11 One trust score, defined once, without stars
+The score people see is a single core function used by the site, API, MCP server and CLI: six signals worth 100 points, unknown signals scored neutral, no number at all when three or more are unknown, and votes moving it by at most twelve points. Stars are not an input. The positioning says stars measure the past; a score that quietly included them would make that a lie.
+
+## 2026-10-11 A personal token ships in v1
+Agent compatibility reports are meant to come from inside the agent, and that needs a credential. The api_keys table and the Bearer check already existed, so v1 ships one revocable personal token per account. Paid API tiers and metering stay in v2.
