@@ -1,5 +1,124 @@
 # reppit launch critique
 
+## Third pass, 2026-10-12 (rebuild)
+
+Same method as before: Chrome through Playwright, desktop and 400px, against the rebuilt production build (761 entries). I ran the full query set again, then name lookups, then seven queries I had never typed before, to see whether the gains hold beyond the libraries I'd already named. Sign-in is still not available on this machine, so the signed-in flows (voting, compatibility reports, tokens) are judged only from what the pages say. I read no source this pass. The two earlier passes are below, unchanged.
+
+### Verdict
+
+**Yes, I'd use the site next week. I wouldn't add it to my agent yet, and it isn't ready for a public launch.**
+- **What's better:** my query set now mostly returns the library I'd pick, at #1, with the real install command and an honest note of how many signals the score rests on. "Too little measured" replaced the fake 79s, and dead libraries are capped (redux-form 35).
+- **What still stops me:** a third of fresh queries for things not in the index still return confident junk. "Feature flags" returns redis, sequelize and yt-dlp. The install line is still wrong, or a `git clone`, for several major projects. And nearly every score is still exactly 85.
+
+### What the team said changed, checked
+
+| Claim | What I saw | Status |
+|---|---|---|
+| Package offered only when it's the repo's primary one; prisma, TanStack Query and react-pdf point to install docs | The wrong packages are gone for those three. But the copy button now gives **`git clone https://github.com/prisma/orm.git`**, and the note says "Check its install docs" with **no link**, plus a grammar slip ("publishes 1 packages"). The same happens for TanStack/query, react-pdf, yaak, hoppscotch, bruno and opendataloader-pdf. Prisma's trust score is **still computed from `@prisma/orm-toolchain`**, the package the page now says isn't the one to install. **Not fixed:** OpenHands still gives `npm install @openhands/agent-canvas`. polars gives `cargo add polars` (a Python developer wants `pip install polars`). ollama gives `go get github.com/ollama/ollama`, and hurl gives `cargo add hurl`. Neither is how you install those apps. | **Partly** |
+| A number only with at least 3 measured signals, otherwise "too little measured" plus the known facts | anything-llm, llama.cpp and Mailspring now say "too little measured · 2 of 4 measured" with the facts table. 19 of 118 rows. | **True** |
+| Not-applicable counts as half, so no package can't raise the score | The /trust page says so, and repos with no package no longer outrank measured ones (anything-llm has no number now). | **True** |
+| Idle a year capped at 50, two years at 35 | redux-form: 35, "last push 2 years ago". httpie: 50. | **True** |
+| Every score shows how many signals it rests on | "4 of 6 measured" on every search row, item page, the /agent transcript and the homepage example. | **True** |
+| A language in the query filters results | "schema validation typescript" no longer returns pydantic. "http client for python async" is all Python. "orm for python" returns only Python. | **True** |
+| Single identifiers are name lookups | Works for indexed names (`zod`, `clap`, `polars`, `httpx`, `envalid`, `express-rate-limit`, `ollama`, `llama.cpp` are all #1) and for `sqlalchemy` and `pino` ("Not in the index yet"). **Fails for some unindexed names:** `requests` returns Alamofire, guzzle, Scrapling. `fastapi` returns fastapi_mcp and then a TikTok downloader. | **Mostly** |
+| zod, clap, polars, httpx, express-rate-limit, envalid added | All present and all #1 for their own queries. | **True** |
+| CLI/MCP commands hidden until published; /agent lists what each tool does | The commands are gone. "Published on launch day." Each tool is described: `search_repos` and `get_repo` read only; `vote` and `report_compat` "act as you, with your personal token"; `install_skill` "returns an install command, it never runs it"; without a token the server only reads. | **True** |
+
+### Search, like for like
+
+Top three, then whether my pick is in the top three and at #1. Hit = something I'd actually choose.
+
+| Query | Pass 1 top | Pass 2 top | Pass 3 top three | Top 3 | #1 |
+|---|---|---|---|---|---|
+| parse pdf tables in python | opendataloader-pdf (Java) | docling | docling 85, pdfplumber 91, pdf-inspector 85 | Yes | Yes |
+| typescript orm for postgres | drizzle-orm | prisma/orm | prisma/orm 85 (`git clone`), drizzle-orm 87, typeorm 85 | Yes | Yes, but Prisma's line is `git clone` |
+| rate limit an express api | scalar | redisson | **express-rate-limit 93**, redisson (too little), firecrawl-mcp | Yes | Yes |
+| run an llm locally | llm-app | llm-app | llm-app 83, anything-llm (too little), OpenHands (wrong package) | No | No |
+| validate env vars in node | developer-roadmap | validator.js | **envalid 92**, validator.js | Yes | Yes |
+| websocket server for node | ws | ws | ws 87, yaak, hoppscotch | Yes | Yes |
+| background jobs with redis in node | river (Go) | bullmq | bullmq 85, xstate, bull | Yes | Yes |
+| cli argument parsing in rust | tree-sitter | Not in index | **clap 93** (only result) | Yes | Yes |
+| http client for python async | aiohttp | aiohttp | aiohttp 85, httpx 79, httpie 50 | Yes | Yes |
+| date library javascript | electron | date-fns | date-fns 87, dayjs 85, timeago.js 82 | Yes | Yes |
+| react form validation | react-hook-form | react-hook-form | react-hook-form 85, react-final-form 81, valibot 85 | Yes | Yes |
+| markdown parser | parsedown (PHP) | marked | marked 85, parsedown (too little), opendataloader-pdf | Yes | Yes |
+| send transactional email from node | n/a | react-email | react-email, nodemailer, novu | Yes | No |
+| dataframe library faster than pandas | n/a | Not in index | **Not in the index yet**, although polars is indexed and the query `dataframe` finds it | No | No |
+| state management for react | n/a | react | react, zustand, react-hook-form | Yes | No |
+| end to end browser testing | n/a | SeleniumBase | SeleniumBase, playwright 87, browser-use | Yes | No |
+| schema validation typescript | n/a | valibot | **zod 93**, valibot, joi | Yes | Yes |
+
+| Set | Pass 1 top 3 / #1 | Pass 2 top 3 / #1 | Pass 3 top 3 / #1 |
+|---|---|---|---|
+| Brief's 8 | 4 / 2 | 4 / 4 | **7 / 7** |
+| Original 12 | 8 / 4 | 8 / 8 | **11 / 11** |
+| 5 new from pass 2 | n/a | 4 / 1 | **4 / 1** |
+| All 17 | n/a | 12 / 9 | **15 / 12** |
+
+**Caveat: much of this jump is teaching to the test.** Every query that moved from miss to hit since pass 2 (rate limiting, env validation, Rust CLI parsing), plus zod taking #1 for schema validation, moved because the team hand-added exactly the libraries my critique named. To check whether it generalises, I typed seven queries I'd never used:
+
+| Fresh query | Result | Hit? |
+|---|---|---|
+| `sqlalchemy` | Not in the index yet | No (honest) |
+| `pino` | Not in the index yet | No (honest) |
+| structured logging for node | maxun, a data-structures textbook, brightdata-mcp | No (junk) |
+| resize images in python | Pillow | Yes |
+| python web framework | Flask, Django | Yes |
+| mock http requests in tests | hoppscotch, hurl, bruno: API clients | No (junk) |
+| feature flags | redis, sequelize, yt-dlp | No (junk) |
+
+**Fresh hit rate: 2 of 7.** The ranking is fine when the library is in the index. The index is still the bottleneck. When the right answer is missing, the relevance floor lets junk through for problem-style queries, and it catches only single words.
+
+### The four questions
+
+**1. Would I use it next week? Would I add it to my agent once the packages are published?**
+- **The site: yes.** I'd use it as a check on what my agent picked. "zod 93 · 5 of 6 measured · last release 28 days ago" and "redux-form 35 · last push 2 years ago" are the answers I came for.
+- **The agent: not yet.** The tool descriptions are now good enough that permissions wouldn't stop me. Two things would:
+  - The MCP returns install lines and an agent acts on them. Today that means a `git clone` for Prisma and TanStack Query, `cargo add polars` for a Python project, `go get` for ollama, and an unrelated npm package for OpenHands.
+  - "The server tells the agent to use [vote] only when you ask" is a prompt instruction, not a permission check. I'd want vote and report_compat to need confirmation in my client, or a read-only token by default.
+
+**2. Does it now deliver on "stars say it was popular, reppit says it still works"?**
+- **For the dead ones, yes.** That's the half that matters most. Archived is capped at 25, idle a year at 50, two years at 35, and advisories show (httpie 50, ollama 72 with 9 advisories). For the first time the product reliably tells me when **not** to use something, and stars can't do that.
+- **For the healthy ones, no.** 79 of 118 scores were exactly 85. Release cadence is measured for only the six newly added repos (they score 91–93), and issue load for none. So the 85-versus-93 gap mostly reflects whether reppit fetched release data, not whether the project is healthier. zod 93 vs valibot 85, and pdfplumber 91 vs docling 85, are measurement artefacts that look like judgements.
+- **"Still works" for my agent** is unanswered: zero agent-compatibility reports anywhere I looked.
+
+Today the product delivers "it's dead or insecure", not yet "it still works".
+
+**3. Launch-ready for a public build-in-public launch, assuming sign-in works?** **No.** It's close, and the remaining reasons are specific:
+1. **Releases and issue load aren't measured for about 99% of the index.** Every healthy library scores 85, the seeded ones score 93, and the first sharp commenter will line up zod 93 against valibot 85 and ask why. This is the score's credibility, on launch day, in public.
+2. **Wrong or useless install lines for well-known projects.** Prisma and TanStack Query get `git clone`, with an unlinked "check its install docs". Polars gets `cargo add`, ollama `go get`, OpenHands an unrelated npm package. And Prisma's trust score is built from a package the page itself disowns. Build-in-public readers will try the famous ones first.
+3. **Junk above the floor for problem queries outside the index** (feature flags, structured logging, mocking HTTP, `requests`, `fastapi`). After pass 2's honest "Not in the index yet", it's jarring when it doesn't fire. Also, "dataframe library faster than pandas" says "not in the index" while polars is indexed, so the floor also has false negatives.
+4. **An empty community layer:** 743 of 761 entries have no votes and there are no agent-compat reports. Launching with empty compatibility tables invites "nobody uses this". The team should seed honest reports on the top 50 before launch.
+
+Smaller: the homepage and /trust intro still say "not enough data" while the UI says "too little measured". The /agent demo transcript still ends on a `git clone` for opendataloader-pdf, and for the same problem returns weaker results than the site's own search (docling, pdfplumber).
+
+### Updated must-fix list, ranked
+
+Struck through = resolved on this build.
+
+1. **Measure releases and issue load across the whole index** (GitHub API with a token budget, run as a batch). Until then, either don't rank by trust between scores that differ only because release data was fetched, or show "releases not measured" on the row. Without this, the score separates dead from alive but not good from fine. *Medium.*
+2. **Finish install lines.**
+   - **No package to offer:** link the repo's install docs (or README install section) and make the copy button copy nothing, never `git clone`.
+   - **Several registries:** pick the one matching the query's language or the repo's main language (`pip install polars` for Python).
+   - **Apps vs libraries:** label apps as apps (ollama, hurl, OpenHands) rather than handing out `go get` / `cargo add`.
+   - **Prisma's score:** stop computing deprecation and advisories from a package the page has rejected.
+   - **Copy:** fix "1 packages".
+
+   *Small to medium.*
+3. **Tighten the relevance floor for multi-word problem queries, and fix its false negatives.** "Feature flags" should say "not in the index", and "dataframe library faster than pandas" should find polars. `requests` and `fastapi` should be name lookups that say "not in the index", not fuzzy matches. *Medium.*
+4. **Keep growing the index on real demand, not on the critique's list.** sqlalchemy, pino, requests, fastapi, msw/nock, a feature-flag library, pandas. Log "not in the index" queries from day one and seed from them. *Medium, ongoing.*
+5. **Seed agent-compatibility reports and some honest votes on the ~50 most-searched entries before launch.** Make `vote` / `report_compat` need confirmation in the client, or default to a read-only token. *Medium.*
+6. **Small copy consistency:** "not enough data" vs "too little measured", and an /agent transcript that ends on a real install command. *Small.*
+7. ~~Publish `reppit-mcp` / `reppit` or hide the commands.~~ Hidden until launch. Publishing them is now a launch-day task. Reserve both names on npm today regardless.
+8. ~~Show how many signals a score rests on; no number for thin data.~~ Done.
+9. ~~Stale repos scoring like healthy ones (redux-form 60).~~ Done: idle caps at 50/35.
+10. ~~Repos without a package outranking measured ones.~~ Done: not-applicable counts as half, and thin data gets no number.
+11. ~~Language-blind ranking.~~ Done.
+12. ~~Exact name first; obvious libraries missing (zod, clap, polars, httpx, express-rate-limit, envalid).~~ Done.
+13. ~~Archived/deprecated cap~~, ~~signal enrichment~~, ~~overclaiming copy~~, ~~mobile nav~~, ~~data errors~~: done in earlier passes, and still holding.
+
+---
+
 ## Second pass, 2026-10-12
 
 I ran the same queries as the first pass, the same way: Chrome through Playwright, at desktop width and at 400px, against the production build on localhost:3100 (755 entries). I added a set of name lookups and five new queries. Sign-in is still not available on this machine, so I judged only what a signed-out user can use. I checked each change the team said it made against the running site, and read the source only to confirm one suspicion. The first pass is kept unchanged below.
