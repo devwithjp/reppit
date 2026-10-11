@@ -5,7 +5,8 @@
  * - A field we could not check is null, never false/0.
  * - A package only counts as this repo's if the registry's repository link points back at the repo
  *   (by current slug or a known alias). Name collisions are common; an unverified match is ignored.
- * - Sources: npm registry, PyPI JSON, OSV.dev (CC-BY-4.0). ecosyste.ms is deliberately not used
+ * - Sources: npm registry, PyPI JSON, crates.io API, OSV.dev (CC-BY-4.0). None needs a key, and none
+ *   spends GitHub API quota (manifests come from raw.githubusercontent.com). ecosyste.ms is deliberately not used
  *   here because it is CC-BY-SA and these values feed the ranker.
  */
 
@@ -13,10 +14,12 @@ export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
 export const SIGNALS_USER_AGENT = "reppit-ingest (+https://reppit.dev)";
 
-export interface PackageRef { ecosystem: "npm" | "PyPI"; name: string }
+/** Ecosystem names exactly as OSV spells them. */
+export type Ecosystem = "npm" | "PyPI" | "crates.io";
+export interface PackageRef { ecosystem: Ecosystem; name: string }
 
 export interface PackageSignals {
-  packageEcosystem: "npm" | "PyPI" | null;
+  packageEcosystem: Ecosystem | null;
   packageName: string | null;
   /** null when no verified package was found. */
   deprecated: boolean | null;
@@ -24,6 +27,8 @@ export interface PackageSignals {
   /** null when no verified package, or the advisory lookup failed. */
   advisoriesOpen: number | null;
   signalsCheckedAt: Date;
+  /** Licence the verified package declares (SPDX-looking only). Used when GitHub detected none. */
+  registryLicense?: string | null;
 }
 
 /** `name` from a package.json, or null when absent, unparsable, or `private: true`. */
@@ -51,6 +56,43 @@ export function packageNameFromPyproject(text: string | null | undefined): strin
   return found["project"] ?? found["tool.poetry"] ?? null;
 }
 
+/** `[metadata] name` from a setup.cfg. */
+export function packageNameFromSetupCfg(text: string | null | undefined): string | null {
+  if (!text) return null;
+  let section = "";
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/\s+[#;].*$/, "").trim();
+    const sec = line.match(/^\[([^\]]+)\]$/);
+    if (sec) { section = sec[1].trim(); continue; }
+    const kv = line.match(/^name\s*[=:]\s*([A-Za-z0-9][A-Za-z0-9._-]*)$/);
+    if (kv && section === "metadata") return kv[1];
+  }
+  return null;
+}
+
+/** A literal `name="..."` inside `setup(...)` in a setup.py. Computed names are not guessed. */
+export function packageNameFromSetupPy(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const call = text.indexOf("setup(");
+  if (call < 0) return null;
+  const m = text.slice(call).match(/\bname\s*=\s*["']([A-Za-z0-9][A-Za-z0-9._-]*)["']/);
+  return m ? m[1] : null;
+}
+
+/** `[package] name` from a Cargo.toml. A workspace-only root (no [package]) has no name. */
+export function packageNameFromCargoToml(text: string | null | undefined): string | null {
+  if (!text) return null;
+  let section = "";
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/\s+#.*$/, "").trim();
+    const sec = line.match(/^\[([^\]]+)\]$/);
+    if (sec) { section = sec[1].trim(); continue; }
+    const kv = line.match(/^name\s*=\s*["']([A-Za-z0-9_-]+)["']$/);
+    if (kv && section === "package") return kv[1];
+  }
+  return null;
+}
+
 /** Normalise any GitHub repository reference to lower-case "owner/name", or null. */
 export function githubSlugFromUrl(u: unknown): string | null {
   if (typeof u !== "string") return null;
@@ -67,7 +109,14 @@ function matchesRepo(candidates: unknown[], slugs: string[]): boolean {
   return candidates.some((c) => { const s = githubSlugFromUrl(c); return !!s && want.has(s); });
 }
 
-interface NpmLatest { name?: string; version?: string; deprecated?: unknown; repository?: unknown }
+interface NpmLatest { name?: string; version?: string; deprecated?: unknown; repository?: unknown; license?: unknown }
+
+/** A declared licence that looks like an SPDX id or expression, else null. Free text is not trusted. */
+export function spdxish(v: unknown): string | null {
+  const s = typeof v === "string" ? v.trim() : v && typeof v === "object" && typeof (v as { type?: unknown }).type === "string" ? String((v as { type: string }).type).trim() : "";
+  if (!s || s.length > 60 || /^(unknown|unlicensed|see license|proprietary|other)$/i.test(s)) return null;
+  return /^[A-Za-z0-9.+-]+( (AND|OR|WITH) [A-Za-z0-9.+-]+)*$/.test(s.replace(/[()]/g, "")) ? s : null;
+}
 
 /** npm: the `latest` version manifest carries `deprecated` (a string when deprecated) and `repository`. */
 export async function checkNpm(name: string, slugs: string[], f: FetchLike = fetch) {
@@ -80,21 +129,63 @@ export async function checkNpm(name: string, slugs: string[], f: FetchLike = fet
   const repoUrl = typeof repo === "string" ? repo : repo && typeof repo === "object" ? (repo as { url?: unknown }).url : null;
   if (!matchesRepo([repoUrl], slugs)) return null;
   const deprecated = typeof j.deprecated === "string" ? j.deprecated.trim() || "deprecated" : j.deprecated === true ? "deprecated" : null;
-  return { ecosystem: "npm" as const, name, version: j.version ?? null, deprecated: deprecated !== null, deprecationMessage: deprecated };
+  return { ecosystem: "npm" as const, name, version: j.version ?? null, deprecated: deprecated !== null, deprecationMessage: deprecated, license: spdxish(j.license) };
 }
 
-interface PypiInfo { name?: string; version?: string; yanked?: boolean; yanked_reason?: string | null; classifiers?: string[]; project_urls?: Record<string, string> | null; home_page?: string | null }
+interface PypiInfo { name?: string; version?: string; yanked?: boolean; yanked_reason?: string | null; classifiers?: string[]; project_urls?: Record<string, string> | null; home_page?: string | null; license?: string | null; license_expression?: string | null }
 
-/** PyPI: latest release yanked, or "Development Status :: 7 - Inactive", counts as deprecated. */
+/**
+ * PyPI: deprecated when every release is yanked (PyPI's `info` then describes a yanked release), or
+ * the project declares "Development Status :: 7 - Inactive".
+ */
 export async function checkPypi(name: string, slugs: string[], f: FetchLike = fetch) {
   const res = await f(`https://pypi.org/pypi/${encodeURIComponent(name)}/json`, { headers: { accept: "application/json", "user-agent": SIGNALS_USER_AGENT } });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`pypi ${name} ${res.status}`);
-  const info = ((await res.json()) as { info?: PypiInfo }).info ?? {};
+  const body = (await res.json()) as { info?: PypiInfo; releases?: Record<string, { yanked?: boolean }[]> };
+  const info = body.info ?? {};
   if (!matchesRepo([...Object.values(info.project_urls ?? {}), info.home_page], slugs)) return null;
+  const published = Object.values(body.releases ?? {}).filter((files) => files.length > 0);
+  const allYanked = info.yanked === true || (published.length > 0 && published.every((files) => files.every((x) => x.yanked === true)));
   const inactive = (info.classifiers ?? []).some((c) => /^Development Status :: 7 - Inactive/.test(c));
-  const message = info.yanked ? `latest release yanked${info.yanked_reason ? `: ${info.yanked_reason}` : ""}` : inactive ? "Development Status :: 7 - Inactive" : null;
-  return { ecosystem: "PyPI" as const, name: info.name ?? name, version: info.version ?? null, deprecated: message !== null, deprecationMessage: message };
+  const message = allYanked ? `every release yanked${info.yanked_reason ? `: ${info.yanked_reason}` : ""}` : inactive ? "Development Status :: 7 - Inactive" : null;
+  return { ecosystem: "PyPI" as const, name: info.name ?? name, version: info.version ?? null, deprecated: message !== null, deprecationMessage: message, license: spdxish(info.license_expression) ?? spdxish(info.license) };
+}
+
+/**
+ * npm search fallback for monorepos whose package name differs from the repo and its folders:
+ * the top hits for the repo name whose `links.repository` points back at the repo. Names only;
+ * the caller verifies each with checkNpm.
+ */
+export async function npmSearchByRepo(repoName: string, slugs: string[], f: FetchLike = fetch): Promise<string[]> {
+  const res = await f(`https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(repoName)}&size=10`, { headers: { accept: "application/json", "user-agent": SIGNALS_USER_AGENT } });
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`npm search ${repoName} ${res.status}`);
+  const j = (await res.json()) as { objects?: { package?: { name?: string; links?: { repository?: string } } }[] };
+  return (j.objects ?? []).map((o) => o.package).filter((p) => p?.name && matchesRepo([p.links?.repository], slugs)).map((p) => p!.name!);
+}
+
+interface CratesResponse {
+  crate?: { name?: string; repository?: string | null; homepage?: string | null; max_version?: string; max_stable_version?: string | null };
+  versions?: { num: string; yanked: boolean; created_at: string; license?: string | null }[];
+}
+
+/**
+ * crates.io: deprecated when the most recently published version is yanked (this also covers a
+ * crate whose every version is yanked). The OSV lookup uses the newest non-yanked version.
+ * crates.io asks for a descriptive User-Agent and at most one request per second.
+ */
+export async function checkCrates(name: string, slugs: string[], f: FetchLike = fetch) {
+  const res = await f(`https://crates.io/api/v1/crates/${encodeURIComponent(name)}`, { headers: { accept: "application/json", "user-agent": SIGNALS_USER_AGENT } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`crates ${name} ${res.status}`);
+  const j = (await res.json()) as CratesResponse;
+  if (!matchesRepo([j.crate?.repository, j.crate?.homepage], slugs)) return null;
+  const versions = [...(j.versions ?? [])].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  const newest = versions[0];
+  const live = j.crate?.max_stable_version || (j.crate?.max_version && j.crate.max_version !== "0.0.0" ? j.crate.max_version : null) || versions.find((v) => !v.yanked)?.num || newest?.num || null;
+  const deprecated = !!newest?.yanked;
+  return { ecosystem: "crates.io" as const, name: j.crate?.name ?? name, version: live, deprecated, deprecationMessage: deprecated ? `latest version ${newest.num} yanked` : null, license: spdxish(newest?.license) };
 }
 
 interface OsvVuln { id: string; aliases?: string[]; withdrawn?: string }
@@ -105,26 +196,54 @@ interface OsvVuln { id: string; aliases?: string[]; withdrawn?: string }
  * Returns null on any failure: an unanswered check is unknown, not zero.
  */
 export async function osvOpenAdvisories(pkg: PackageRef, version: string, f: FetchLike = fetch): Promise<number | null> {
-  try {
-    const res = await f("https://api.osv.dev/v1/querybatch", {
-      method: "POST",
-      headers: { "content-type": "application/json", "user-agent": SIGNALS_USER_AGENT },
-      body: JSON.stringify({ queries: [{ package: { name: pkg.name, ecosystem: pkg.ecosystem }, version }] }),
+  return (await osvOpenAdvisoriesBatch([{ ...pkg, version }], f))[0];
+}
+
+/**
+ * What the count means: advisories OSV says affect the LATEST published version (the version passed
+ * in), not advisories ever filed against the package. Withdrawn entries are dropped and aliases
+ * merged. One querybatch call per 1000 packages; vulnerability details are fetched once per id
+ * (`detailCache` can be shared across calls). Per package: a number, or null when that package's
+ * answer was incomplete (paged result, or a detail fetch failed). A failed batch call makes every
+ * entry null. Never 0 for something unchecked.
+ */
+export async function osvOpenAdvisoriesBatch(
+  pkgs: (PackageRef & { version: string })[], f: FetchLike = fetch,
+  detailCache: Map<string, OsvVuln> = new Map(), concurrency = 6,
+): Promise<(number | null)[]> {
+  const out: (number | null)[] = pkgs.map(() => null);
+  for (let start = 0; start < pkgs.length; start += 1000) {
+    const part = pkgs.slice(start, start + 1000);
+    let results: { vulns?: { id: string }[]; next_page_token?: string }[];
+    try {
+      const res = await f("https://api.osv.dev/v1/querybatch", {
+        method: "POST",
+        headers: { "content-type": "application/json", "user-agent": SIGNALS_USER_AGENT },
+        body: JSON.stringify({ queries: part.map((p) => ({ package: { name: p.name, ecosystem: p.ecosystem }, version: p.version })) }),
+      });
+      if (!res.ok) continue;
+      results = ((await res.json()) as { results?: typeof results }).results ?? [];
+    } catch { continue; }
+    const need = [...new Set(results.flatMap((r) => (r?.vulns ?? []).map((v) => v.id)))].filter((id) => !detailCache.has(id));
+    const failed = new Set<string>();
+    for (let i = 0; i < need.length; i += concurrency) {
+      await Promise.all(need.slice(i, i + concurrency).map(async (id) => {
+        try {
+          const d = await f(`https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`, { headers: { "user-agent": SIGNALS_USER_AGENT } });
+          if (!d.ok) throw new Error(String(d.status));
+          detailCache.set(id, (await d.json()) as OsvVuln);
+        } catch { failed.add(id); }
+      }));
+    }
+    part.forEach((_, i) => {
+      const r = results[i];
+      if (!r || r.next_page_token) return; // missing or paged: we would undercount, so unknown
+      const ids = (r.vulns ?? []).map((v) => v.id);
+      if (ids.some((id) => failed.has(id))) return;
+      out[start + i] = countDistinctAdvisories(ids.map((id) => detailCache.get(id)!));
     });
-    if (!res.ok) return null;
-    const j = (await res.json()) as { results?: { vulns?: { id: string }[]; next_page_token?: string }[] };
-    const r = j.results?.[0];
-    if (!r) return null;
-    if (r.next_page_token) return null; // more than one page: we would undercount, so say unknown
-    const ids = (r.vulns ?? []).map((v) => v.id);
-    if (ids.length === 0) return 0;
-    const details = await Promise.all(ids.map(async (id) => {
-      const d = await f(`https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`, { headers: { "user-agent": SIGNALS_USER_AGENT } });
-      if (!d.ok) throw new Error(`osv ${id} ${d.status}`);
-      return (await d.json()) as OsvVuln;
-    }));
-    return countDistinctAdvisories(details);
-  } catch { return null; }
+  }
+  return out;
 }
 
 /** Union-find over ids and aliases; withdrawn entries are dropped. */
@@ -137,7 +256,55 @@ export function countDistinctAdvisories(vulns: OsvVuln[]): number {
   return new Set(live.map((v) => find(v.id))).size;
 }
 
-export interface RepoManifests { packageJson?: string | null; pyproject?: string | null }
+export interface RepoManifests {
+  packageJson?: string | null; pyproject?: string | null; setupCfg?: string | null; setupPy?: string | null; cargoToml?: string | null;
+  /** package.json files from monorepo folders named like the repo (`<name>/`, `packages/<name>/`). */
+  subPackageJsons?: (string | null)[];
+}
+
+export interface ResolvedPackage { ecosystem: Ecosystem; name: string; version: string | null; deprecated: boolean; deprecationMessage: string | null; license?: string | null }
+
+/**
+ * The repo's own published package. Every candidate must be confirmed by its registry entry linking
+ * back to one of `slugs`, so a name collision never counts. Candidates, in order:
+ *   1. the repo's own name, in each ecosystem the repo has a root manifest for (so docling resolves
+ *      to `docling`, not the `docling-slim` its pyproject names, and localstack to `localstack`);
+ *   2. names from root manifests: package.json, pyproject.toml, setup.cfg, setup.py, Cargo.toml;
+ *   3. package.json in monorepo folders named like the repo (drizzle-orm/, packages/react/);
+ *   4. npm search for the repo name, filtered by repository link (when a package.json exists).
+ * Null = no verified package. Throws when a registry call fails, so callers can tell "none" from
+ * "could not check".
+ */
+export async function resolvePackage(slugs: string[], m: RepoManifests, f: FetchLike = fetch): Promise<ResolvedPackage | null> {
+  const repoName = (slugs[0] ?? "").split("/")[1]?.toLowerCase() ?? "";
+  const hasNpm = !!m.packageJson || (m.subPackageJsons ?? []).some(Boolean);
+  const hasPy = !!(m.pyproject || m.setupCfg || m.setupPy);
+  const hasCargo = !!m.cargoToml;
+  const tried = new Set<string>();
+  const attempt = async (eco: Ecosystem, name: string | null): Promise<ResolvedPackage | null> => {
+    if (!name) return null;
+    const key = `${eco}:${eco === "npm" ? name : name.toLowerCase().replace(/[-_.]+/g, "-")}`;
+    if (tried.has(key)) return null;
+    tried.add(key);
+    if (eco === "npm" && !/^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/i.test(name)) return null; // not a valid npm name
+    return eco === "npm" ? checkNpm(name, slugs, f) : eco === "PyPI" ? checkPypi(name, slugs, f) : checkCrates(name, slugs, f);
+  };
+  const steps: [Ecosystem, string | null][] = [];
+  if (repoName) {
+    if (hasNpm) steps.push(["npm", repoName]);
+    if (hasPy) steps.push(["PyPI", repoName]);
+    if (hasCargo) steps.push(["crates.io", repoName]);
+  }
+  steps.push(["npm", packageNameFromPackageJson(m.packageJson)]);
+  for (const py of [packageNameFromPyproject(m.pyproject), packageNameFromSetupCfg(m.setupCfg), packageNameFromSetupPy(m.setupPy)]) steps.push(["PyPI", py]);
+  steps.push(["crates.io", packageNameFromCargoToml(m.cargoToml)]);
+  for (const sub of m.subPackageJsons ?? []) steps.push(["npm", packageNameFromPackageJson(sub)]);
+  for (const [eco, name] of steps) { const hit = await attempt(eco, name); if (hit) return hit; }
+  if (hasNpm && repoName) {
+    for (const name of await npmSearchByRepo(repoName, slugs, f)) { const hit = await attempt("npm", name); if (hit) return hit; }
+  }
+  return null;
+}
 
 /**
  * Check one repo's zero-user signals. `slugs` = current slug plus known aliases (all lower-cased
@@ -145,27 +312,44 @@ export interface RepoManifests { packageJson?: string | null; pyproject?: string
  * untouched rather than overwrite them with unknowns.
  */
 export async function checkPackageSignals(slugs: string[], manifests: RepoManifests, f: FetchLike = fetch, now = new Date()): Promise<PackageSignals | null> {
-  const none: PackageSignals = { packageEcosystem: null, packageName: null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now };
   try {
-    const npmName = packageNameFromPackageJson(manifests.packageJson);
-    const pyName = packageNameFromPyproject(manifests.pyproject);
-    const hit = (npmName ? await checkNpm(npmName, slugs, f) : null) ?? (pyName ? await checkPypi(pyName, slugs, f) : null);
-    if (!hit) return none;
+    const hit = await resolvePackage(slugs, manifests, f);
+    if (!hit) return noPackageSignals(now);
     const advisoriesOpen = hit.version ? await osvOpenAdvisories({ ecosystem: hit.ecosystem, name: hit.name }, hit.version, f) : null;
-    return { packageEcosystem: hit.ecosystem, packageName: hit.name, deprecated: hit.deprecated, deprecationMessage: hit.deprecationMessage, advisoriesOpen, signalsCheckedAt: now };
+    return { packageEcosystem: hit.ecosystem, packageName: hit.name, deprecated: hit.deprecated, deprecationMessage: hit.deprecationMessage, advisoriesOpen, signalsCheckedAt: now, registryLicense: hit.license ?? null };
   } catch {
     return null;
   }
 }
 
-/** No-token path: read manifests from raw.githubusercontent.com, which does not spend API quota. */
-export async function fetchManifestsRaw(owner: string, name: string, f: FetchLike = fetch): Promise<RepoManifests> {
+export const noPackageSignals = (now: Date): PackageSignals =>
+  ({ packageEcosystem: null, packageName: null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now });
+
+export const MANIFEST_FILES: Record<Exclude<keyof RepoManifests, "subPackageJsons">, string> = {
+  packageJson: "package.json", pyproject: "pyproject.toml", setupCfg: "setup.cfg", setupPy: "setup.py", cargoToml: "Cargo.toml",
+};
+
+/**
+ * No-token path: read root manifests from raw.githubusercontent.com (the content CDN, which does not
+ * spend GitHub API quota). A missing file is null. A transport failure or a 429/5xx also reads as
+ * null here; pass `strict` to have those throw instead, so a batch job can retry the repo later.
+ */
+export async function fetchManifestsRaw(owner: string, name: string, f: FetchLike = fetch, opts: { strict?: boolean } = {}): Promise<RepoManifests> {
   const get = async (file: string) => {
     try {
       const r = await f(`https://raw.githubusercontent.com/${owner}/${name}/HEAD/${file}`, { headers: { "user-agent": SIGNALS_USER_AGENT } });
-      return r.ok ? (await r.text()).slice(0, 200_000) : null;
-    } catch { return null; }
+      if (r.ok) return (await r.text()).slice(0, 200_000);
+      if (opts.strict && (r.status === 429 || r.status >= 500)) throw new Error(`raw ${owner}/${name}/${file} ${r.status}`);
+      return null;
+    } catch (e) { if (opts.strict) throw e; return null; }
   };
-  const [packageJson, pyproject] = await Promise.all([get("package.json"), get("pyproject.toml")]);
-  return { packageJson, pyproject };
+  const keys = Object.keys(MANIFEST_FILES) as (keyof typeof MANIFEST_FILES)[];
+  const texts = await Promise.all(keys.map((k) => get(MANIFEST_FILES[k])));
+  const out = Object.fromEntries(keys.map((k, i) => [k, texts[i]])) as RepoManifests;
+  // Monorepo: a private root package.json (or none beside a workspace file) means the package lives
+  // in a folder. Only folders named like the repo are fetched, to keep this to two requests.
+  if (out.packageJson && packageNameFromPackageJson(out.packageJson) === null) {
+    out.subPackageJsons = await Promise.all([`${name}/package.json`, `packages/${name}/package.json`].map(get));
+  }
+  return out;
 }

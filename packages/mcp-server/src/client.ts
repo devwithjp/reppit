@@ -39,7 +39,7 @@ export class ReppitClient {
   }
   search(problem: string, opts: { language?: string; kind?: string; limit?: number } = {}) {
     const q = new URLSearchParams({ q: problem, ...(opts.language ? { language: opts.language } : {}), ...(opts.kind ? { kind: opts.kind } : {}), ...(opts.limit ? { limit: String(opts.limit) } : {}) });
-    return this.req<{ results: SearchResult[]; cached: boolean }>("GET", `/api/search?${q}`);
+    return this.req<{ results: SearchResult[]; notIndexed?: boolean; cached: boolean }>("GET", `/api/search?${q}`);
   }
   item(slug: string) { return this.req<ItemDetail>("GET", `/api/items/by-slug/${slugPath(slug)}`); }
   vote(slug: string, direction: "up" | "down", reason?: string) { return this.req<unknown>("POST", `/api/items/by-slug/${slugPath(slug)}/vote`, { direction, reason }); }
@@ -63,8 +63,9 @@ export interface SearchResult {
     id: string; kind: "repo" | "skill" | "mcp"; slug: string; url: string; description: string | null; language: string | null;
     stars: number; installs: number; healthScore: number; upvotes: number; downvotes: number; license: string | null;
     archived?: boolean; deprecated?: boolean | null; advisoriesOpen?: number | null;
+    packageEcosystem?: string | null; packageName?: string | null;
   };
-  score: number; semantic: number; why: string;
+  score: number; semantic: number; why: string; match?: "exact" | "strong" | "partial";
   downvoteReasons: Record<string, number>;
   compat: Record<string, { works: number; broken: number }>;
   trust?: Trust;
@@ -80,21 +81,23 @@ export function formatTrust(t: Trust | undefined): string {
   return t.score === null ? "trust: not enough data" : `trust ${t.score}/100`;
 }
 
-/** The install command an agent should run for a result. Libraries get a package-manager hint. */
+/**
+ * The install command for a result. Only a package verified against its registry gets a package
+ * manager command; anything else gets a pointer to the repo, never a `git clone` of a library.
+ */
 export function installCommand(r: SearchResult["item"]): string {
   if (r.kind === "skill") return `npx skills add ${r.slug}`;
   if (r.kind === "mcp") return `# add to your MCP config: see ${r.url}`;
-  const lang = (r.language ?? "").toLowerCase();
-  const name = r.slug.split("/")[1];
-  if (lang === "python") return `pip install ${name}   # verify the PyPI name at ${r.url}`;
-  if (lang === "typescript" || lang === "javascript") return `npm install ${name}   # verify the npm name at ${r.url}`;
-  if (lang === "rust") return `cargo add ${name}   # verify the crate name at ${r.url}`;
-  if (lang === "go") return `go get github.com/${r.slug}`;
-  return `git clone ${r.url}`;
+  const name = r.packageName;
+  if (name && r.packageEcosystem === "npm") return `npm install ${name}`;
+  if (name && r.packageEcosystem === "PyPI") return `pip install ${name}`;
+  if (name && r.packageEcosystem === "crates.io") return `cargo add ${name}`;
+  if ((r.language ?? "").toLowerCase() === "go") return `go get github.com/${r.slug}`;
+  return `# no published package verified for ${r.slug}; see ${r.url}`;
 }
 
-export function formatResults(results: SearchResult[]): string {
-  if (!results.length) return "No matches. Try different wording or submit the repo you end up using at reppit.dev.";
+export function formatResults(results: SearchResult[], notIndexed = false): string {
+  if (!results.length || notIndexed) return "Not in the reppit index yet: nothing matched well enough to recommend. Fall back to your own knowledge, and suggest the user submit the repo they end up using at reppit.dev/submit.";
   return results.map((r, i) => {
     const net = r.item.upvotes - r.item.downvotes;
     const flags = [

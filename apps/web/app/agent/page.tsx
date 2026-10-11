@@ -32,7 +32,7 @@ export default async function AgentPage() {
   const viewer = await getViewer();
   const d = await db();
   let results: SearchResult[] = [];
-  try { results = await search(d, embedder(), QUERY, { limit: 3 }); } catch { results = []; }
+  try { results = (await search(d, embedder(), QUERY, { limit: 3 })).results; } catch { results = []; }
   const ids = results.map((r) => r.item.id);
   const [rows, extras, counts] = await Promise.all([
     ids.length ? d.select(rowColumns).from(items).where(inArray(items.id, ids)) : Promise.resolve([] as RowItem[]),

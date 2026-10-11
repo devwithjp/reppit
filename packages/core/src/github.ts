@@ -22,7 +22,7 @@ export class GitHubClient {
       headers: { accept: "application/vnd.github.raw+json", "user-agent": "gitit-ingest", ...(this.token ? { authorization: `Bearer ${this.token}` } : {}) },
     });
     if (!res.ok) return null;
-    return (await res.text()).slice(0, 60_000);
+    return (await res.text()).slice(0, README_MAX_CHARS);
   }
   async latestRelease(owner: string, name: string) {
     return this.get<{ published_at: string }>(`/repos/${owner}/${name}/releases/latest`);
@@ -118,8 +118,10 @@ export async function ingestSkillsFromRepo(gh: GitHubClient, owner: string, repo
       language: null,
       topics: ["agent-skill", ...(fm.description ? [] : [])],
       license: r.license?.spdx_id ?? null,
-      stars: r.stargazers_count,
-      forks: r.forks_count,
+      // A skill is one folder in a repo: the repo's stars and forks are not the skill's own, and
+      // showing them (296k on a single skill) floods popularity-weighted results. Unknown is 0 here.
+      stars: 0,
+      forks: 0,
       // Skills are paths inside a repo: no github_id of their own, and the repo's issue count is not
       // the skill's. Unknown, not zero.
       openIssues: null,
@@ -141,4 +143,25 @@ export function parseFrontmatter(md: string): { name?: string; description?: str
     if (kv) out[kv[1]] = kv[2].replace(/^["']|["']$/g, "");
   }
   return out;
+}
+
+/** Stored README length, shared by the REST ingester and the raw-CDN path. */
+export const README_MAX_CHARS = 60_000;
+export const README_FILES = ["README.md", "readme.md", "README.rst", "README", "Readme.md", "README.markdown"];
+
+/**
+ * README from raw.githubusercontent.com at HEAD (the content CDN, no API quota). Tries the usual
+ * file names in order and returns the first, truncated like the REST ingester. Null when none exists.
+ * With `strict`, a 429/5xx or network error throws so a batch job can retry the repo later.
+ */
+export async function fetchReadmeRaw(owner: string, name: string, f: (url: string, init?: RequestInit) => Promise<Response> = fetch, opts: { strict?: boolean } = {}): Promise<string | null> {
+  for (const file of README_FILES) {
+    let r: Response;
+    try {
+      r = await f(`https://raw.githubusercontent.com/${owner}/${name}/HEAD/${file}`, { headers: { "user-agent": "reppit-ingest (+https://reppit.dev)" } });
+    } catch (e) { if (opts.strict) throw e; return null; }
+    if (r.ok) { const text = await r.text(); if (text.trim()) return text.slice(0, README_MAX_CHARS); continue; }
+    if (opts.strict && (r.status === 429 || r.status >= 500)) throw new Error(`raw ${owner}/${name}/${file} ${r.status}`);
+  }
+  return null;
 }

@@ -106,13 +106,26 @@ describe("search demotes deprecated items (pglite)", () => {
       const { id } = await upsertRepoItem(db, repo(9000 + i, r.slug, { description: r.text, embedding: vecs[i], stars: r.deprecated ? 26000 : 14000 }), { now });
       await applySignals(db, id, { packageEcosystem: "npm", packageName: r.slug.split("/")[1], deprecated: r.deprecated, deprecationMessage: r.deprecated ? "request has been deprecated" : null, advisoriesOpen: r.deprecated ? 1 : 0, signalsCheckedAt: now }, now);
     }
-    const res = await search(db, e, "simplified http request client for node", { candidates: 50, limit: 10 });
+    const { results: res } = await search(db, e, "simplified http request client for node", { candidates: 50, limit: 10 });
     const slugs = res.map((r) => r.item.slug);
     expect(res.find((r) => r.item.slug === "request/request")!.semantic).toBeGreaterThan(res.find((r) => r.item.slug === "sindresorhus/got")!.semantic);
     expect(slugs.indexOf("sindresorhus/got")).toBeLessThan(slugs.indexOf("request/request"));
     const req = res.find((r) => r.item.slug === "request/request")!;
     expect(req.why).toMatch(/deprecated on npm/);
     expect(req.why).toMatch(/1 open security advisory/);
-    expect(res.find((r) => r.item.slug === "sindresorhus/got")!.why).not.toMatch(/advisor/);
+    expect(res.find((r) => r.item.slug === "sindresorhus/got")!.why).not.toMatch(/open security advisor/);
+  });
+});
+
+describe("applySignals licence fill", () => {
+  it("fills a missing or NOASSERTION licence from the registry but never overrides GitHub's", async () => {
+    const mk = async (gid: number, slug: string, license: string | null) => (await upsertRepoItem(db, repo(gid, slug, { license }), { now })).id;
+    const none = await mk(9100, "date-fns/date-fns", null);
+    const unclear = await mk(9101, "acme/unclear", "NOASSERTION");
+    const known = await mk(9102, "acme/known", "Apache-2.0");
+    const s = { packageEcosystem: "npm", packageName: "x", deprecated: false, deprecationMessage: null, advisoriesOpen: 0, signalsCheckedAt: now, registryLicense: "MIT" };
+    for (const id of [none, unclear, known]) await applySignals(db, id, s, now);
+    const lic = async (id: string) => (await db.select({ l: items.license }).from(items).where(eq(items.id, id)))[0].l;
+    expect([await lic(none), await lic(unclear), await lic(known)]).toEqual(["MIT", "MIT", "Apache-2.0"]);
   });
 });

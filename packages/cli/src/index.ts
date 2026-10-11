@@ -25,8 +25,8 @@ async function main() {
     case "find": {
       const problem = rest.filter((a) => !a.startsWith("-") && rest[rest.indexOf(a) - 1]?.startsWith("-") !== true)[0];
       if (!problem) throw new Error("find needs a problem string");
-      const { results, cached } = await client.search(problem, { language: flag(rest, "--lang"), kind: flag(rest, "--kind"), limit: flag(rest, "-n") ? Number(flag(rest, "-n")) : undefined });
-      console.log(formatResults(results)); if (cached) console.error("(cached)");
+      const { results, notIndexed, cached } = await client.search(problem, { language: flag(rest, "--lang"), kind: flag(rest, "--kind"), limit: flag(rest, "-n") ? Number(flag(rest, "-n")) : undefined });
+      console.log(formatResults(results, notIndexed)); if (cached) console.error("(cached)");
       break;
     }
     case "show": {

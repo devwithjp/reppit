@@ -63,7 +63,7 @@ export const items = pgTable("items", {
   // Zero-user signals (DECISIONS.md "Ranking must be useful at zero users"). Null always means
   // "not checked / no source", never "clean".
   // The package this repo publishes, verified to point back at this repo. Null = none found.
-  packageEcosystem: text("package_ecosystem"), // "npm" | "PyPI"
+  packageEcosystem: text("package_ecosystem"), // OSV ecosystem name: "npm" | "PyPI" | "crates.io"
   packageName: text("package_name"),
   // true = registry marks the latest release deprecated (npm `deprecated`, PyPI yanked / Inactive).
   deprecated: boolean("deprecated"),

@@ -23,8 +23,10 @@
  *
  * Score:
  *   - Unknown signals score half their points (neutral).
- *   - Three or more unknown signals: no number, `{ score: null, reason: "not enough data" }`.
- *   - Archived or deprecated caps the base at 25.
+ *   - Archived or deprecated is decisive: the score is capped at 25 (votes included) and `reason`
+ *     names it, even when other signals are unknown. Nobody needs four more measurements to know an
+ *     archived project is unmaintained.
+ *   - Otherwise, three or more unknown signals: no number, `{ score: null, reason: "not enough data" }`.
  *   - Votes adjust by at most ±12: round(12 * tanh(weightedScore / 6)), where weightedScore is the
  *     time-decayed, reputation-weighted vote sum from ranking.ts.
  */
@@ -64,7 +66,8 @@ export interface TrustItem {
 export interface TrustScore {
   /** 0..100, or null when three or more signals are unknown. */
   score: number | null;
-  reason?: "not enough data";
+  /** Why the score is null ("not enough data") or capped ("archived" / "deprecated"). */
+  reason?: "not enough data" | "archived" | "deprecated";
   /** Signals-only score before the vote adjustment; null with score. */
   base: number | null;
   voteAdjust: number;
@@ -161,8 +164,13 @@ export function trustScore(item: TrustItem, votes?: VoteRow[] | number, now: Dat
   const unknownCount = cells.filter((c) => c.state === "unknown").length;
   const ws = Array.isArray(votes) ? computeWeightedScore(votes, now) : typeof votes === "number" ? votes : item.weightedScore ?? 0;
   const adj = voteAdjust(ws);
+  const flagged = item.archived ? "archived" : item.deprecated === true ? "deprecated" : null;
+  if (flagged) {
+    // Known fatal signal beats unknowns. Votes cannot lift it past the cap.
+    const base = Math.min(Math.round(cells.reduce((a, c) => a + c.points, 0)), FLAGGED_CAP);
+    return { score: Math.max(0, Math.min(FLAGGED_CAP, base + adj)), reason: flagged, base, voteAdjust: adj, unknownCount, cells };
+  }
   if (unknownCount > MAX_UNKNOWN) return { score: null, reason: "not enough data", base: null, voteAdjust: adj, unknownCount, cells };
-  let base = Math.round(cells.reduce((a, c) => a + c.points, 0));
-  if (item.archived || item.deprecated === true) base = Math.min(base, FLAGGED_CAP);
+  const base = Math.round(cells.reduce((a, c) => a + c.points, 0));
   return { score: Math.max(0, Math.min(100, base + adj)), base, voteAdjust: adj, unknownCount, cells };
 }

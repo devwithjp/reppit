@@ -139,12 +139,21 @@ export async function refreshHealth(db: Db, itemId: string, now: Date = new Date
 }
 
 /** Write package signals for an item and refresh its health. `null` signals (a failed check) are a no-op. */
+/**
+ * Write a signals check. `registryLicense` fills `license` only when GitHub detected none (null or
+ * NOASSERTION): date-fns has no licence file GitHub recognises, but npm declares MIT.
+ */
 export async function applySignals(db: Db, itemId: string, s: {
   packageEcosystem: string | null; packageName: string | null; deprecated: boolean | null; deprecationMessage: string | null;
-  advisoriesOpen: number | null; signalsCheckedAt: Date;
+  advisoriesOpen: number | null; signalsCheckedAt: Date; registryLicense?: string | null;
 } | null, now: Date = new Date()) {
   if (!s) return false;
-  await db.update(items).set({ ...s, updatedAt: now }).where(eq(items.id, itemId));
+  const { registryLicense, ...cols } = s;
+  await db.update(items).set({
+    ...cols,
+    ...(registryLicense ? { license: sql`case when ${items.license} is null or ${items.license} = 'NOASSERTION' then ${registryLicense} else ${items.license} end` } : {}),
+    updatedAt: now,
+  }).where(eq(items.id, itemId));
   await refreshHealth(db, itemId, now);
   return true;
 }

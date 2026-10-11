@@ -42,18 +42,18 @@ describe("castVote (pglite)", () => {
 
 describe("search (pglite + pgvector)", () => {
   it("ranks the relevant repo first and explains why", async () => {
-    const res = await search(db, new LocalEmbedder(), "I need to extract tables from PDF files in Python");
-    expect(res.length).toBe(2);
-    expect(res[0].item.slug).toBe("x/pdfplumber");
-    expect(res[0].why).toMatch(/match/);
+    const { results: res } = await search(db, new LocalEmbedder(), "I need to extract tables from PDF files in Python");
+    // express shares no term with the query, so it falls below the relevance floor.
+    expect(res.map((r) => r.item.slug)).toEqual(["x/pdfplumber"]);
+    expect(res[0].why).toMatch(/^(Exact name match|Matches every term|Partial match)/);
   });
   it("filters by language", async () => {
-    const res = await search(db, new LocalEmbedder(), "web server", { language: "javascript" });
+    const { results: res } = await search(db, new LocalEmbedder(), "web server", { language: "javascript" });
     expect(res.map((r) => r.item.slug)).toEqual(["y/express"]);
   });
   it("surfaces downvote reasons", async () => {
     await castVote(db, strongUserId, b, "down", "unmaintained");
-    const res = await search(db, new LocalEmbedder(), "node web framework");
+    const { results: res } = await search(db, new LocalEmbedder(), "node web framework");
     const ex = res.find((r) => r.item.slug === "y/express")!;
     expect(ex.downvoteReasons.unmaintained).toBe(1);
   });

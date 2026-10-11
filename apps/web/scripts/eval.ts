@@ -99,14 +99,16 @@ async function main() {
   const resolved = new Map<string, Resolution>();
   for (const s of all) resolved.set(s, await resolveExpected(db, s));
 
-  let hits = 0, ceiling = 0;
+  let hits = 0, hits1 = 0, ceiling = 0, empty = 0;
   const t0 = Date.now();
   for (const f of fixtures) {
     const expectedIds = new Set(f.expect.map((e) => resolved.get(e)!.id).filter((x): x is string => !!x));
     if (expectedIds.size) ceiling++;
-    const res = await search(db, embedder, f.q, { limit: 5 });
+    const { results: res } = await search(db, embedder, f.q, { limit: 5 });
     const hit = res.some((r) => expectedIds.has(r.item.id));
     if (hit) hits++;
+    if (res[0] && expectedIds.has(res[0].item.id)) hits1++;
+    if (res.length === 0) empty++;
     const mark = hit ? "✓" : expectedIds.size ? "✗" : "∅"; // ∅ = no expected repo is indexed: cannot hit
     console.log(`${mark} ${f.q}\n    top: ${res.map((r) => r.item.slug).join(", ") || "(none)"}`);
     if (verbose || !hit) {
@@ -120,7 +122,8 @@ async function main() {
   const inIndex = [...resolved.values()].filter((x) => x.id).length;
   const renamed = [...resolved.entries()].filter(([s, x]) => x.canonical && x.canonical.toLowerCase() !== s.toLowerCase());
   const unknown = all.filter((s) => !resolved.get(s)!.id && !cache[key(s)]);
-  console.log(`\nhit@5: ${hits}/${fixtures.length} · ceiling: ${ceiling}/${fixtures.length} (queries with ≥1 expected repo indexed) · expected repos indexed: ${inIndex}/${all.length}`);
+  console.log(`\nhit@1: ${hits1}/${fixtures.length} · empty (not indexed): ${empty}/${fixtures.length}`);
+  console.log(`hit@5: ${hits}/${fixtures.length} · ceiling: ${ceiling}/${fixtures.length} (queries with ≥1 expected repo indexed) · expected repos indexed: ${inIndex}/${all.length}`);
   console.log(`indexed items: ${indexed} · embedder: ${embedder.name} · ${((Date.now() - t0) / fixtures.length).toFixed(0)} ms/query`);
   if (renamed.length) console.log(`renamed/transferred since the fixture was written: ${renamed.map(([s, x]) => `${s} → ${x.canonical}`).join(", ")}`);
   if (unknown.length) console.log(`${unknown.length} expected slug(s) neither indexed nor resolved on GitHub${offline ? " (--offline)" : ""}; a rename among them would be missed: ${unknown.join(", ")}`);

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   packageNameFromPackageJson, packageNameFromPyproject, githubSlugFromUrl, checkNpm, checkPypi, osvOpenAdvisories,
   countDistinctAdvisories, checkPackageSignals, type FetchLike,
+  packageNameFromSetupCfg, packageNameFromSetupPy, packageNameFromCargoToml, checkCrates, osvOpenAdvisoriesBatch, resolvePackage,
 } from "../src/signals";
 
 /** Route table fake. Bodies below follow shapes recorded from the live APIs on 2026-10-11. */
@@ -45,7 +46,7 @@ describe("manifest parsing", () => {
 describe("checkNpm", () => {
   it("flags a deprecated package whose repository points back at the repo", async () => {
     const f = fake({ "https://registry.npmjs.org/request/latest": REQUEST_LATEST });
-    expect(await checkNpm("request", ["request/request"], f)).toEqual({ ecosystem: "npm", name: "request", version: "2.88.2", deprecated: true, deprecationMessage: REQUEST_LATEST.deprecated });
+    expect(await checkNpm("request", ["request/request"], f)).toEqual({ ecosystem: "npm", name: "request", version: "2.88.2", deprecated: true, deprecationMessage: REQUEST_LATEST.deprecated, license: null });
   });
   it("ignores a same-named package that belongs to another repo", async () => {
     const f = fake({ "https://registry.npmjs.org/request/latest": REQUEST_LATEST });
@@ -69,7 +70,7 @@ describe("checkPypi", () => {
   });
   it("is deprecated when the latest release is yanked or marked Inactive", async () => {
     const yanked = fake({ "https://pypi.org/pypi/requests/json": { info: { ...info, yanked: true, yanked_reason: "broken" } } });
-    expect(await checkPypi("requests", ["psf/requests"], yanked)).toMatchObject({ deprecated: true, deprecationMessage: "latest release yanked: broken" });
+    expect(await checkPypi("requests", ["psf/requests"], yanked)).toMatchObject({ deprecated: true, deprecationMessage: "every release yanked: broken" });
     const inactive = fake({ "https://pypi.org/pypi/requests/json": { info: { ...info, classifiers: ["Development Status :: 7 - Inactive"] } } });
     expect((await checkPypi("requests", ["psf/requests"], inactive))?.deprecated).toBe(true);
   });
@@ -126,5 +127,112 @@ describe("checkPackageSignals", () => {
   it("advisory lookup failure leaves advisories unknown but keeps the deprecation result", async () => {
     const f = fake({ "https://registry.npmjs.org/request/latest": REQUEST_LATEST, "https://api.osv.dev/v1/querybatch": new Response("", { status: 500 }) });
     expect(await checkPackageSignals(["request/request"], { packageJson: '{"name":"request"}' }, f, now)).toMatchObject({ deprecated: true, advisoriesOpen: null });
+  });
+});
+
+describe("more manifests", () => {
+  it("reads setup.cfg, setup.py and Cargo.toml names", () => {
+    expect(packageNameFromSetupCfg("[metadata]\nname = attrs\nversion = 1\n[options]\nname = nope")).toBe("attrs");
+    expect(packageNameFromSetupCfg("[options]\nname = nope")).toBeNull();
+    expect(packageNameFromSetupPy("from setuptools import setup\nsetup(\n    name='pytesseract',\n    version=v,\n)")).toBe("pytesseract");
+    expect(packageNameFromSetupPy("setup(name=NAME)")).toBeNull();
+    expect(packageNameFromCargoToml('[package]\nname = "clap"\nversion = "4.5.0"\n[dependencies]\nname = "x"')).toBe("clap");
+    expect(packageNameFromCargoToml('[workspace]\nmembers = ["clap_builder"]')).toBeNull();
+  });
+});
+
+describe("crates.io", () => {
+  const crate = { name: "clap", repository: "https://github.com/clap-rs/clap", max_version: "4.5.20", max_stable_version: "4.5.20" };
+  it("verifies the repository link and uses the newest live version", async () => {
+    const f = fake({ "https://crates.io/api/v1/crates/clap": { crate, versions: [{ num: "4.5.20", yanked: false, created_at: "2026-09-01T00:00:00Z" }, { num: "4.5.19", yanked: false, created_at: "2026-08-01T00:00:00Z" }] } });
+    expect(await checkCrates("clap", ["clap-rs/clap"], f)).toMatchObject({ ecosystem: "crates.io", version: "4.5.20", deprecated: false });
+    expect(await checkCrates("clap", ["someone/else"], f)).toBeNull();
+  });
+  it("is deprecated when the latest version is yanked", async () => {
+    const f = fake({ "https://crates.io/api/v1/crates/clap": { crate: { ...crate, max_version: "0.0.0", max_stable_version: null }, versions: [{ num: "1.0.1", yanked: true, created_at: "2026-09-01T00:00:00Z" }, { num: "1.0.0", yanked: true, created_at: "2026-01-01T00:00:00Z" }] } });
+    expect(await checkCrates("clap", ["clap-rs/clap"], f)).toMatchObject({ deprecated: true, deprecationMessage: "latest version 1.0.1 yanked", version: "1.0.1" });
+  });
+});
+
+describe("PyPI every release yanked", () => {
+  it("is deprecated only when all published releases are yanked", async () => {
+    const info = { name: "x", version: "2.0", project_urls: { Source: "https://github.com/a/x" }, classifiers: [] };
+    const all = fake({ "https://pypi.org/pypi/x/json": { info, releases: { "1.0": [{ yanked: true }], "2.0": [{ yanked: true }], "0.1": [] } } });
+    expect((await checkPypi("x", ["a/x"], all))?.deprecated).toBe(true);
+    const some = fake({ "https://pypi.org/pypi/x/json": { info, releases: { "1.0": [{ yanked: true }], "2.0": [{ yanked: false }] } } });
+    expect((await checkPypi("x", ["a/x"], some))?.deprecated).toBe(false);
+  });
+});
+
+describe("resolvePackage", () => {
+  it("falls through to setup.py and Cargo.toml when earlier names do not link back", async () => {
+    const f = fake({
+      "https://registry.npmjs.org/docs-site/latest": { name: "docs-site", version: "1.0.0", repository: "https://github.com/other/thing" },
+      "https://crates.io/api/v1/crates/clap": { crate: { name: "clap", repository: "https://github.com/clap-rs/clap", max_stable_version: "4.5.20" }, versions: [{ num: "4.5.20", yanked: false, created_at: "2026-09-01T00:00:00Z" }] },
+    });
+    const hit = await resolvePackage(["clap-rs/clap"], { packageJson: '{"name":"docs-site"}', cargoToml: '[package]\nname = "clap"' }, f);
+    expect(hit).toMatchObject({ ecosystem: "crates.io", name: "clap" });
+  });
+});
+
+describe("OSV batch", () => {
+  it("answers many packages in one call, shares vuln details, and leaves paged results unknown", async () => {
+    let batchCalls = 0;
+    const f = fake({
+      "https://api.osv.dev/v1/querybatch": (init?: RequestInit) => {
+        batchCalls++;
+        const q = JSON.parse(String(init?.body)).queries as { package: { name: string } }[];
+        expect(q).toHaveLength(3);
+        return { results: [{ vulns: [{ id: "GHSA-1" }, { id: "PYSEC-1" }] }, {}, { vulns: [{ id: "GHSA-1" }], next_page_token: "t" }] };
+      },
+      "https://api.osv.dev/v1/vulns/GHSA-1": { id: "GHSA-1", aliases: ["PYSEC-1"] },
+      "https://api.osv.dev/v1/vulns/PYSEC-1": { id: "PYSEC-1", aliases: ["GHSA-1"] },
+    });
+    const out = await osvOpenAdvisoriesBatch([
+      { ecosystem: "PyPI", name: "a", version: "1" }, { ecosystem: "npm", name: "b", version: "2" }, { ecosystem: "crates.io", name: "c", version: "3" },
+    ], f);
+    expect(out).toEqual([1, 0, null]);
+    expect(batchCalls).toBe(1);
+    expect(f.hits.filter((h) => h.includes("/vulns/GHSA-1"))).toHaveLength(1);
+  });
+  it("makes everything unknown when the batch call fails", async () => {
+    const f = fake({ "https://api.osv.dev/v1/querybatch": new Response("", { status: 503 }) });
+    expect(await osvOpenAdvisoriesBatch([{ ecosystem: "npm", name: "b", version: "2" }], f)).toEqual([null]);
+  });
+});
+
+describe("package resolution for monorepos and renamed packages", () => {
+  const npmPkg = (name: string, repo: string, extra: object = {}) => ({ name, version: "1.0.0", repository: { url: `git+https://github.com/${repo}.git` }, ...extra });
+  it("prefers the repo's own name over the name a manifest gives (docling, not docling-slim)", async () => {
+    const urls = { project_urls: { Repository: "https://github.com/docling-project/docling" } };
+    const f = fake({
+      "https://pypi.org/pypi/docling/json": { info: { name: "docling", version: "2.0", ...urls } },
+      "https://pypi.org/pypi/docling-slim/json": { info: { name: "docling-slim", version: "2.0", ...urls } },
+    });
+    expect(await resolvePackage(["docling-project/docling"], { pyproject: '[project]\nname = "docling-slim"' }, f)).toMatchObject({ ecosystem: "PyPI", name: "docling" });
+  });
+  it("finds a package in a folder named like the repo when the root package.json is private", async () => {
+    const f = fake({ "https://registry.npmjs.org/drizzle-kit/latest": npmPkg("drizzle-kit", "drizzle-team/drizzle-orm") });
+    const hit = await resolvePackage(["drizzle-team/drizzle-orm"], { packageJson: '{"name":"drizzle-root","private":true}', subPackageJsons: ['{"name":"drizzle-kit"}', null] }, f);
+    expect(hit).toMatchObject({ ecosystem: "npm", name: "drizzle-kit" });
+  });
+  it("falls back to npm search by repository link", async () => {
+    const f = fake({
+      "https://registry.npmjs.org/-/v1/search?text=thing&size=10": { objects: [
+        { package: { name: "unrelated", links: { repository: "https://github.com/x/other" } } },
+        { package: { name: "@acme/thing-core", links: { repository: "https://github.com/acme/thing" } } },
+      ] },
+      "https://registry.npmjs.org/@acme%2fthing-core/latest": npmPkg("@acme/thing-core", "acme/thing"),
+    });
+    expect(await resolvePackage(["acme/thing"], { packageJson: '{"name":"root","private":true}' }, f)).toMatchObject({ name: "@acme/thing-core" });
+  });
+  it("reads the declared SPDX licence and ignores free text", async () => {
+    const f = fake({ "https://registry.npmjs.org/date-fns/latest": npmPkg("date-fns", "date-fns/date-fns", { license: "MIT" }) });
+    expect((await resolvePackage(["date-fns/date-fns"], { packageJson: '{"name":"@date-fns/root","private":true}' }, f))?.license).toBe("MIT");
+    const { spdxish } = await import("../src/signals");
+    expect(spdxish("Apache-2.0 OR MIT")).toBe("Apache-2.0 OR MIT");
+    expect(spdxish({ type: "BSD-3-Clause" })).toBe("BSD-3-Clause");
+    expect(spdxish("Copyright (c) 2020 someone. All rights reserved and more text here")).toBeNull();
+    expect(spdxish("UNLICENSED")).toBeNull();
   });
 });

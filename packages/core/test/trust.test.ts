@@ -53,9 +53,24 @@ describe("trustScore", () => {
     const withStars = { ...healthy, stars: 1_000_000 } as TrustItem;
     expect(trustScore(withStars, 0, now)).toEqual(trustScore(healthy, 0, now));
   });
-  it("caps archived and deprecated items at 25 before votes", () => {
-    expect(trustScore({ ...healthy, archived: true }, 0, now).base).toBe(25);
-    expect(trustScore({ ...healthy, deprecated: true }, 0, now).base).toBe(25);
+  it("caps archived and deprecated items at 25, votes included, and names the reason", () => {
+    expect(trustScore({ ...healthy, archived: true }, 0, now)).toMatchObject({ score: 25, base: 25, reason: "archived" });
+    expect(trustScore({ ...healthy, deprecated: true }, 0, now)).toMatchObject({ score: 25, reason: "deprecated" });
+    expect(trustScore({ ...healthy, archived: true }, 1000, now).score).toBe(25);
+    expect(trustScore({ ...healthy, archived: true }, -1000, now).score).toBe(13);
+  });
+  it("archived or deprecated overrides not enough data", () => {
+    // localstack-shaped: archived, pushed months ago, nothing else known (4 unknowns).
+    const t = trustScore({ archived: true, pushedAt: daysAgo(200) }, 0, now);
+    expect(t.unknownCount).toBe(4);
+    expect(t.score).not.toBeNull();
+    expect(t.score!).toBeLessThanOrEqual(25);
+    expect(t.reason).toBe("archived");
+    const dep = trustScore({ deprecated: true, archived: false }, 0, now);
+    expect(dep).toMatchObject({ reason: "deprecated" });
+    expect(dep.score!).toBeLessThanOrEqual(25);
+    // Not flagged and four unknowns: still no number.
+    expect(trustScore({ archived: false, pushedAt: daysAgo(5) }, 0, now).score).toBeNull();
   });
   it("votes move the score by at most ±12", () => {
     expect(voteAdjust(1e9)).toBe(12);

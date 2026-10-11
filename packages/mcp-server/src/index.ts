@@ -19,8 +19,8 @@ export function buildServer(client = new ReppitClient()) {
       limit: z.number().int().min(1).max(10).optional().describe("Number of results, default 5"),
     },
   }, async ({ problem, language, kind, limit }) => {
-    const { results } = await client.search(problem, { language, kind, limit });
-    return { content: [{ type: "text", text: formatResults(results) }], structuredContent: { results } };
+    const { results, notIndexed } = await client.search(problem, { language, kind, limit });
+    return { content: [{ type: "text", text: formatResults(results, notIndexed) }], structuredContent: { results, notIndexed: notIndexed ?? results.length === 0 } };
   });
 
   server.registerTool("get_repo", {

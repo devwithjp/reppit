@@ -11,10 +11,15 @@ const LANGUAGE_RE = /^[A-Za-z0-9+#. -]{1,40}$/;
 
 // Bounded, TTL'd result cache keyed by normalised query (10 min, 2,000 entries, LRU). Shared across
 // HMR reloads. Rate limits are applied before the cache, so cached answers still count.
-const g = globalThis as unknown as { __searchCache?: TtlCache<SearchResult[]> };
-const cache = (g.__searchCache ??= new TtlCache<SearchResult[]>(2000, 10 * 60_000));
+type Answer = { results: SearchResult[]; notIndexed: boolean };
+const g = globalThis as unknown as { __searchCache2?: TtlCache<Answer> };
+const cache = (g.__searchCache2 ??= new TtlCache<Answer>(2000, 10 * 60_000));
 
-/** GET /api/search?q=...&language=...&kind=repo|skill|mcp&limit=1..10 */
+/**
+ * GET /api/search?q=...&language=...&kind=repo|skill|mcp&limit=1..10
+ * → { results, notIndexed, cached }. notIndexed: true (with results: []) means nothing in the index
+ * cleared the relevance floor: say "not in the index yet", never show weak matches.
+ */
 export const GET = route("search GET", async (req) => {
   const url = new URL(req.url);
   const q = url.searchParams.get("q")?.trim() ?? "";
@@ -44,11 +49,11 @@ export const GET = route("search GET", async (req) => {
   const headers = { "cache-control": "private, max-age=60" };
 
   const cached = cache.get(key);
-  if (cached) { void log(cached); return json({ results: cached, cached: true }, { headers }); }
+  if (cached) { void log(cached.results); return json({ ...cached, cached: true }, { headers }); }
 
-  let results = await search(d, embedder(), q, { language, kind, limit });
-  results = await explainWithClaude(q, results);
-  cache.set(key, results);
-  void log(results);
-  return json({ results, cached: false }, { headers });
+  const found = await search(d, embedder(), q, { language, kind, limit });
+  const answer: Answer = { results: await explainWithClaude(q, found.results), notIndexed: found.notIndexed };
+  cache.set(key, answer);
+  void log(answer.results);
+  return json({ ...answer, cached: false }, { headers });
 });

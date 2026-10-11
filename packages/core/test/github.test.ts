@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseRepoRef, repoToItem, type GhRepo } from "../src/github";
+import { parseRepoRef, repoToItem, fetchReadmeRaw, README_MAX_CHARS, type GhRepo } from "../src/github";
 
 describe("parseRepoRef", () => {
   it("parses owner/name and URLs", () => {
@@ -34,5 +34,20 @@ describe("repoToItem", () => {
     expect(item.openPullRequests).toBeNull();
     // Health ignores issue load entirely when it is unknown: same score whatever REST reported.
     expect(repoToItem({ ...r, open_issues_count: 0 }, null, null).healthScore).toBe(item.healthScore);
+  });
+});
+
+describe("fetchReadmeRaw", () => {
+  const routes = (map: Record<string, Response>) => async (url: string) => map[url] ?? new Response("", { status: 404 });
+  it("falls through the usual names and truncates", async () => {
+    const long = "x".repeat(README_MAX_CHARS + 10);
+    const f = routes({ "https://raw.githubusercontent.com/a/b/HEAD/README.rst": new Response(long) });
+    expect((await fetchReadmeRaw("a", "b", f))?.length).toBe(README_MAX_CHARS);
+  });
+  it("returns null when there is none, and throws on 5xx only when strict", async () => {
+    expect(await fetchReadmeRaw("a", "b", routes({}))).toBeNull();
+    const down = async () => new Response("", { status: 503 });
+    expect(await fetchReadmeRaw("a", "b", down)).toBeNull();
+    await expect(fetchReadmeRaw("a", "b", down, { strict: true })).rejects.toThrow(/503/);
   });
 });
