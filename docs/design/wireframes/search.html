@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Search results wireframe</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#fff;color:#222}
+body{font:13px/1.45 "DejaVu Sans",Arial,sans-serif}
+.m{font-family:"DejaVu Sans Mono",Menlo,monospace}
+a{color:#222}
+.sheet{border-bottom:2px solid #222;padding:10px 40px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font:11px/1.4 "DejaVu Sans Mono",monospace;letter-spacing:.04em;text-transform:uppercase}
+.sheet b{font-size:12px}
+.wrap{max-width:1440px;margin:0 auto;padding-inline:40px}
+.frame{border:1px solid #222;margin:18px 40px 0}
+.mast{display:flex;align-items:center;gap:18px;padding:10px 16px;border-bottom:1px solid #222}
+.logo{display:flex;align-items:center;gap:6px;font:700 16px "DejaVu Sans Mono",monospace}
+.logo i{display:inline-block;width:9px;height:14px;background:#8a8a8a}
+.nav{display:flex;gap:16px;font:12px "DejaVu Sans Mono",monospace}
+.grow{flex:1}
+.in{border:1px solid #222;padding:7px 9px;font:12px "DejaVu Sans Mono",monospace;background:#fff;min-width:0}
+.in.ph{color:#555}
+.btn{display:inline-block;border:1px solid #222;padding:6px 12px;font:12px "DejaVu Sans Mono",monospace;background:#fff;white-space:nowrap}
+.btn.em{background:#8a8a8a;color:#fff;border-color:#8a8a8a}
+.btn.off{border-style:dashed;color:#666}
+.lbl{font:10.5px "DejaVu Sans Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:#444}
+.box{border:1px solid #222;padding:12px}
+.dash{border:1px dashed #222;padding:12px}
+.fill{background:#8a8a8a;color:#fff}
+.tag{display:inline-block;border:1px solid #222;padding:1px 6px;font:11px "DejaVu Sans Mono",monospace;margin:2px 4px 2px 0;white-space:nowrap}
+.tag.em{background:#8a8a8a;color:#fff;border-color:#8a8a8a}
+.chip{display:inline-block;border:1px dashed #222;padding:1px 6px;font:11px "DejaVu Sans Mono",monospace;margin:2px 4px 2px 0;white-space:nowrap}
+.c{display:inline-block;min-width:19px;height:19px;padding:0 4px;border-radius:10px;background:#222;color:#fff;font:700 11px/19px "DejaVu Sans Mono",monospace;text-align:center;margin:0 4px;vertical-align:middle;letter-spacing:0;text-transform:none}
+h1{font:700 26px/1.15 "DejaVu Sans Mono",monospace;letter-spacing:-.03em}
+h2{font:700 13px "DejaVu Sans Mono",monospace;border-bottom:1px solid #222;padding-bottom:5px;margin-bottom:10px}
+p{max-width:68ch}
+.mut{color:#555}
+.sm{font-size:12px}
+.xs{font-size:11px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.cols{display:flex;gap:24px;align-items:flex-start}
+.cols>*{min-width:0}
+.main{flex:1}
+.side{width:340px;flex:none}
+.stack>*+*{margin-top:12px}
+.pad{padding:16px}
+.strip{display:inline-flex;gap:2px;vertical-align:middle}
+.strip s{display:inline-block;width:8px;height:12px;border:1px solid #222;text-decoration:none}
+.strip s.h{background:#222}.strip s.g{background:#8a8a8a;border-color:#8a8a8a}.strip s.u{border-style:dotted}
+table{border-collapse:collapse;width:100%}
+td,th{border-bottom:1px solid #222;padding:6px 6px;text-align:left;vertical-align:top;font-size:12px}
+th{font:10.5px "DejaVu Sans Mono",monospace;letter-spacing:.1em;text-transform:uppercase}
+td.n{font-family:"DejaVu Sans Mono",monospace;text-align:right;white-space:nowrap}
+.foot{border-top:1px solid #222;padding:12px 16px;display:flex;gap:14px;flex-wrap:wrap;font:11.5px "DejaVu Sans Mono",monospace}
+.legend{margin:18px 40px 30px;border:2px solid #222}
+.legend h3{font:700 12px "DejaVu Sans Mono",monospace;letter-spacing:.08em;text-transform:uppercase;padding:8px 12px;border-bottom:1px solid #222}
+.legend ol{list-style:none;columns:2;column-gap:24px;padding:10px 12px}
+.legend li{break-inside:avoid;padding:4px 0;display:flex;gap:6px;font-size:12px;align-items:flex-start}
+.legend li .c{flex:none;margin-left:0}
+.legend .note{padding:0 12px 10px;font-size:12px;color:#444}
+/* feed / search rows */
+.list{border-top:1px solid #222;border-bottom:1px solid #222}
+.it{display:grid;grid-template-columns:56px 1fr 170px;gap:14px;padding:11px 14px;border-bottom:1px solid #999}
+.it:last-child{border-bottom:0}
+.rail{text-align:center;font:700 13px "DejaVu Sans Mono",monospace}
+.rail .t{display:block;font-size:11px;font-weight:400}
+.rail .v{display:block;font:9px "DejaVu Sans Mono",monospace;letter-spacing:.1em;color:#555}
+.id{font:500 15px "DejaVu Sans Mono",monospace}
+.id .o{font-weight:400;color:#555}
+.desc{color:#333;margin:3px 0;font-size:13px}
+.band{font-size:12px;margin-top:3px}
+.trust{text-align:right;font-family:"DejaVu Sans Mono",monospace}
+.trust .s{font:700 22px "DejaVu Sans Mono",monospace}
+.picker{grid-column:2/4;border:2px solid #222;padding:10px;margin-top:4px}
+.hide-d{display:none}
+.alts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.alts .lbl{display:block;margin-bottom:6px}
+@media (max-width:700px){
+  .sheet{padding:8px 16px}
+  .frame{margin:12px 16px 0}
+  .legend{margin:14px 16px 24px}
+  .legend ol{columns:1}
+  .wrap{padding-inline:16px}
+  .mast{flex-wrap:wrap;gap:10px;padding:10px 12px}
+  .hide-p{display:none!important}
+  .hide-d{display:block}
+  span.hide-d,b.hide-d{display:inline}
+  .cols{flex-direction:column;gap:16px}
+  .side{width:100%}
+  h1{font-size:20px}
+  .it{grid-template-columns:40px 1fr;gap:10px;padding:10px 10px}
+  .trust{grid-column:2;text-align:left}
+  .picker{grid-column:1/3}
+  .alts{grid-template-columns:1fr}
+  .pad{padding:12px}
+  .btn{white-space:normal;max-width:100%}
+  .tag,.chip{white-space:normal}
+  td,th{padding:5px 4px;overflow-wrap:break-word}
+  td.hide-p,th.hide-p{display:none}
+}
+</style></head>
+<body>
+<div class="sheet"><span><b>reppit · wireframe · Search results</b></span><span>/search?q=pull+tables+out+of+a+pdf+in+python</span><span>v1 · low fidelity · greyscale</span></div>
+<div class="frame">
+<div class="mast">
+  <div class="logo"><i></i>reppit</div>
+  <div class="nav hide-p"><span>Browse</span><span>Trust score</span><span>In your agent</span></div>
+  <div class="grow hide-p"></div>
+  <div class="grow hide-d"></div>
+  <span class="btn hide-d">Search</span><span class="btn hide-d">Menu</span>
+  <span class="btn">Sign in</span>
+</div>
+<div class="pad stack" style="border-bottom:1px solid #222">
+  <div class="row" style="flex-wrap:nowrap"><div class="in grow">pull tables out of a pdf in python</div><span class="btn em">Search</span><b class="c">1</b></div>
+  <div class="row xs"><span class="lbl">Read as</span><span class="tag">task: table extraction ×</span><span class="tag">format: pdf ×</span><span class="tag">language: python ×</span><span class="tag">surface: library ×</span><b class="c">2</b></div>
+</div>
+<div class="pad row" style="justify-content:space-between;padding-block:10px">
+  <div class="row nav"><span style="border-bottom:2px solid #222">Repos 7</span><span>Skills 3</span><span>MCP servers 1</span><b class="c">3</b></div>
+  <div class="row m sm"><span class="lbl">Sort</span><span style="border-bottom:2px solid #222">Relevance</span><span>Trust</span><b class="c">4</b></div>
+</div>
+<div class="pad" style="padding-block:6px;border-top:1px solid #999"><span class="m xs"><span class="strip"><s class="h"></s><s class="g"></s><s class="h"></s><s class=""></s><s class="h"></s><s class="u"></s></span> = last push · releases · archived/deprecated · advisories · issue load · licence.</span></div>
+<div class="list"><div class="it">
+  <div class="rail"><span class="t">▲</span>974<span class="v">VOTES</span><span class="t">▼</span><b class="c">7</b></div>
+  <div>
+    <div class="id"><span class="mut m xs">1</span> <span class="o">jsvine/</span>pdfplumber <span class="m xs mut">Python · MIT</span></div>
+    <div class="desc"><b>Does the specific thing you asked for: extract_tables() returns rows directly.</b><b class="c">5</b></div>
+    <div class="desc"></div>
+    <div class="band m xs mut">pushed 11d ago · 6 releases in 12mo · no advisories · MIT · 118 open issues on 7.4k stars<b class="c">6</b></div>
+    <div class="band"><span class="lbl">Reasons</span> <span class="tag">29 works as described</span><span class="tag">4 low quality</span></div>
+    <div class="band"><span class="lbl">Agents</span> <span class="chip">✓ Claude Code 44</span><span class="chip">✓ Codex 17</span><span class="chip">✓ Cursor 11</span></div>
+  </div>
+  <div class="trust"><span class="lbl">Trust</span><br><span class="s">88</span>/100<br><span class="strip"><s class="h"></s><s class="h"></s><s class="h"></s><s class="h"></s><s class="g"></s><s class="h"></s></span><br><span class="xs mut">pushed 11 days ago</span></div>
+  
+</div><div class="it">
+  <div class="rail"><span class="t">▲</span>188<span class="v">VOTES</span><span class="t">▼</span></div>
+  <div>
+    <div class="id"><span class="mut m xs">2</span> <span class="o">camelot-dev/</span>camelot <span class="m xs mut">Python · MIT · <span class='tag'>slowing</span></span></div>
+    <div class="desc"><b>Best for bordered tables. Needs Ghostscript installed, which is where most agent runs fall over.</b></div>
+    <div class="desc"></div>
+    <div class="band m xs mut">pushed 7mo ago · 1 release in 12mo · no advisories · MIT</div>
+    <div class="band"><span class="lbl">Reasons</span> <span class="tag">14 works as described</span><span class="tag">11 unmaintained</span><span class="tag">6 broken on an agent</span></div>
+    <div class="band"><span class="lbl">Agents</span> <span class="chip">✓ Claude Code 18</span><span class="chip">✗ Codex 9</span><span class="chip">✗ Cursor 6</span></div>
+  </div>
+  <div class="trust"><span class="lbl">Trust</span><br><span class="s">58</span>/100<br><span class="strip"><s class="g"></s><s class="g"></s><s class="h"></s><s class="h"></s><s class="g"></s><s class="h"></s></span><br><span class="xs mut">pushed 7 months ago</span></div>
+  
+</div><div class="it">
+  <div class="rail"><span class="t">▲</span>−243<span class="v">VOTES</span><span class="t">▼</span></div>
+  <div>
+    <div class="id"><span class="mut m xs">3</span> <span class="o">atlanhq/</span>camelot <span class="m xs mut">Python · MIT · <span class='tag em'>archived</span> · <span class='tag'>partial match</span></span><b class="c">8</b></div>
+    <div class="desc"><b>Shown because agents keep picking it. Abandoned fork of the result above.</b></div>
+    <div class="desc"></div>
+    <div class="band m xs mut">pushed 3y ago · archived by owner · no releases</div>
+    <div class="band"><span class="lbl">Reasons</span> <span class="tag">47 unmaintained</span><span class="tag">19 misleading</span></div>
+    <div class="band"><span class="lbl">Agents</span> <span class="chip">✗ Claude Code 22</span><span class="chip">✗ Codex 14</span></div>
+  </div>
+  <div class="trust"><span class="lbl">Trust</span><br><span class="s">11</span>/100<br><span class="strip"><s class=""></s><s class=""></s><s class="h"></s><s class="h"></s><s class=""></s><s class=""></s></span><br><span class="xs mut">pushed 3 years ago</span></div>
+  
+</div></div>
+<div class="pad m xs">Nothing here is sponsored. Ranking and placement are separate systems and always will be.<b class="c">9</b> · How the trust score is computed</div>
+<div style="border-top:1px solid #222"><div class="pad"><div class="lbl" style="margin-bottom:8px">Alternate states of this screen</div><div class="alts">
+<div class="dash"><span class="lbl">Zero results<b class="c">10</b></span><p class="sm">Nothing indexed matches that.</p><p class="sm" style="margin-top:6px"><u>Submit the repo you end up using</u></p></div>
+<div class="dash"><span class="lbl">All weak matches<b class="c">11</b></span><p class="sm">Nothing here is a strong match. Try describing the problem differently, or submit the repo you end up using.</p></div>
+<div class="dash"><span class="lbl">Rate limited (429)<b class="c">12</b></span><p class="sm">Search limit reached for this hour. Sign in for more. Resets at 14:00.</p></div>
+<div class="dash"><span class="lbl">Query under 3 chars<b class="c">13</b></span><p class="sm">Type at least 3 characters.</p></div>
+<div class="dash"><span class="lbl">Explanation service down<b class="c">14</b></span><p class="sm">Rows show the item description in place of the why line. No error shown.</p></div>
+</div></div></div>
+<div class="foot"><span>reppit.dev</span><span>repos</span><span>skills</span><span>mcp servers</span><span>how the trust score works</span><span>mcp server</span><span>terms</span><span>privacy</span><span>status</span></div>
+</div>
+<div class="legend"><h3>Callouts → docs/product/feature-list.md</h3><ol><li><b class="c">1</b><span><b class="m">F-01</b> Query box keeps the query; URL /search?q= is shareable.</span></li><li><b class="c">2</b><span><b class="m">F-01</b> Read-as chips; removing one re-runs without that filter.</span></li><li><b class="c">3</b><span><b class="m">F-16</b> Kind tabs with counts.</span></li><li><b class="c">4</b><span><b class="m">F-01</b> Sort Relevance (default) / Trust.</span></li><li><b class="c">5</b><span><b class="m">F-02</b> One-line why, at most 240 chars.</span></li><li><b class="c">6</b><span><b class="m">F-03</b> Facts line: the measured signals in words.</span></li><li><b class="c">7</b><span><b class="m">F-07 / F-08</b> Same vote rail and reason picker as the feed.</span></li><li><b class="c">8</b><span><b class="m">F-02 / F-05</b> Archived flag always shown; &#x27;partial match&#x27; label.</span></li><li><b class="c">9</b><span><b class="m">F-33</b> Not-sponsored line.</span></li><li><b class="c">10</b><span><b class="m">F-36</b> Zero results: submit link, query preserved.</span></li><li><b class="c">11</b><span><b class="m">F-02</b> All-weak notice.</span></li><li><b class="c">12</b><span><b class="m">F-31</b> Anonymous limit (30/hour/IP) reached.</span></li><li><b class="c">13</b><span><b class="m">F-01</b> Short query rejected.</span></li><li><b class="c">14</b><span><b class="m">F-02</b> Graceful fallback when explanations fail.</span></li></ol></div>
+</body></html>

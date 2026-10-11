@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>First vote flow</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#fff;color:#222}
+body{font:13px/1.45 "DejaVu Sans",Arial,sans-serif}
+.m{font-family:"DejaVu Sans Mono",Menlo,monospace}
+a{color:#222}
+.sheet{border-bottom:2px solid #222;padding:10px 40px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font:11px/1.4 "DejaVu Sans Mono",monospace;letter-spacing:.04em;text-transform:uppercase}
+.sheet b{font-size:12px}
+.wrap{max-width:1440px;margin:0 auto;padding-inline:40px}
+.frame{border:1px solid #222;margin:18px 40px 0}
+.mast{display:flex;align-items:center;gap:18px;padding:10px 16px;border-bottom:1px solid #222}
+.logo{display:flex;align-items:center;gap:6px;font:700 16px "DejaVu Sans Mono",monospace}
+.logo i{display:inline-block;width:9px;height:14px;background:#8a8a8a}
+.nav{display:flex;gap:16px;font:12px "DejaVu Sans Mono",monospace}
+.grow{flex:1}
+.in{border:1px solid #222;padding:7px 9px;font:12px "DejaVu Sans Mono",monospace;background:#fff;min-width:0}
+.in.ph{color:#555}
+.btn{display:inline-block;border:1px solid #222;padding:6px 12px;font:12px "DejaVu Sans Mono",monospace;background:#fff;white-space:nowrap}
+.btn.em{background:#8a8a8a;color:#fff;border-color:#8a8a8a}
+.btn.off{border-style:dashed;color:#666}
+.lbl{font:10.5px "DejaVu Sans Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:#444}
+.box{border:1px solid #222;padding:12px}
+.dash{border:1px dashed #222;padding:12px}
+.fill{background:#8a8a8a;color:#fff}
+.tag{display:inline-block;border:1px solid #222;padding:1px 6px;font:11px "DejaVu Sans Mono",monospace;margin:2px 4px 2px 0;white-space:nowrap}
+.tag.em{background:#8a8a8a;color:#fff;border-color:#8a8a8a}
+.chip{display:inline-block;border:1px dashed #222;padding:1px 6px;font:11px "DejaVu Sans Mono",monospace;margin:2px 4px 2px 0;white-space:nowrap}
+.c{display:inline-block;min-width:19px;height:19px;padding:0 4px;border-radius:10px;background:#222;color:#fff;font:700 11px/19px "DejaVu Sans Mono",monospace;text-align:center;margin:0 4px;vertical-align:middle;letter-spacing:0;text-transform:none}
+h1{font:700 26px/1.15 "DejaVu Sans Mono",monospace;letter-spacing:-.03em}
+h2{font:700 13px "DejaVu Sans Mono",monospace;border-bottom:1px solid #222;padding-bottom:5px;margin-bottom:10px}
+p{max-width:68ch}
+.mut{color:#555}
+.sm{font-size:12px}
+.xs{font-size:11px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.cols{display:flex;gap:24px;align-items:flex-start}
+.cols>*{min-width:0}
+.main{flex:1}
+.side{width:340px;flex:none}
+.stack>*+*{margin-top:12px}
+.pad{padding:16px}
+.strip{display:inline-flex;gap:2px;vertical-align:middle}
+.strip s{display:inline-block;width:8px;height:12px;border:1px solid #222;text-decoration:none}
+.strip s.h{background:#222}.strip s.g{background:#8a8a8a;border-color:#8a8a8a}.strip s.u{border-style:dotted}
+table{border-collapse:collapse;width:100%}
+td,th{border-bottom:1px solid #222;padding:6px 6px;text-align:left;vertical-align:top;font-size:12px}
+th{font:10.5px "DejaVu Sans Mono",monospace;letter-spacing:.1em;text-transform:uppercase}
+td.n{font-family:"DejaVu Sans Mono",monospace;text-align:right;white-space:nowrap}
+.foot{border-top:1px solid #222;padding:12px 16px;display:flex;gap:14px;flex-wrap:wrap;font:11.5px "DejaVu Sans Mono",monospace}
+.legend{margin:18px 40px 30px;border:2px solid #222}
+.legend h3{font:700 12px "DejaVu Sans Mono",monospace;letter-spacing:.08em;text-transform:uppercase;padding:8px 12px;border-bottom:1px solid #222}
+.legend ol{list-style:none;columns:2;column-gap:24px;padding:10px 12px}
+.legend li{break-inside:avoid;padding:4px 0;display:flex;gap:6px;font-size:12px;align-items:flex-start}
+.legend li .c{flex:none;margin-left:0}
+.legend .note{padding:0 12px 10px;font-size:12px;color:#444}
+/* feed / search rows */
+.list{border-top:1px solid #222;border-bottom:1px solid #222}
+.it{display:grid;grid-template-columns:56px 1fr 170px;gap:14px;padding:11px 14px;border-bottom:1px solid #999}
+.it:last-child{border-bottom:0}
+.rail{text-align:center;font:700 13px "DejaVu Sans Mono",monospace}
+.rail .t{display:block;font-size:11px;font-weight:400}
+.rail .v{display:block;font:9px "DejaVu Sans Mono",monospace;letter-spacing:.1em;color:#555}
+.id{font:500 15px "DejaVu Sans Mono",monospace}
+.id .o{font-weight:400;color:#555}
+.desc{color:#333;margin:3px 0;font-size:13px}
+.band{font-size:12px;margin-top:3px}
+.trust{text-align:right;font-family:"DejaVu Sans Mono",monospace}
+.trust .s{font:700 22px "DejaVu Sans Mono",monospace}
+.picker{grid-column:2/4;border:2px solid #222;padding:10px;margin-top:4px}
+.hide-d{display:none}
+.alts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.alts .lbl{display:block;margin-bottom:6px}
+@media (max-width:700px){
+  .sheet{padding:8px 16px}
+  .frame{margin:12px 16px 0}
+  .legend{margin:14px 16px 24px}
+  .legend ol{columns:1}
+  .wrap{padding-inline:16px}
+  .mast{flex-wrap:wrap;gap:10px;padding:10px 12px}
+  .hide-p{display:none!important}
+  .hide-d{display:block}
+  span.hide-d,b.hide-d{display:inline}
+  .cols{flex-direction:column;gap:16px}
+  .side{width:100%}
+  h1{font-size:20px}
+  .it{grid-template-columns:40px 1fr;gap:10px;padding:10px 10px}
+  .trust{grid-column:2;text-align:left}
+  .picker{grid-column:1/3}
+  .alts{grid-template-columns:1fr}
+  .pad{padding:12px}
+  .btn{white-space:normal;max-width:100%}
+  .tag,.chip{white-space:normal}
+  td,th{padding:5px 4px;overflow-wrap:break-word}
+  td.hide-p,th.hide-p{display:none}
+}
+
+.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));column-gap:40px;row-gap:14px;padding:18px 16px}
+.st{border:1px solid #222;background:#fff;position:relative;min-height:120px;display:flex;flex-direction:column}
+.st .hd{border-bottom:1px solid #222;padding:5px 8px;font:700 11.5px "DejaVu Sans Mono",monospace;display:flex;justify-content:space-between;gap:6px;align-items:center}
+.st .hd>span:last-child{white-space:nowrap;flex:none}
+.st .hd .n{background:#222;color:#fff;padding:0 5px}
+.st .bd{padding:8px;font-size:12px;flex:1}
+.st .bd .mini{border:1px dashed #222;padding:5px;margin-top:6px;font:11px "DejaVu Sans Mono",monospace;overflow-wrap:anywhere}
+.st .ft{border-top:1px solid #999;padding:4px 8px;font:11px "DejaVu Sans Mono",monospace;color:#444}
+.st.alt{border-style:dashed}
+.st.em .hd{background:#8a8a8a;color:#fff;border-color:#8a8a8a}
+.st.dec{border-width:2px}
+.st.to::after{content:"→";position:absolute;right:-31px;top:44px;font:700 22px "DejaVu Sans Mono",monospace}
+.down{text-align:center;font:700 16px "DejaVu Sans Mono",monospace;line-height:1;align-self:end}
+.lane{grid-column:1/-1;font:10.5px "DejaVu Sans Mono",monospace;letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid #222;padding:8px 0 4px;margin-top:6px}
+.term{background:#fff;border:1px solid #222;padding:6px;font:11px/1.45 "DejaVu Sans Mono",monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.key{display:flex;gap:18px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid #222;font-size:12px;align-items:center}
+.key span{display:inline-flex;gap:6px;align-items:center}
+.key i{display:inline-block;width:26px;height:14px;border:1px solid #222}
+</style></head>
+<body>
+<div class="sheet"><span><b>reppit · flow · (a) first visit to first vote</b></span><span>desktop reference · read left to right, top to bottom</span><span>v1 · low fidelity · greyscale</span></div>
+<div class="frame"><div class="key"><span><i></i> screen or step</span><span><i style="border-width:2px"></i> decision</span><span><i style="border-style:dashed"></i> branch / error path</span><span><i style="background:#8a8a8a;border-color:#8a8a8a"></i> outcome recorded</span><span>→ next step · ↓ branch from the step above</span></div><div class="flow"><div class="lane">Main path: arrive, find, decide, vote</div><div class="st  to"><div class="hd"><span>Landing</span><span><span class="n">step 1</span><b class="c">1</b></span></div><div class="bd">Types the problem.<div class="mini">[pull tables out of a pdf in python] [Ask]</div></div><div class="ft">/</div></div><div class="st  to"><div class="hd"><span>Search results</span><span><span class="n">step 2</span><b class="c">2</b></span></div><div class="bd">Ranked rows. Sees camelot: TRUST 58, <b>11 unmaintained</b>, ✗ Codex 9.<div class="mini">▲ 188 ▼ · camelot-dev/camelot</div></div><div class="ft">/search?q=…</div></div><div class="st  to"><div class="hd"><span>Item page</span><span><span class="n">step 3</span><b class="c">3</b></span></div><div class="bd">Reads trust panel and Codex failures. Tries it; it fails under Codex.<div class="mini">Vote on this repo [▲ It works] [▼ reason…]</div></div><div class="ft">/r/camelot-dev/camelot</div></div><div class="st dec to"><div class="hd"><span>Picks ▼ — signed in?</span><span><span class="n">step 4</span></span></div><div class="bd">Clicks a reason chip under "Downvoting? Pick a reason."<div class="mini">no → 4a · yes → 5</div></div><div class="ft">decision</div></div><div class="st "><div class="hd"><span>Reason picker</span><span><span class="n">step 5</span><b class="c">4</b></span></div><div class="bd">Five reasons. Submit is disabled until one is chosen. Optional note.<div class="mini">● broken on an agent<br>[Submit downvote]</div></div><div class="ft">no free-text-only option</div></div><div class="down" style="grid-column:4">↓</div><div class="down" style="grid-column:5">↓</div><div class="st alt" style="grid-column:4"><div class="hd"><span>Sign in</span><span><span class="n">step 4a</span><b class="c">5</b></span></div><div class="bd">Context line: "Sign in to vote. You'll come back to camelot-dev/camelot." Password or magic link (flow c).</div><div class="ft">returns to step 3; nothing recorded yet</div></div><div class="st alt" style="grid-column:5"><div class="hd"><span>Cancel / close picker</span><span><span class="n">step 5a</span><b class="c">4</b></span></div><div class="bd">Nothing recorded. Composer returns to its resting state.</div><div class="ft">no vote</div></div><div class="lane">After a reason is chosen and submitted</div><div class="st dec to"><div class="hd"><span>Reason = broken on an agent?</span><span><span class="n">step 6</span></span></div><div class="bd">If yes, ask which agent.<div class="mini">yes → 7 · no → 8</div></div><div class="ft">decision</div></div><div class="st  to"><div class="hd"><span>Which agent?</span><span><span class="n">step 7</span><b class="c">6</b></span></div><div class="bd">Agent list, default from the last one used. Optional note.<div class="mini">(●) Codex  ( ) Cursor …</div></div><div class="ft">the question nobody else asks</div></div><div class="st em to"><div class="hd"><span>Recorded</span><span><span class="n">step 8</span><b class="c">4</b><b class="c">6</b></span></div><div class="bd">Downvote with reason; plus a compat report "broken on Codex" when step 7 ran.</div><div class="ft">POST …/vote · …/compat</div></div><div class="st "><div class="hd"><span>Item page updates</span><span><span class="n">step 9</span><b class="c">7</b><b class="c">8</b></span></div><div class="bd">Reason count +1 · composer shows "Your vote: ▼ broken on an agent · Change · Withdraw". Weight shown.</div></div><div class="st alt" style="grid-column:5"><div class="hd"><span>Upvote path</span><span><span class="n">step 3b</span><b class="c">9</b></span></div><div class="bd">"It works as described" from step 3 records at once (after sign-in if needed). No reason required.</div></div><div class="lane">Error paths, from step 5 or the upvote</div><div class="st alt" style="grid-column:1"><div class="hd"><span>429 vote limit</span><span><span class="n">step e1</span><b class="c">10</b></span></div><div class="bd">"Too many votes, slow down" (61st in an hour). Nothing recorded.</div></div><div class="st alt" style="grid-column:2"><div class="hd"><span>Unconfirmed account</span><span><span class="n">step e2</span><b class="c">11</b></span></div><div class="bd">"Confirm your email first." with Resend. Nothing recorded.</div></div><div class="st alt" style="grid-column:3"><div class="hd"><span>Account under 24h old</span><span><span class="n">step e3</span><b class="c">12</b></span></div><div class="bd">Vote refused with the reason stated.</div></div></div></div>
+<div class="legend"><h3>Callouts → docs/product/feature-list.md</h3><ol><li><b class="c">1</b><span><b class="m">F-19 / F-01</b> Landing search.</span></li><li><b class="c">2</b><span><b class="m">F-01 / F-02</b> Search results with reasons and agents on every row.</span></li><li><b class="c">3</b><span><b class="m">F-13</b> Item page: decide first, vote in the sidebar only.</span></li><li><b class="c">4</b><span><b class="m">F-08</b> Reason is mandatory; cancel records nothing.</span></li><li><b class="c">5</b><span><b class="m">F-07 / F-22</b> Signed-out vote goes to sign in with next=, returns, nothing recorded yet.</span></li><li><b class="c">6</b><span><b class="m">F-08 c8 / F-10</b> broken-on-agent asks which agent and records a compat report.</span></li><li><b class="c">7</b><span><b class="m">F-12</b> Your vote shown with Change / Withdraw.</span></li><li><b class="c">8</b><span><b class="m">F-09</b> Vote weight shown; decays from now.</span></li><li><b class="c">9</b><span><b class="m">F-07</b> Upvote needs no reason.</span></li><li><b class="c">10</b><span><b class="m">F-31</b> Vote rate limit.</span></li><li><b class="c">11</b><span><b class="m">F-21</b> Unconfirmed accounts cannot vote.</span></li><li><b class="c">12</b><span><b class="m">F-32</b> New-account cool-off.</span></li></ol><div class="note">Decision taken here, open to challenge: the pending vote is not replayed after sign-in (step 4a). The user lands back on the item page with nothing recorded and votes again.</div></div>
+</body></html>

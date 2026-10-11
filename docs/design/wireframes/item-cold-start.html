@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Item cold start wireframe</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#fff;color:#222}
+body{font:13px/1.45 "DejaVu Sans",Arial,sans-serif}
+.m{font-family:"DejaVu Sans Mono",Menlo,monospace}
+a{color:#222}
+.sheet{border-bottom:2px solid #222;padding:10px 40px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font:11px/1.4 "DejaVu Sans Mono",monospace;letter-spacing:.04em;text-transform:uppercase}
+.sheet b{font-size:12px}
+.wrap{max-width:1440px;margin:0 auto;padding-inline:40px}
+.frame{border:1px solid #222;margin:18px 40px 0}
+.mast{display:flex;align-items:center;gap:18px;padding:10px 16px;border-bottom:1px solid #222}
+.logo{display:flex;align-items:center;gap:6px;font:700 16px "DejaVu Sans Mono",monospace}
+.logo i{display:inline-block;width:9px;height:14px;background:#8a8a8a}
+.nav{display:flex;gap:16px;font:12px "DejaVu Sans Mono",monospace}
+.grow{flex:1}
+.in{border:1px solid #222;padding:7px 9px;font:12px "DejaVu Sans Mono",monospace;background:#fff;min-width:0}
+.in.ph{color:#555}
+.btn{display:inline-block;border:1px solid #222;padding:6px 12px;font:12px "DejaVu Sans Mono",monospace;background:#fff;white-space:nowrap}
+.btn.em{background:#8a8a8a;color:#fff;border-color:#8a8a8a}
+.btn.off{border-style:dashed;color:#666}
+.lbl{font:10.5px "DejaVu Sans Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:#444}
+.box{border:1px solid #222;padding:12px}
+.dash{border:1px dashed #222;padding:12px}
+.fill{background:#8a8a8a;color:#fff}
+.tag{display:inline-block;border:1px solid #222;padding:1px 6px;font:11px "DejaVu Sans Mono",monospace;margin:2px 4px 2px 0;white-space:nowrap}
+.tag.em{background:#8a8a8a;color:#fff;border-color:#8a8a8a}
+.chip{display:inline-block;border:1px dashed #222;padding:1px 6px;font:11px "DejaVu Sans Mono",monospace;margin:2px 4px 2px 0;white-space:nowrap}
+.c{display:inline-block;min-width:19px;height:19px;padding:0 4px;border-radius:10px;background:#222;color:#fff;font:700 11px/19px "DejaVu Sans Mono",monospace;text-align:center;margin:0 4px;vertical-align:middle;letter-spacing:0;text-transform:none}
+h1{font:700 26px/1.15 "DejaVu Sans Mono",monospace;letter-spacing:-.03em}
+h2{font:700 13px "DejaVu Sans Mono",monospace;border-bottom:1px solid #222;padding-bottom:5px;margin-bottom:10px}
+p{max-width:68ch}
+.mut{color:#555}
+.sm{font-size:12px}
+.xs{font-size:11px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.cols{display:flex;gap:24px;align-items:flex-start}
+.cols>*{min-width:0}
+.main{flex:1}
+.side{width:340px;flex:none}
+.stack>*+*{margin-top:12px}
+.pad{padding:16px}
+.strip{display:inline-flex;gap:2px;vertical-align:middle}
+.strip s{display:inline-block;width:8px;height:12px;border:1px solid #222;text-decoration:none}
+.strip s.h{background:#222}.strip s.g{background:#8a8a8a;border-color:#8a8a8a}.strip s.u{border-style:dotted}
+table{border-collapse:collapse;width:100%}
+td,th{border-bottom:1px solid #222;padding:6px 6px;text-align:left;vertical-align:top;font-size:12px}
+th{font:10.5px "DejaVu Sans Mono",monospace;letter-spacing:.1em;text-transform:uppercase}
+td.n{font-family:"DejaVu Sans Mono",monospace;text-align:right;white-space:nowrap}
+.foot{border-top:1px solid #222;padding:12px 16px;display:flex;gap:14px;flex-wrap:wrap;font:11.5px "DejaVu Sans Mono",monospace}
+.legend{margin:18px 40px 30px;border:2px solid #222}
+.legend h3{font:700 12px "DejaVu Sans Mono",monospace;letter-spacing:.08em;text-transform:uppercase;padding:8px 12px;border-bottom:1px solid #222}
+.legend ol{list-style:none;columns:2;column-gap:24px;padding:10px 12px}
+.legend li{break-inside:avoid;padding:4px 0;display:flex;gap:6px;font-size:12px;align-items:flex-start}
+.legend li .c{flex:none;margin-left:0}
+.legend .note{padding:0 12px 10px;font-size:12px;color:#444}
+/* feed / search rows */
+.list{border-top:1px solid #222;border-bottom:1px solid #222}
+.it{display:grid;grid-template-columns:56px 1fr 170px;gap:14px;padding:11px 14px;border-bottom:1px solid #999}
+.it:last-child{border-bottom:0}
+.rail{text-align:center;font:700 13px "DejaVu Sans Mono",monospace}
+.rail .t{display:block;font-size:11px;font-weight:400}
+.rail .v{display:block;font:9px "DejaVu Sans Mono",monospace;letter-spacing:.1em;color:#555}
+.id{font:500 15px "DejaVu Sans Mono",monospace}
+.id .o{font-weight:400;color:#555}
+.desc{color:#333;margin:3px 0;font-size:13px}
+.band{font-size:12px;margin-top:3px}
+.trust{text-align:right;font-family:"DejaVu Sans Mono",monospace}
+.trust .s{font:700 22px "DejaVu Sans Mono",monospace}
+.picker{grid-column:2/4;border:2px solid #222;padding:10px;margin-top:4px}
+.hide-d{display:none}
+.alts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.alts .lbl{display:block;margin-bottom:6px}
+@media (max-width:700px){
+  .sheet{padding:8px 16px}
+  .frame{margin:12px 16px 0}
+  .legend{margin:14px 16px 24px}
+  .legend ol{columns:1}
+  .wrap{padding-inline:16px}
+  .mast{flex-wrap:wrap;gap:10px;padding:10px 12px}
+  .hide-p{display:none!important}
+  .hide-d{display:block}
+  span.hide-d,b.hide-d{display:inline}
+  .cols{flex-direction:column;gap:16px}
+  .side{width:100%}
+  h1{font-size:20px}
+  .it{grid-template-columns:40px 1fr;gap:10px;padding:10px 10px}
+  .trust{grid-column:2;text-align:left}
+  .picker{grid-column:1/3}
+  .alts{grid-template-columns:1fr}
+  .pad{padding:12px}
+  .btn{white-space:normal;max-width:100%}
+  .tag,.chip{white-space:normal}
+  td,th{padding:5px 4px;overflow-wrap:break-word}
+  td.hide-p,th.hide-p{display:none}
+}
+</style></head>
+<body>
+<div class="sheet"><span><b>reppit · wireframe · Item page at cold start</b></span><span>/r/stanfordnlp/dspy  (0 votes)</span><span>v1 · low fidelity · greyscale</span></div>
+<div class="frame">
+<div class="mast">
+  <div class="logo"><i></i>reppit</div>
+  <div class="nav hide-p"><span>Browse</span><span>Trust score</span><span>In your agent</span></div>
+  <div class="in ph grow hide-p">Describe the problem, not the package</div>
+  <div class="grow hide-d"></div>
+  <span class="btn hide-d">Search</span><span class="btn hide-d">Menu</span>
+  <span class="btn">Sign in</span>
+</div>
+<div class="pad stack" style="border-bottom:1px solid #222">
+  <div class="m xs mut">repos / python / llm programming / stanfordnlp/dspy</div>
+  <h1><span class="mut" style="font-weight:400">stanfordnlp/</span>dspy</h1>
+  <p>A framework for programming language models rather than prompting them.</p>
+  <div><span class="tag">Python</span><span class="tag">MIT</span><span class="tag">27.8k stars</span><span class="tag">added to reppit 4 hours ago</span></div>
+  <div class="row" style="flex-wrap:nowrap"><div class="box m sm grow" style="padding:8px">$ pip install dspy</div><span class="btn">Copy</span></div>
+  <div class="row box"><span class="m"><b>no votes yet</b></span><span class="sm mut">Nobody has voted on this one yet. The score below does not wait for them.</span><b class="c">1</b></div>
+</div>
+<div class="pad cols">
+  <div class="main stack">
+    <div class="box stack">
+      <div class="row" style="align-items:flex-end"><span class="m" style="font:700 80px/1 'DejaVu Sans Mono',monospace">80</span><span class="lbl">Trust, of 100</span><b class="c">2</b></div>
+      <h2 style="border:0;margin:0">Nobody has voted. Here is what the repo is doing.</h2>
+      <p class="sm">Computed from six measurements taken four hours ago. No human has touched this number and none of it is a star count. Votes adjust it by at most ±12.<b class="c">9</b></p>
+      <table><tr><th>Signal</th><th>Observed</th><th style="text-align:right">Points</th></tr><tr><td>Maintenance recency</td><td class="sm">last push 19 hours ago</td><td class="n">25/25</td></tr><tr><td>Release cadence</td><td class="sm">22 releases in 12 months</td><td class="n">19/20</td></tr><tr><td>Deprecation flags</td><td class="sm">not archived, not deprecated</td><td class="n">15/15</td></tr><tr><td>Security advisories</td><td class="sm"><b>unknown</b>: advisory source not reachable, scored at half</td><td class="n">8/15</td></tr><tr><td>Issue load vs size</td><td class="sm">411 open on 27.8k stars, 58% stale</td><td class="n">3/15</td></tr><tr><td>Licence clarity</td><td class="sm">MIT, SPDX resolved</td><td class="n">10/10</td></tr></table>
+      <p class="m xs">5 of 6 measured · trust 80<b class="c">3</b><b class="c">4</b></p>
+      <div class="dash xs">If 3 or more signals are unknown: no number. Panel reads "Not enough data to score."</div>
+    </div>
+    <div class="stack"><h2>Reports · none yet</h2><div class="dash"><b class="m">No reports yet.</b><p class="sm">This is a four-hour-old entry, so there is nothing here and we are not going to pad it out with a star count.</p><b class="c">5</b></div></div>
+    <div class="stack"><h2>Agent compatibility · no reports yet<b class="c">6</b></h2>
+      <table><tr><th>Agent</th><th>Reports</th><th>Status</th></tr>
+      <tr><td>? Claude Code</td><td>—</td><td class="m">unknown</td></tr><tr><td>? Codex</td><td>—</td><td class="m">unknown</td></tr><tr><td>? Cursor</td><td>—</td><td class="m">unknown</td></tr><tr><td>? Gemini CLI</td><td>—</td><td class="m">unknown</td></tr></table>
+      <p class="xs mut">Unknown is an honest answer. It is not the same as "works".</p></div>
+  </div>
+  <div class="side stack">
+    <div class="box stack"><h2>Vote on this repo</h2>
+<span class="btn" style="display:block;text-align:center">▲ It works as described</span><b class="c">7</b>
+<div class="lbl">▼ Downvoting? Pick a reason. Required.<b class="c">7</b></div>
+<div><span class="tag">○ unmaintained</span><span class="tag">○ insecure</span><span class="tag">○ broken on an agent</span><span class="tag">○ misleading</span><span class="tag">○ low quality</span></div>
+<div class="in ph sm">Optional note (500 chars)</div>
+<span class="btn off" style="display:block;text-align:center">Submit downvote</span><p class="xs mut">Disabled until a reason is picked.</p>
+<p class="xs mut">Picking "broken on an agent" asks which agent next.</p>
+</div>
+<div class="box stack"><h2>Report agent compatibility<b class="c">10</b></h2>
+<div class="row"><div class="in grow">Agent: Codex ▾</div></div>
+<div class="row"><span class="btn">✓ Works</span><span class="btn">✗ Broken</span></div>
+<div class="in ph sm">What happened (optional, 500 chars)</div>
+<span class="btn em" style="display:block;text-align:center">Send report</span></div>
+    <div class="box"><h2>Scored, not voted<b class="c">8</b></h2><table><tr><td class="m">stanfordnlp/dspy</td><td class="n">80</td></tr><tr><td class="m">BerriAI/litellm</td><td class="n">86</td></tr><tr><td class="m">outlines-dev/outlines</td><td class="n">79</td></tr></table>
+    <p class="xs mut" style="margin-top:6px">1,842 repos indexed. 1,109 have no votes yet and all 1,842 have a score.</p></div>
+  </div>
+</div>
+<div class="foot"><span>reppit.dev</span><span>repos</span><span>skills</span><span>mcp servers</span><span>how the trust score works</span><span>mcp server</span><span>terms</span><span>privacy</span><span>status</span></div>
+</div>
+<div class="legend"><h3>Callouts → docs/product/feature-list.md</h3><ol><li><b class="c">1</b><span><b class="m">F-14</b> &#x27;no votes yet&#x27; — not 0, not &#x27;be first&#x27;.</span></li><li><b class="c">2</b><span><b class="m">F-14</b> Score at hero size when there are no votes.</span></li><li><b class="c">3</b><span><b class="m">F-03</b> Six signals listed, points sum to the score.</span></li><li><b class="c">4</b><span><b class="m">F-04</b> Unknown signal: labelled, scored at half; 3+ unknown = no number.</span></li><li><b class="c">5</b><span><b class="m">F-14</b> Dashed &#x27;No reports yet.&#x27; box, no zero counts.</span></li><li><b class="c">6</b><span><b class="m">F-11 / F-04</b> Four default agents shown as ? unknown.</span></li><li><b class="c">7</b><span><b class="m">F-07 / F-08</b> Same composer as the standard item page.</span></li><li><b class="c">8</b><span><b class="m">F-14</b> Scored, not voted: neighbours and the indexed/no-votes count.</span></li><li><b class="c">9</b><span><b class="m">F-05</b> Measurement age; recomputed hourly.</span></li><li><b class="c">10</b><span><b class="m">F-10</b> Compat report form.</span></li></ol><div class="note">On the first vote the page switches to the standard item layout (F-14 c6).</div></div>
+</body></html>
