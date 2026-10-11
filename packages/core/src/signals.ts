@@ -327,7 +327,7 @@ export interface RepoManifests {
   goMod?: string | null;
   /** package.json files from monorepo folders named like the repo (`<name>/`, `packages/<name>/`). */
   subPackageJsons?: (string | null)[];
-  /** The module builds a program: a `main` package at the root (main.go or <name>.go) or cmd/<name>/main.go. */
+  /** The module root is `package main` (main.go or <name>.go at the root): the module is an app. */
   goRootIsMain?: boolean;
   /**
    * True only when every manifest file (root, and monorepo folders when the root is private) was
@@ -496,44 +496,54 @@ export async function resolvePackage(slugs: string[], m: RepoManifests, f: Fetch
 
 /**
  * Whether a README's install section says "this is an application": its first install command is a
- * system or binary install (brew, curl/wget pipes, PowerShell downloads, scoop/winget/choco, apt/snap,
- * docker), or it points at downloading a binary/release before any command. A first command that adds
+ * system or binary install of this project (brew, curl/wget pipes, PowerShell downloads,
+ * scoop/winget/choco, apt/snap, docker) whose command names the project, or it points at downloading a
+ * prebuilt binary before any command. A first command that adds
  * a dependency (npm/yarn/pnpm install, pip install, cargo add, go get, poetry/uv add) means a library.
  * Null when there is no recognisable install section.
  */
-export function readmeSuggestsApp(readme: string | null | undefined): boolean | null {
+export function readmeSuggestsApp(readme: string | null | undefined, names: string[] = []): boolean | null {
   if (!readme) return null;
+  // A system install only counts when it installs this project (brew install graphviz is a
+  // prerequisite; a curl of a badge image is not an installer).
+  const own = names.map((n) => n.toLowerCase().replace(/^@[^/]+\//, "")).filter((n) => n.length >= 2);
+  const namesThis = (cmd: string) => !own.length || own.some((n) => cmd.toLowerCase().includes(n));
   const lines = readme.split(/\r?\n/);
-  const start = lines.findIndex((l, i) => /^#{1,4}\s.*\b(install|installation|getting started|quick ?start|setup)\b/i.test(l) || (/\b(install|installation)\b/i.test(l) && /^[=-]{3,}\s*$/.test(lines[i + 1] ?? "")));
-  if (start < 0) return null;
-  const level = (lines[start].match(/^#+/)?.[0].length) ?? 2;
-  const section: string[] = [];
-  for (let i = start + 1; i < lines.length && section.length < 80; i++) {
-    const h = lines[i].match(/^(#+)\s/);
-    if (h && h[1].length <= level) break;
-    section.push(lines[i]);
-  }
-  const APP = /^(sudo\s+)?(brew|curl|wget|iwr|irm|scoop|winget|choco|snap|flatpak|apt(-get)?|dnf|yum|pacman|yay|docker|podman)\b/i;
+  const isHeading = (i: number, re: RegExp) => (/^#{1,4}\s/.test(lines[i]) && re.test(lines[i])) || (re.test(lines[i]) && /^[=-]{3,}\s*$/.test(lines[i + 1] ?? ""));
+  // Sections that mention install first, then getting started / quick start / setup; the first one
+  // with a decisive command wins, so an earlier "Setup" heading without commands does not hide
+  // "Installation".
+  const install = lines.map((_, i) => i).filter((i) => isHeading(i, /\b(install|installation|installing)\b/i));
+  const other = lines.map((_, i) => i).filter((i) => !install.includes(i) && isHeading(i, /\b(getting started|quick ?start|setup)\b/i));
+  const APP = /^(sudo\s+)?(brew|curl|wget|iwr|irm|scoop|winget|choco|snap|flatpak|apt(-get)?|dnf|yum|pacman|yay|docker|podman|powershell)\b/i;
   const LIB = /^(npm|yarn|pnpm|bun)\s+(i|install|add)\b(?!.*\s(-g|--global)\b)|^(pip3?|python3? -m pip)\s+install\b|^cargo\s+add\b|^go\s+get\b|^(poetry|uv|pdm|rye)\s+add\b|^dotnet\s+add\b|^composer\s+require\b|^gem\s+install\b|^bundle\s+add\b/i;
-  let inCode = false;
-  for (const raw of section) {
-    const line = raw.trim();
-    if (line.startsWith("```")) { inCode = !inCode; continue; }
-    const cmd = line.replace(/^\$\s*/, "").replace(/^>\s*/, "");
-    if (inCode || raw.startsWith("    ") || /^\$\s/.test(line)) {
-      if (!cmd || cmd.startsWith("#")) continue;
-      if (APP.test(cmd)) return true;
-      if (LIB.test(cmd)) return false;
-      continue;
+  for (const start of [...install, ...other]) {
+    const level = (lines[start].match(/^#+/)?.[0].length) ?? 2;
+    let inCode = false;
+    for (let i = start + 1, n = 0; i < lines.length && n < 80; i++, n++) {
+      const raw = lines[i];
+      const h = raw.match(/^(#+)\s/);
+      if (h && h[1].length <= level && !inCode) break;
+      const line = raw.trim();
+      if (line.startsWith("```")) { inCode = !inCode; continue; }
+      const cmd = line.replace(/^\$\s*/, "").replace(/^>\s*/, "");
+      if (inCode || raw.startsWith("    ") || /^\$\s/.test(line)) {
+        if (!cmd || cmd.startsWith("#")) continue;
+        if (APP.test(cmd)) { if (namesThis(cmd)) return true; continue; }
+        if (LIB.test(cmd)) return false;
+        continue;
+      }
+      // A prebuilt binary or executable; a "releases page" alone is also how libraries are vendored.
+      if (/\b(download|grab)\b.{0,80}\b(binar(y|ies)|executables?)\b/i.test(line)) return true;
     }
-    if (/\b(download|grab)\b.{0,60}\b(binar(y|ies)|release|executable)/i.test(line)) return true;
   }
   return null;
 }
 
 /** Turn a resolved "package" into an "app" when the README's install section says so. */
-export function withReadmeKind(r: ResolvedPackages, readme: string | null | undefined): ResolvedPackages {
-  if (r.installKind !== "package" || readmeSuggestsApp(readme) !== true) return r;
+export function withReadmeKind(r: ResolvedPackages, readme: string | null | undefined, repoName?: string): ResolvedPackages {
+  const names = [...(repoName ? [repoName] : []), ...r.packages.map((p) => p.name.split("/").pop() ?? p.name)];
+  if (r.installKind !== "package" || readmeSuggestsApp(readme, names) !== true) return r;
   return { ...r, install: null, options: [], installKind: "app" };
 }
 
@@ -600,7 +610,7 @@ export function combinePackageSignals(r: ResolvedPackages, advisories: (number |
  */
 export async function checkPackageSignals(slugs: string[], manifests: RepoManifests, f: FetchLike = fetch, now = new Date(), opts: { language?: string | null; readme?: string | null } = {}): Promise<PackageSignals | null> {
   try {
-    const r = withReadmeKind(await resolvePackages(slugs, manifests, f, opts), opts.readme);
+    const r = withReadmeKind(await resolvePackages(slugs, manifests, f, opts), opts.readme, (slugs[0] ?? "").split("/")[1]);
     if (!r.packages.length) return noPackageSignals(now, await confirmNoPackage(slugs[0] ?? "", manifests, f));
     const adv = await osvOpenAdvisoriesBatch(r.packages.map((p) => ({ ecosystem: p.ecosystem, name: p.name, version: p.version ?? "" })), f);
     const releases = r.install ? await registryReleases(r.install.ecosystem, r.install.name, f, now).catch(() => null) : null;
@@ -668,10 +678,12 @@ export async function fetchManifestsRaw(owner: string, name: string, f: FetchLik
     out.subPackageJsons = await Promise.all([`${name}/package.json`, `packages/${name}/package.json`].map(get));
   }
   if (out.goMod) {
-    // An app: a main package at the root (main.go, or <name>.go as in yq) or cmd/<name>/main.go.
+    // An app only when the module root itself is `package main` (main.go, or <name>.go as in yq). A
+    // root that is an importable package (golang-migrate's migrate.go) is a library, even if it ships
+    // a CLI under cmd/<name>: that keeps `go get`. A cmd/ folder alone never makes an app.
     const base = name.toLowerCase().replace(/\.go$/, "");
-    const mains = await Promise.all(["main.go", `${base}.go`, `cmd/${base}/main.go`].map(get));
-    out.goRootIsMain = mains.some((t) => !!t && /^package\s+main\b/m.test(t));
+    const roots = await Promise.all(["main.go", `${base}.go`].map(get));
+    out.goRootIsMain = roots.some((t) => !!t && /^package\s+main\b/m.test(t));
   }
   out.complete = complete;
   return out;

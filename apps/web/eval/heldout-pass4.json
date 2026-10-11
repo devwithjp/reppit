@@ -1,0 +1,9 @@
+{
+  "_note": "The reviewer's 15 fresh queries from the fourth-pass critique (2026-10-12). Held out: never tune against these; judged by a person.",
+  "queries": [
+    "graphql client for react", "mock api calls in jest tests", "python structured logging", "self hosted feature flags",
+    "generate pdf from html in node", "parse yaml in go", "drag and drop list in react", "oauth login for express",
+    "database migrations for postgres in go", "fast python linter", "embedded key value store in rust", "image resizing in node",
+    "cron jobs in node", "retry with exponential backoff python", "terminal ui library python"
+  ]
+}

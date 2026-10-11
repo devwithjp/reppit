@@ -48,6 +48,14 @@ gte-small similarities sit in a narrow band: unrelated pairs often score 0.80 or
   - k = 5 is one step above the value that leaks: keep watching the negatives as the index grows.
 - **Untouched:** the local hashed embedder never admits on meaning. One-word queries and identifiers stay name lookups.
 
+The word-based floor weights query terms by inverse document frequency over names, topics and descriptions. Frequent words like "self", "hosted", "list" or "tool" count for little, with no hand-written list. The rules:
+- One of the query's two rarest terms must match in an item's name, topics or description.
+- IDF-weighted coverage must reach 0.5.
+- In one- or two-word queries, every word must be in those fields.
+- A result admitted by meaning must also contain one of the two rarest terms somewhere, README included.
+
+Requiring only the single rarest term was rejected: ordinary words like "manipulation", "read" and "render" are rare in this index and became mandatory, costing 6 eval hits. Tuned on 32 positives and 16 negatives (hit@5 30/32, hit@1 21/32, 16/16 empty). Overrides: `SEARCH_IDF_COVERAGE`, `SEARCH_DISTINCTIVE_MODE`, `SEARCH_SHORT_ALL`.
+
 If the query embedder fails (the model can't load, or the function is down), search logs it and falls back to full-text only.
 
 ## Running under Next.js

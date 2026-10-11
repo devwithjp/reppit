@@ -17,7 +17,7 @@ async function main() {
   const db = await getDb({ migrationsFolder: path.resolve(process.cwd(), process.env.GITIT_MIGRATIONS_DIR ?? "../../packages/db/drizzle") });
   const rows = await db.select({ id: items.id, slug: items.slug, readme: items.readme, installPackage: items.installPackage, eco: items.packageEcosystem })
     .from(items).where(eq(items.installKind, "package"));
-  const apps = rows.filter((r) => readmeSuggestsApp(r.readme) === true);
+  const apps = rows.filter((r) => readmeSuggestsApp(r.readme, [r.slug.split("/")[1] ?? "", (r.installPackage ?? "").split("/").pop() ?? ""]) === true);
   for (const r of apps) {
     console.log(`  app: ${r.slug} (was ${r.eco}: ${r.installPackage})`);
     if (!dry) await db.update(items).set({ installKind: "app", installPackage: null, installOptions: [] }).where(eq(items.id, r.id));

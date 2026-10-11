@@ -77,11 +77,15 @@ export const BASELINE_SIZE = 300;
  * IDF-weighted relevance floor. A query term's weight is its inverse document frequency over the
  * index's heads (name, topics, description): ln((N + 1) / (df + 1)) + 0.1. Generic words ("self",
  * "hosted", "list", "tool") are frequent, so they weigh little without any hand list. A problem query
- * passes on words only if its most distinctive term matches in the head and the IDF-weighted coverage
- * (head 1, README-only 0.4) reaches IDF_COVERAGE_MIN. Tuned on the eval fixtures and negatives;
- * override with SEARCH_IDF_COVERAGE.
+ * passes on words when one of its two most distinctive terms matches in the head, the IDF-weighted
+ * coverage (head 1, README-only 0.4) reaches IDF_COVERAGE_MIN, and, for one- or two-word queries,
+ * every word is in the head.
+ * Requiring only the single rarest term was tried and rejected: over a ~2,000-repo index, ordinary
+ * words ("manipulation", "read", "render") are rare in heads and became mandatory, which cost 6 eval
+ * hits. Tuned on the eval fixtures and negatives (32 + 16): hit@5 30/32, hit@1 21/32, 16/16 empty.
+ * Overrides: SEARCH_IDF_COVERAGE, SEARCH_DISTINCTIVE_MODE, SEARCH_SHORT_ALL.
  */
-export const IDF_COVERAGE_MIN = 0.6;
+export const IDF_COVERAGE_MIN = 0.5;
 export const idfCoverageMin = (env: Record<string, string | undefined> = process.env) => {
   const v = Number(env.SEARCH_IDF_COVERAGE);
   return env.SEARCH_IDF_COVERAGE && Number.isFinite(v) ? v : IDF_COVERAGE_MIN;
@@ -94,13 +98,25 @@ export const idfWeight = (n: number, df: number) => Math.log((n + 1) / (df + 1))
  * term: nothing indexed is about it, which is the strongest sign the domain is not covered
  * ("self hosted password manager" when no password manager is indexed).
  */
-export function idfCoverage(hits: number[], weights: number[]): { coverage: number; distinctive: number } {
-  if (!hits.length) return { coverage: 0, distinctive: -1 };
+export function idfCoverage(hits: number[], weights: number[]): { coverage: number; distinctive: number; topTwo: number[] } {
+  if (!hits.length) return { coverage: 0, distinctive: -1, topTwo: [] };
   const total = weights.reduce((a, w) => a + w, 0) || 1;
   const got = hits.reduce((a, h, i) => a + weights[i] * (h === 2 ? 1 : h === 1 ? 0.4 : 0), 0);
-  const distinctive = weights.reduce((best, w, i) => (w > weights[best] ? i : best), 0);
-  return { coverage: got / total, distinctive };
+  const order = weights.map((w, i) => i).sort((a, b) => weights[b] - weights[a]);
+  return { coverage: got / total, distinctive: order[0], topTwo: order.slice(0, 2) };
 }
+
+/**
+ * Which distinctive terms must match in the head: "top1" (the rarest), "top2" (one of the two
+ * rarest), "none" (IDF-weighted coverage alone). Chosen on the eval fixtures and negatives;
+ * override with SEARCH_DISTINCTIVE_MODE.
+ */
+/** Queries with at most two content words need all of them in the head. Tuned on eval; override SEARCH_SHORT_ALL=0|1. */
+export const SHORT_QUERY_ALL_IN_HEAD = true;
+export type DistinctiveMode = "top1" | "top2" | "none";
+export const DISTINCTIVE_MODE: DistinctiveMode = "top2";
+export const distinctiveMode = (env: Record<string, string | undefined> = process.env): DistinctiveMode =>
+  env.SEARCH_DISTINCTIVE_MODE === "top2" || env.SEARCH_DISTINCTIVE_MODE === "none" || env.SEARCH_DISTINCTIVE_MODE === "top1" ? env.SEARCH_DISTINCTIVE_MODE : DISTINCTIVE_MODE;
 
 /** Head document frequency per term form-set, cached per database for 10 minutes. */
 const dfCache = new WeakMap<object, { n: number; at: number; df: Map<string, number> }>();
@@ -321,6 +337,7 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
   const maxRank = Math.max(1e-9, ...rows.map((r) => Number(r.rank)));
   const weights = await termWeights(db, pq.alts);
   const coverageMin = idfCoverageMin();
+  const mode = distinctiveMode();
   const scale = semanticScale(embedder.name);
   const rule = vec ? outlierRule(embedder.name) : null;
   let admitAt = Number.POSITIVE_INFINITY; // similarity needed to pass on meaning alone
@@ -334,7 +351,7 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     const semantic = Math.max(0, Number(r.semantic));
     const hits = (r.hits ?? []).map(Number);
     // IDF-weighted: README-only hits count 0.4 of a head hit (name, topics, description).
-    const { coverage, distinctive } = idfCoverage(hits, weights);
+    const { coverage, distinctive, topTwo } = idfCoverage(hits, weights);
     const headHits = hits.filter((h) => h === 2).length;
     const headAll = hits.length > 0 && headHits === hits.length;
     const lexical = 0.75 * coverage + 0.25 * (Number(r.rank) / maxRank);
@@ -362,8 +379,13 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
      *   - a language named in the query filters; a mismatch never passes.
      */
     const distinctHit = distinctive >= 0 ? hits[distinctive] : 0;
-    const lexicalPass = distinctHit === 2 && coverage >= coverageMin;
-    const semanticPass = semantic >= admitAt && (hits.length <= 1 || distinctHit >= 1);
+    const distinctiveInHead = mode === "none" ? headHits >= 1 : mode === "top2" ? topTwo.some((i) => hits[i] === 2) : distinctHit === 2;
+    const distinctiveAnywhere = mode === "top2" ? topTwo.some((i) => hits[i] >= 1) : mode === "none" ? hits.some((h) => h >= 1) : distinctHit >= 1;
+    // Two content words or fewer: each carries the meaning, so all must be in the head ("html
+    // sanitizer": a string sanitizer that mentions HTML only in its README is not one).
+    const shortNeedsAll = (process.env.SEARCH_SHORT_ALL ?? (SHORT_QUERY_ALL_IN_HEAD ? "1" : "0")) === "1" && hits.length <= 2;
+    const lexicalPass = distinctiveInHead && coverage >= coverageMin && (!shortNeedsAll || headAll);
+    const semanticPass = semantic >= admitAt && (hits.length <= 1 || distinctiveAnywhere);
     const isMatch = exact || (
       !pq.singleWord &&
       !langMismatch &&

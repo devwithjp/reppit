@@ -479,16 +479,20 @@ describe("apps and registry choice", () => {
   });
 });
 
-describe("Go programs: main at the root, <name>.go or cmd/<name>", () => {
-  it("detects a main package in <name>.go and cmd/<name>/main.go", async () => {
+describe("Go programs: only a main package at the module root is an app", () => {
+  it("yq-like root <name>.go main is an app; golang-migrate-like root package with cmd/<name> is a library", async () => {
     const files = (map: Record<string, string>) => async (url: string) => {
       const hit = Object.entries(map).find(([k]) => url.endsWith(`/HEAD/${k}`));
       return hit ? new Response(hit[1]) : new Response("", { status: 404 });
     };
     const named = await fetchManifestsRaw("acme", "yamlq", files({ "go.mod": "module github.com/acme/yamlq/v4", "yamlq.go": "package main\n\nfunc main() {}" }));
     expect(named.goRootIsMain).toBe(true);
-    const cmd = await fetchManifestsRaw("acme", "migrator", files({ "go.mod": "module github.com/acme/migrator", "cmd/migrator/main.go": "// tool\npackage main" }));
-    expect(cmd.goRootIsMain).toBe(true);
+    const migrateLike = await fetchManifestsRaw("acme", "migrate", files({ "go.mod": "module github.com/acme/migrate/v4", "migrate.go": "// Package migrate reads migrations\npackage migrate", "cmd/migrate/main.go": "package main" }));
+    expect(migrateLike.goRootIsMain).toBe(false);
+    const cmdOnly = await fetchManifestsRaw("acme", "tool", files({ "go.mod": "module github.com/acme/tool", "cmd/tool/main.go": "package main" }));
+    expect(cmdOnly.goRootIsMain).toBe(false);
+    const rootMain = await fetchManifestsRaw("acme", "server", files({ "go.mod": "module github.com/acme/server", "main.go": "package main" }));
+    expect(rootMain.goRootIsMain).toBe(true);
     const lib = await fetchManifestsRaw("acme", "yaml", files({ "go.mod": "module github.com/acme/yaml", "yaml.go": "package yaml" }));
     expect(lib.goRootIsMain).toBe(false);
   });
@@ -500,6 +504,16 @@ describe("README install section", () => {
     expect(readmeSuggestsApp("## Install\n\n```bash\n$ curl -fsSL https://x.sh/install | sh\n```")).toBe(true);
     expect(readmeSuggestsApp("## Install\n\nDownload the latest binary from the releases page.\n\n```\ngo install x@latest\n```")).toBe(true);
     expect(readmeSuggestsApp("## Quick start\n\n```\ndocker run -p 80:80 acme/app\n```")).toBe(true);
+  });
+  it("reads the Installation section even after an earlier, inconclusive Setup heading", () => {
+    const md = "# tool\n\n## Project setup\n\nSome words.\n\n## Installation\n\nInstall tool with our standalone installers:\n\n```bash\n# On macOS and Linux.\ncurl -LsSf https://example.dev/tool/install.sh | sh\n```\n\nOr from PyPI:\n\n```\npip install tool\n```";
+    expect(readmeSuggestsApp(md, ["tool"])).toBe(true);
+  });
+  it("ignores prerequisites, unrelated downloads and release pages", () => {
+    expect(readmeSuggestsApp("## Installation\n```\nbrew install graphviz\nnpm install -g graphmap\n```", ["graphmap"])).toBeNull();
+    expect(readmeSuggestsApp("## Setup\n```\ncurl -fsSL https://cdn.example.com/badge.svg | head\npip install mlkit\n```", ["mlkit"])).toBe(false);
+    expect(readmeSuggestsApp("## Getting started\n\nYou can also download mathlib from the releases page and host it yourself.\n\n```\nnpm install mathlib\n```", ["mathlib"])).toBe(false);
+    expect(readmeSuggestsApp("## Install\n```\nbrew install datasette\n```", ["datasette"])).toBe(true);
   });
   it("is a library when it leads with adding a dependency", () => {
     expect(readmeSuggestsApp("## Installation\n\n```\nnpm install --save-dev lib\n```\n\n```\nbrew install lib\n```")).toBe(false);

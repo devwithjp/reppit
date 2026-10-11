@@ -35,5 +35,16 @@
   { "q": "purple elephant dances quietly", "expect": [], "negative": true },
   { "q": "banana telescope umbrella", "expect": [], "negative": true },
   { "q": "lorem ipsum dolor sit amet", "expect": [], "negative": true },
-  { "q": "blorf the snargle quickly", "expect": [], "negative": true }
+  { "q": "blorf the snargle quickly", "expect": [], "negative": true },
+  { "q": "progress bars for python", "expect": ["Textualize/rich", "tqdm/tqdm", "rsalmei/alive-progress"] },
+  { "q": "http router for go", "expect": ["go-chi/chi", "gorilla/mux", "julienschmidt/httprouter", "gin-gonic/gin", "labstack/echo"] },
+  { "q": "fuzzy string matching in python", "expect": [], "negative": true },
+  { "q": "parse icalendar files in python", "expect": [], "negative": true },
+  { "q": "bloom filter for go", "expect": [], "negative": true },
+  { "q": "midi file reader for python", "expect": [], "negative": true },
+  { "q": "html sanitizer for node", "expect": [], "negative": true },
+  { "q": "spell checking library for javascript", "expect": [], "negative": true },
+  { "q": "barcode generation in python", "expect": [], "negative": true },
+  { "q": "pluralize english words in javascript", "expect": [], "negative": true },
+  { "q": "encode coordinates as geohash", "expect": [], "negative": true }
 ]

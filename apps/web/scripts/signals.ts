@@ -164,7 +164,7 @@ async function main() {
         if (!row.signalsDue) return;
         try {
           const manifests = await fetchManifestsRaw(owner, name, paced, { strict: true });
-          const res = withReadmeKind(await resolvePackages(slugs, manifests, paced, { language: row.language }), fetchedReadme ?? row.readme);
+          const res = withReadmeKind(await resolvePackages(slugs, manifests, paced, { language: row.language }), fetchedReadme ?? row.readme, name);
           resolved.push({ row, res, complete: res.packages.length ? false : await confirmNoPackage(slug, manifests, paced) });
         } catch (e) {
           tally.failed++;
