@@ -8,3 +8,5 @@ dist
 coverage
 .gstack/
 __pycache__/
+e2e-report/
+test-results/

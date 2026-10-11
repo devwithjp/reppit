@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { eq, isNull, and } from "drizzle-orm";
 import { apiKeys, users, type User } from "@gitit/db";
-import { auth } from "./auth";
+import { getViewerUser } from "./viewer";
 import { db } from "./db";
 
 /** Resolve the acting user from a session cookie or `Authorization: Bearer gitit_...` API key. */
@@ -15,11 +15,7 @@ export async function requestUser(req: Request): Promise<{ user: User | null; ap
     const [row] = await d.select({ k: apiKeys, u: users }).from(apiKeys).innerJoin(users, eq(users.id, apiKeys.userId)).where(and(eq(apiKeys.keyHash, hash), isNull(apiKeys.revokedAt)));
     return row ? { user: row.u, apiKeyId: row.k.id } : { user: null };
   }
-  const session = await auth();
-  if (!session?.user?.id) return { user: null };
-  const d = await db();
-  const [u] = await d.select().from(users).where(eq(users.id, session.user.id));
-  return { user: u ?? null };
+  return { user: await getViewerUser() };
 }
 
 export function json(data: unknown, init: ResponseInit = {}) {

@@ -1,0 +1,50 @@
+import { test, expect } from "@playwright/test";
+import { createTestUser, deleteTestUser, firstFeedSlug, signIn, type TestUser } from "./helpers";
+
+let user: TestUser | undefined;
+test.beforeAll(async () => { user = await createTestUser("acct"); });
+test.afterAll(async () => { await deleteTestUser(user); });
+
+test("wrong password shows a plain message and does not sign in", async ({ page }) => {
+  await page.goto("/login");
+  await page.locator('input[name="email"]').fill(user!.email);
+  await page.locator('input[name="password"]').fill("not-the-password");
+  await page.getByTestId("auth-submit").click();
+  await expect(page.getByTestId("auth-message")).toContainText(/do not match/i);
+  await expect(page.getByTestId("viewer-handle")).toHaveCount(0);
+});
+
+test("sign in, see your handle, sign out", async ({ page }) => {
+  await signIn(page, user!);
+  await expect(page.getByTestId("viewer-handle")).toContainText(user!.handle);
+  await page.getByTestId("sign-out-button").click();
+  await expect(page.getByTestId("sign-in-link").first()).toBeVisible();
+});
+
+test("sign in returns you to the page you came from", async ({ page }) => {
+  const slug = await firstFeedSlug(page);
+  await signIn(page, user!, `/r/${slug}`);
+  await expect(page).toHaveURL(new RegExp(`/r/${slug.replace("/", "\\/")}`));
+});
+
+test("a sign-in link for an off-site 'next' stays on site", async ({ page }) => {
+  await signIn(page, user!, "//evil.example.com");
+  const base = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3100");
+  expect(new URL(page.url()).host).toBe(base.host);
+});
+
+test("signup form rejects a short password before calling the server", async ({ page }) => {
+  await page.goto("/signup");
+  await page.locator('input[name="handle"]').fill("shortpw");
+  await page.locator('input[name="email"]').fill("e2e.shortpw@example.com");
+  await page.locator('input[name="password"]').fill("abc");
+  await page.getByTestId("auth-submit").click();
+  await expect(page.getByTestId("auth-message").or(page.locator("input:invalid"))).toBeVisible();
+});
+
+test("magic link request answers the same way for any address", async ({ page }) => {
+  await page.goto("/login");
+  await page.locator('input[name="email"]').fill(user!.email);
+  await page.getByTestId("magic-link-submit").click();
+  await expect(page.getByTestId("auth-message")).toContainText(/link is on its way|too many attempts/i);
+});
