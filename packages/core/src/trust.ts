@@ -9,9 +9,10 @@
  *                      good <= 180 days, slipping <= 365, failing beyond. Null = unknown (many projects
  *                      never cut GitHub releases, and the REST ingest path does not fetch them).
  *   3. archived    15  archived flag. Always known. Archived = 0, failing.
- *   4. deprecated  15  registry deprecation (npm deprecated, PyPI yanked/Inactive). Null = unknown
- *                      (no verified package, or not checked). Deprecated = 0, failing.
- *   5. advisories  15  OSV advisories on the latest published version. 0 = 15 good, 1 = 6 slipping,
+ *   4. deprecated  15  registry deprecation (npm deprecated, PyPI all yanked/Inactive, crates.io latest
+ *                      yanked). Not applicable when the repo is confirmed to publish no package. Null = unknown
+ *                      (no package found by a check that could not confirm absence, or not checked). Deprecated = 0, failing.
+ *   5. advisories  15  OSV advisories on the latest published version (N/A as above). 0 = 15 good, 1 = 6 slipping,
  *                      2+ = 0 failing. Null = unknown, never shown as zero.
  *   6. issues      15  share of all-time issues still open: open / (open + closed). Stars-free on
  *                      purpose. Points 15 * (1 - share / 0.5). good <= 0.15, slipping <= 0.35, failing
@@ -23,16 +24,23 @@
  *
  * Score:
  *   - Unknown signals score half their points (neutral).
+ *   - Not applicable: a repo confirmed to publish no package (package_ecosystem = 'none') has no
+ *     deprecation or advisories to measure. Those cells leave the denominator; the score is computed
+ *     over the applicable signals and rescaled to 100. A failed or unattempted check stays unknown.
  *   - Archived or deprecated is decisive: the score is capped at 25 (votes included) and `reason`
  *     names it, even when other signals are unknown. Nobody needs four more measurements to know an
  *     archived project is unmaintained.
- *   - Otherwise, three or more unknown signals: no number, `{ score: null, reason: "not enough data" }`.
+ *   - Otherwise, fewer than half of the applicable signals measured: no number,
+ *     `{ score: null, reason: "not enough data" }`. `measured` and `applicable` say how many.
  *   - Votes adjust by at most ±12: round(12 * tanh(weightedScore / 6)), where weightedScore is the
  *     time-decayed, reputation-weighted vote sum from ranking.ts.
  */
 import { weightedScore as computeWeightedScore, type VoteRow } from "./ranking";
 
-export type SignalState = "good" | "slipping" | "failing" | "unknown";
+export type SignalState = "good" | "slipping" | "failing" | "unknown" | "not_applicable";
+
+/** `items.package_ecosystem` value recording a confirmed check that found no published package. */
+export const NO_PACKAGE = "none";
 export type SignalKey = "push" | "release" | "archived" | "deprecated" | "advisories" | "issues";
 
 export interface SignalCell {
@@ -64,7 +72,7 @@ export interface TrustItem {
 }
 
 export interface TrustScore {
-  /** 0..100, or null when three or more signals are unknown. */
+  /** 0..100, or null when fewer than half of the applicable signals are measured. */
   score: number | null;
   /** Why the score is null ("not enough data") or capped ("archived" / "deprecated"). */
   reason?: "not enough data" | "archived" | "deprecated";
@@ -72,6 +80,10 @@ export interface TrustScore {
   base: number | null;
   voteAdjust: number;
   unknownCount: number;
+  /** Signals measured (not unknown, not N/A). UI: "{measured} of {applicable} measured". */
+  measured: number;
+  /** Signals that apply to this item (6, or 4 for a repo confirmed to publish no package). */
+  applicable: number;
   cells: SignalCell[];
 }
 
@@ -86,7 +98,12 @@ export const SIGNAL_ORDER: { key: SignalKey; short: string }[] = [
 ];
 export const VOTE_ADJUST_MAX = 12;
 export const FLAGGED_CAP = 25;
-export const MAX_UNKNOWN = 2;
+/**
+ * @deprecated The rule is now "fewer than half of the applicable signals measured → no number"
+ * (TrustScore.measured / .applicable). With all six applicable that is "more than 3 unknown".
+ * Kept for UI copy until it moves to measured/applicable.
+ */
+export const MAX_UNKNOWN = 3;
 
 const DAY = 86_400_000;
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
@@ -105,7 +122,7 @@ export function ago(d: Date, now: Date = new Date()): string {
 function cell(key: SignalKey, state: SignalState, label: string, points?: number): SignalCell {
   const max = TRUST_POINTS[key];
   const short = SIGNAL_ORDER.find((s) => s.key === key)!.short;
-  return { key, short, state, label, max, points: state === "unknown" ? max / 2 : Math.round(points ?? 0) };
+  return { key, short, state, label, max, points: state === "unknown" ? max / 2 : state === "not_applicable" ? 0 : Math.round(points ?? 0) };
 }
 
 /** The six cells in fixed strip order. */
@@ -127,11 +144,14 @@ export function signalCells(i: TrustItem, now: Date = new Date()): SignalCell[] 
   out.push(i.archived ? cell("archived", "failing", "archived by its owner", 0) : cell("archived", "good", "not archived", 15));
 
   const pkg = i.packageName ? `${i.packageName}${i.packageEcosystem ? ` on ${i.packageEcosystem}` : ""}` : null;
-  if (i.deprecated === true) out.push(cell("deprecated", "failing", `${pkg ?? "package"} is deprecated`, 0));
+  const noPackage = i.packageEcosystem === NO_PACKAGE && i.deprecated !== true;
+  if (noPackage) out.push(cell("deprecated", "not_applicable", "publishes no package"));
+  else if (i.deprecated === true) out.push(cell("deprecated", "failing", `${pkg ?? "package"} is deprecated`, 0));
   else if (i.deprecated === false) out.push(cell("deprecated", "good", `${pkg ?? "package"} not deprecated`, 15));
   else out.push(cell("deprecated", "unknown", pkg ? "deprecation not checked yet" : "no published package found to check"));
 
-  if (typeof i.advisoriesOpen === "number") {
+  if (noPackage) out.push(cell("advisories", "not_applicable", "publishes no package"));
+  else if (typeof i.advisoriesOpen === "number") {
     const n = i.advisoriesOpen;
     out.push(cell("advisories", n === 0 ? "good" : n === 1 ? "slipping" : "failing",
       n === 0 ? `no open advisories on the latest ${pkg ?? "release"}` : `${n} open advisor${n === 1 ? "y" : "ies"} on the latest ${pkg ?? "release"}`,
@@ -161,16 +181,22 @@ export function voteAdjust(weightedScore: number): number {
  */
 export function trustScore(item: TrustItem, votes?: VoteRow[] | number, now: Date = new Date()): TrustScore {
   const cells = signalCells(item, now);
-  const unknownCount = cells.filter((c) => c.state === "unknown").length;
+  const applicableCells = cells.filter((c) => c.state !== "not_applicable");
+  const unknownCount = applicableCells.filter((c) => c.state === "unknown").length;
+  const applicable = applicableCells.length;
+  const measured = applicable - unknownCount;
   const ws = Array.isArray(votes) ? computeWeightedScore(votes, now) : typeof votes === "number" ? votes : item.weightedScore ?? 0;
   const adj = voteAdjust(ws);
+  // Points over the applicable signals only, rescaled to 100. Unknowns carry their neutral half.
+  const maxPoints = applicableCells.reduce((a, c) => a + c.max, 0);
+  const raw = maxPoints > 0 ? Math.round((100 * applicableCells.reduce((a, c) => a + c.points, 0)) / maxPoints) : 0;
+  const counts = { voteAdjust: adj, unknownCount, measured, applicable, cells };
   const flagged = item.archived ? "archived" : item.deprecated === true ? "deprecated" : null;
   if (flagged) {
     // Known fatal signal beats unknowns. Votes cannot lift it past the cap.
-    const base = Math.min(Math.round(cells.reduce((a, c) => a + c.points, 0)), FLAGGED_CAP);
-    return { score: Math.max(0, Math.min(FLAGGED_CAP, base + adj)), reason: flagged, base, voteAdjust: adj, unknownCount, cells };
+    const base = Math.min(raw, FLAGGED_CAP);
+    return { score: Math.max(0, Math.min(FLAGGED_CAP, base + adj)), reason: flagged, base, ...counts };
   }
-  if (unknownCount > MAX_UNKNOWN) return { score: null, reason: "not enough data", base: null, voteAdjust: adj, unknownCount, cells };
-  const base = Math.round(cells.reduce((a, c) => a + c.points, 0));
-  return { score: Math.max(0, Math.min(100, base + adj)), base, voteAdjust: adj, unknownCount, cells };
+  if (measured * 2 < applicable) return { score: null, reason: "not enough data", base: null, ...counts };
+  return { score: Math.max(0, Math.min(100, raw + adj)), base: raw, ...counts };
 }

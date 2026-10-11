@@ -13,6 +13,8 @@ describe("helpers", () => {
   it("shows the API's trust number or says there is not enough data", () => {
     expect(formatTrust({ score: 87, base: 80, voteAdjust: 7, unknownCount: 0, cells: [] })).toBe("trust 87/100");
     expect(formatTrust({ score: null, reason: "not enough data", base: null, voteAdjust: 0, unknownCount: 3, cells: [] })).toBe("trust: not enough data");
+    expect(formatTrust({ score: 79, base: 79, voteAdjust: 0, unknownCount: 2, measured: 2, applicable: 4, cells: [] })).toBe("trust 79/100 (2 of 4 measured)");
+    expect(formatTrust({ score: 20, reason: "archived", base: 20, voteAdjust: 0, unknownCount: 0, measured: 4, applicable: 4, cells: [] })).toBe("trust 20/100 (archived)");
   });
 });
 

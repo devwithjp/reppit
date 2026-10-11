@@ -11,13 +11,13 @@ import { VoteComposer } from "@/components/VoteComposer";
 import { CompatForm } from "@/components/CompatForm";
 import { AgentChip, agentState } from "@/components/marks";
 import { flags, ago, compact, band } from "@/components/trust";
-import { trustScore, VOTE_ADJUST_MAX, MAX_UNKNOWN, type SignalCell } from "@/components/score";
+import { trustScore, VOTE_ADJUST_MAX, type SignalCell } from "@/components/score";
 import { ScoreNum } from "@/components/marks";
 import { REASONS, REASON_LABEL, CORE_AGENTS, KIND_LABEL, MCP_INSTALL, installCommand, splitSlug, itemHref, parentRepo } from "@/components/labels";
 import { rowColumns, indexCounts } from "../_data/items";
 
 const HALF_LIFE_DAYS = 180;
-const STATE_CLASS = { good: "", slipping: " mid", failing: " bad", unknown: "" } as const;
+const STATE_CLASS = { good: "", slipping: " mid", failing: " bad", unknown: "", not_applicable: "" } as const;
 
 /** One plain sentence on what the cells say. Words only; the number comes from core. */
 function verdict(cells: SignalCell[]): string {
@@ -27,8 +27,9 @@ function verdict(cells: SignalCell[]): string {
   if (cells.find((c) => c.key === "archived")?.state === "failing") return "Archived. Nobody is maintaining it.";
   if (cells.find((c) => c.key === "deprecated")?.state === "failing") return "Deprecated by its maintainers.";
   const unknown = cells.filter((c) => c.state === "unknown").length;
+  const applicable = cells.filter((c) => c.state !== "not_applicable").length;
   if (failing.length === 0 && slipping.length === 0) {
-    return unknown > MAX_UNKNOWN ? "Too little is measured yet to give it a number." : unknown > 0 ? "What is measured is holding." : "Everything measured is holding.";
+    return (applicable - unknown) * 2 < applicable ? "Too little is measured yet to give it a number." : unknown > 0 ? "What is measured is holding." : "Everything measured is holding.";
   }
   if (failing.length === 0) return `It holds, with ${list(slipping)} slipping.`;
   const f = list(failing);
@@ -105,7 +106,7 @@ export async function ItemView({ slug }: { slug: string }) {
   const agentsReporting = Object.keys(byAgent).length;
   const unknownWords = t.cells.filter((c) => c.state === "unknown").map((c) => c.short);
   const unknownNote = unknownWords.length === 0 ? null : t.score === null
-    ? `${unknownWords.length} of six signals are unknown for this entry (${unknownWords.join(", ")}). More than ${MAX_UNKNOWN} unknown and we show no number rather than guess one.`
+    ? `${t.measured} of ${t.applicable} applicable signals are measured for this entry; ${unknownWords.join(", ")} ${unknownWords.length === 1 ? "is" : "are"} unknown. With fewer than half measured we show no number rather than guess one.`
     : `${unknownWords.join(" and ")} ${unknownWords.length === 1 ? "is" : "are"} unknown for this entry and ${unknownWords.length === 1 ? "counts" : "count"} as half points: neither a pass nor a zero.`;
 
   return (
@@ -202,9 +203,10 @@ export async function ItemView({ slug }: { slug: string }) {
                   {t.cells.map((c) => (
                     <tr key={c.key}>
                       <th scope="row">{c.short.charAt(0).toUpperCase() + c.short.slice(1)}</th>
-                      <td className={`val${c.state === "unknown" ? " unk-t" : ""}`}>{c.label}</td>
+                      <td className={`val${c.state === "unknown" || c.state === "not_applicable" ? " unk-t" : ""}`}>{c.label}</td>
                       <td className="pts">
-                        {c.state === "unknown" ? <span className="unk-t">unknown, counts {c.points}/{c.max}</span> : (
+                        {c.state === "not_applicable" ? <span className="unk-t">not applicable</span>
+                        : c.state === "unknown" ? <span className="unk-t">unknown, counts {c.points}/{c.max}</span> : (
                           <>
                             <span className={`pbar${STATE_CLASS[c.state]}`} aria-hidden="true"><i style={{ width: `${Math.round((100 * c.points) / c.max)}%` }} /></span>
                             <b>{c.points}</b>/{c.max}
@@ -216,8 +218,8 @@ export async function ItemView({ slug }: { slug: string }) {
                 </tbody>
                 <tfoot><tr>
                   <th scope="row">Trust score</th>
-                  <td className="val">{t.score === null ? `${t.cells.length - unknownWords.length} of six signals known`
-                    : `${t.base} from the signals${t.voteAdjust !== 0 ? `, votes ${t.voteAdjust > 0 ? "+" : "\u2212"}${Math.abs(t.voteAdjust)}` : ""}${item.archived || item.deprecated ? ", capped at 25" : ""}`}</td>
+                  <td className="val">{t.score === null ? `${t.measured} of ${t.applicable} measured`
+                    : `${t.base} from ${t.measured} of ${t.applicable} measured signals${t.voteAdjust !== 0 ? `, votes ${t.voteAdjust > 0 ? "+" : "\u2212"}${Math.abs(t.voteAdjust)}` : ""}${item.archived || item.deprecated ? ", capped at 25" : ""}`}</td>
                   <td className="pts">{t.score === null ? "not enough data" : `${t.score}/100`}</td>
                 </tr></tfoot>
               </table>

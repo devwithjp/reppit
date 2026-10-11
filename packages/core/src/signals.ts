@@ -10,16 +10,19 @@
  *   here because it is CC-BY-SA and these values feed the ranker.
  */
 
+import { NO_PACKAGE } from "./trust";
+
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export const SIGNALS_USER_AGENT = "reppit-ingest (+https://reppit.dev)";
 
 /** Ecosystem names exactly as OSV spells them. */
-export type Ecosystem = "npm" | "PyPI" | "crates.io";
+export type Ecosystem = "npm" | "PyPI" | "crates.io" | "Go";
 export interface PackageRef { ecosystem: Ecosystem; name: string }
 
 export interface PackageSignals {
-  packageEcosystem: Ecosystem | null;
+  /** An ecosystem, "none" (confirmed: publishes no package), or null (unknown). */
+  packageEcosystem: Ecosystem | typeof NO_PACKAGE | null;
   packageName: string | null;
   /** null when no verified package was found. */
   deprecated: boolean | null;
@@ -149,7 +152,8 @@ export async function checkPypi(name: string, slugs: string[], f: FetchLike = fe
   const allYanked = info.yanked === true || (published.length > 0 && published.every((files) => files.every((x) => x.yanked === true)));
   const inactive = (info.classifiers ?? []).some((c) => /^Development Status :: 7 - Inactive/.test(c));
   const message = allYanked ? `every release yanked${info.yanked_reason ? `: ${info.yanked_reason}` : ""}` : inactive ? "Development Status :: 7 - Inactive" : null;
-  return { ecosystem: "PyPI" as const, name: info.name ?? name, version: info.version ?? null, deprecated: message !== null, deprecationMessage: message, license: spdxish(info.license_expression) ?? spdxish(info.license) };
+  const stableReleases = Object.entries(body.releases ?? {}).filter(([v, files]) => files.length > 0 && !PRERELEASE.test(v)).length;
+  return { ecosystem: "PyPI" as const, name: info.name ?? name, version: info.version ?? null, deprecated: message !== null, deprecationMessage: message, license: spdxish(info.license_expression) ?? spdxish(info.license), stableReleases };
 }
 
 /**
@@ -164,6 +168,52 @@ export async function npmSearchByRepo(repoName: string, slugs: string[], f: Fetc
   const j = (await res.json()) as { objects?: { package?: { name?: string; links?: { repository?: string } } }[] };
   return (j.objects ?? []).map((o) => o.package).filter((p) => p?.name && matchesRepo([p.links?.repository], slugs)).map((p) => p!.name!);
 }
+
+/** `module` path from a go.mod, and its `// Deprecated:` notice (Go's own deprecation convention). */
+export function goModInfo(text: string | null | undefined): { module: string; deprecated: string | null } | null {
+  if (!text) return null;
+  const lines = text.split(/\r?\n/);
+  const i = lines.findIndex((l) => /^\s*module\s+/.test(l));
+  if (i < 0) return null;
+  const module = lines[i].replace(/\/\/.*$/, "").replace(/^\s*module\s+/, "").trim().replace(/^"|"$/g, "");
+  if (!module) return null;
+  // The comment block directly above the module line, or a trailing comment on it.
+  const block: string[] = [];
+  for (let j = i - 1; j >= 0 && /^\s*\/\//.test(lines[j]); j--) block.unshift(lines[j].replace(/^\s*\/\/\s?/, ""));
+  const trailing = lines[i].match(/\/\/\s?(.*)$/)?.[1];
+  if (trailing) block.push(trailing);
+  const dep = block.map((l) => l.match(/^Deprecated:\s*(.*)$/)?.[1]).find((x) => x !== undefined);
+  return { module, deprecated: dep === undefined ? null : dep.trim() || "deprecated" };
+}
+
+/** proxy.golang.org path escaping: each upper-case letter becomes "!" + lower-case. */
+export const goProxyEscape = (m: string) => m.replace(/[A-Z]/g, (c) => `!${c.toLowerCase()}`);
+
+/**
+ * Go module: the repo's own module, published on proxy.golang.org (no key). The link back is the
+ * proxy's `Origin.URL` for the latest version, which also covers vanity paths (gorm.io/gorm →
+ * github.com/go-gorm/gorm); without an Origin, the module path must be github.com/<owner>/<name>
+ * (optionally /vN). 404/410 means never published. Deprecated when go.mod at HEAD carries a
+ * `// Deprecated:` notice, Go's own convention.
+ */
+export async function checkGo(goMod: string | null | undefined, slugs: string[], f: FetchLike = fetch) {
+  const info = goModInfo(goMod);
+  if (!info) return null;
+  const res = await f(`https://proxy.golang.org/${goProxyEscape(info.module)}/@latest`, { headers: { "user-agent": SIGNALS_USER_AGENT } });
+  if (res.status === 404 || res.status === 410) return null;
+  if (!res.ok) throw new Error(`goproxy ${info.module} ${res.status}`);
+  const j = (await res.json()) as { Version?: string; Origin?: { URL?: string } };
+  const byPath = info.module.match(/^github\.com\/([^/]+\/[^/]+?)(?:\/v\d+)?$/i)?.[1];
+  const linked = j.Origin?.URL ? matchesRepo([j.Origin.URL], slugs) : !!byPath && slugs.some((s) => s.toLowerCase() === byPath.toLowerCase());
+  if (!linked) return null;
+  return { ecosystem: "Go" as const, name: info.module, version: j.Version ?? null, deprecated: info.deprecated !== null, deprecationMessage: info.deprecated, license: null };
+}
+
+/**
+ * Root manifests of ecosystems this resolver cannot check yet (Maven, Gradle, RubyGems, Composer,
+ * Swift, Dart, Mix, .NET). If one exists, "no package found" is not a confirmed absence.
+ */
+export const UNSUPPORTED_MANIFESTS = ["pom.xml", "build.gradle", "build.gradle.kts", "Gemfile", "composer.json", "Package.swift", "pubspec.yaml", "mix.exs", "Directory.Build.props"];
 
 interface CratesResponse {
   crate?: { name?: string; repository?: string | null; homepage?: string | null; max_version?: string; max_stable_version?: string | null };
@@ -185,7 +235,8 @@ export async function checkCrates(name: string, slugs: string[], f: FetchLike = 
   const newest = versions[0];
   const live = j.crate?.max_stable_version || (j.crate?.max_version && j.crate.max_version !== "0.0.0" ? j.crate.max_version : null) || versions.find((v) => !v.yanked)?.num || newest?.num || null;
   const deprecated = !!newest?.yanked;
-  return { ecosystem: "crates.io" as const, name: j.crate?.name ?? name, version: live, deprecated, deprecationMessage: deprecated ? `latest version ${newest.num} yanked` : null, license: spdxish(newest?.license) };
+  const stableReleases = versions.filter((v) => !v.yanked && !PRERELEASE.test(v.num)).length;
+  return { ecosystem: "crates.io" as const, name: j.crate?.name ?? name, version: live, deprecated, deprecationMessage: deprecated ? `latest version ${newest.num} yanked` : null, license: spdxish(newest?.license), stableReleases };
 }
 
 interface OsvVuln { id: string; aliases?: string[]; withdrawn?: string }
@@ -258,28 +309,65 @@ export function countDistinctAdvisories(vulns: OsvVuln[]): number {
 
 export interface RepoManifests {
   packageJson?: string | null; pyproject?: string | null; setupCfg?: string | null; setupPy?: string | null; cargoToml?: string | null;
+  goMod?: string | null;
   /** package.json files from monorepo folders named like the repo (`<name>/`, `packages/<name>/`). */
   subPackageJsons?: (string | null)[];
+  /**
+   * True only when every manifest file (root, and monorepo folders when the root is private) was
+   * fetched with a definite answer: found, or 404. Only then can "no package" be a confirmed absence.
+   */
+  complete?: boolean;
 }
 
-export interface ResolvedPackage { ecosystem: Ecosystem; name: string; version: string | null; deprecated: boolean; deprecationMessage: string | null; license?: string | null }
+export interface ResolvedPackage {
+  ecosystem: Ecosystem; name: string; version: string | null; deprecated: boolean; deprecationMessage: string | null; license?: string | null;
+  /** Non-prerelease versions published, when the registry response already carries them. */
+  stableReleases?: number;
+}
+
+const PRERELEASE = /[-+](alpha|beta|rc|pre|dev|canary|next|nightly)|(a|b|rc|dev)\d+$/i;
+export const ESTABLISHED_MIN_RELEASES = 3;
+
+/** Stable versions on npm, from the abbreviated packument (smaller than the full document). */
+export async function npmStableReleases(name: string, f: FetchLike = fetch): Promise<number> {
+  const path = name.startsWith("@") ? name.replace("/", "%2f") : encodeURIComponent(name);
+  const res = await f(`https://registry.npmjs.org/${path}`, { headers: { accept: "application/vnd.npm.install-v1+json", "user-agent": SIGNALS_USER_AGENT } });
+  if (!res.ok) throw new Error(`npm packument ${name} ${res.status}`);
+  const j = (await res.json()) as { versions?: Record<string, unknown> };
+  return Object.keys(j.versions ?? {}).filter((v) => !PRERELEASE.test(v)).length;
+}
+
+/** Primary repo languages each registry plausibly publishes. Unknown language: no restriction. */
+const ECOSYSTEM_LANGUAGES: Record<Exclude<Ecosystem, "Go">, string[]> = {
+  npm: ["javascript", "typescript", "coffeescript", "vue", "svelte", "astro", "html", "css", "scss", "mdx"],
+  PyPI: ["python", "jupyter notebook", "cython"],
+  "crates.io": ["rust"],
+};
+const fitsLanguage = (eco: Ecosystem, language?: string | null) =>
+  eco === "Go" || !language || ECOSYSTEM_LANGUAGES[eco].includes(language.toLowerCase());
 
 /**
  * The repo's own published package. Every candidate must be confirmed by its registry entry linking
  * back to one of `slugs`, so a name collision never counts. Candidates, in order:
+ *   0. a Go module from the root go.mod, published on proxy.golang.org, whose Origin is this repo;
  *   1. the repo's own name, in each ecosystem the repo has a root manifest for (so docling resolves
  *      to `docling`, not the `docling-slim` its pyproject names, and localstack to `localstack`);
  *   2. names from root manifests: package.json, pyproject.toml, setup.cfg, setup.py, Cargo.toml;
  *   3. package.json in monorepo folders named like the repo (drizzle-orm/, packages/react/);
  *   4. npm search for the repo name, filtered by repository link (when a package.json exists).
+ * Steps 1 and 4 are not grounded in the repo's own files, and a registry's repository field is
+ * self-declared (npm "rails" is an unrelated 2022 beta claiming rails/rails). So when the ecosystem
+ * does not fit the repo's primary language, those candidates must also be established: at least 3
+ * non-prerelease versions (typescript, electron, uv pass; the rails squat does not).
  * Null = no verified package. Throws when a registry call fails, so callers can tell "none" from
  * "could not check".
  */
-export async function resolvePackage(slugs: string[], m: RepoManifests, f: FetchLike = fetch): Promise<ResolvedPackage | null> {
+export async function resolvePackage(slugs: string[], m: RepoManifests, f: FetchLike = fetch, opts: { language?: string | null } = {}): Promise<ResolvedPackage | null> {
   const repoName = (slugs[0] ?? "").split("/")[1]?.toLowerCase() ?? "";
   const hasNpm = !!m.packageJson || (m.subPackageJsons ?? []).some(Boolean);
   const hasPy = !!(m.pyproject || m.setupCfg || m.setupPy);
   const hasCargo = !!m.cargoToml;
+  if (m.goMod) { const go = await checkGo(m.goMod, slugs, f); if (go) return go; }
   const tried = new Set<string>();
   const attempt = async (eco: Ecosystem, name: string | null): Promise<ResolvedPackage | null> => {
     if (!name) return null;
@@ -287,13 +375,24 @@ export async function resolvePackage(slugs: string[], m: RepoManifests, f: Fetch
     if (tried.has(key)) return null;
     tried.add(key);
     if (eco === "npm" && !/^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/i.test(name)) return null; // not a valid npm name
-    return eco === "npm" ? checkNpm(name, slugs, f) : eco === "PyPI" ? checkPypi(name, slugs, f) : checkCrates(name, slugs, f);
+    return eco === "npm" ? checkNpm(name, slugs, f) : eco === "PyPI" ? checkPypi(name, slugs, f) : eco === "crates.io" ? checkCrates(name, slugs, f) : null;
   };
   const steps: [Ecosystem, string | null][] = [];
+  /** Ungrounded candidates (repo name, npm search) in an ecosystem that does not fit the language must be established. */
+  const grounded = new Set([
+    packageNameFromPackageJson(m.packageJson), ...(m.subPackageJsons ?? []).map(packageNameFromPackageJson),
+    packageNameFromPyproject(m.pyproject), packageNameFromSetupCfg(m.setupCfg), packageNameFromSetupPy(m.setupPy), packageNameFromCargoToml(m.cargoToml),
+  ].filter((x): x is string => !!x).map((x) => x.toLowerCase().replace(/[-_.]+/g, "-")));
+  const ungrounded = async (eco: Ecosystem, name: string) => {
+    const hit = await attempt(eco, name);
+    if (!hit || fitsLanguage(eco, opts.language) || grounded.has(hit.name.toLowerCase().replace(/[-_.]+/g, "-"))) return hit;
+    const stable = hit.stableReleases ?? (eco === "npm" ? await npmStableReleases(hit.name, f) : 0);
+    return stable >= ESTABLISHED_MIN_RELEASES ? hit : null;
+  };
   if (repoName) {
-    if (hasNpm) steps.push(["npm", repoName]);
-    if (hasPy) steps.push(["PyPI", repoName]);
-    if (hasCargo) steps.push(["crates.io", repoName]);
+    if (hasNpm) { const hit = await ungrounded("npm", repoName); if (hit) return hit; }
+    if (hasPy) { const hit = await ungrounded("PyPI", repoName); if (hit) return hit; }
+    if (hasCargo) { const hit = await ungrounded("crates.io", repoName); if (hit) return hit; }
   }
   steps.push(["npm", packageNameFromPackageJson(m.packageJson)]);
   for (const py of [packageNameFromPyproject(m.pyproject), packageNameFromSetupCfg(m.setupCfg), packageNameFromSetupPy(m.setupPy)]) steps.push(["PyPI", py]);
@@ -301,7 +400,7 @@ export async function resolvePackage(slugs: string[], m: RepoManifests, f: Fetch
   for (const sub of m.subPackageJsons ?? []) steps.push(["npm", packageNameFromPackageJson(sub)]);
   for (const [eco, name] of steps) { const hit = await attempt(eco, name); if (hit) return hit; }
   if (hasNpm && repoName) {
-    for (const name of await npmSearchByRepo(repoName, slugs, f)) { const hit = await attempt("npm", name); if (hit) return hit; }
+    for (const name of await npmSearchByRepo(repoName, slugs, f)) { const hit = await ungrounded("npm", name); if (hit) return hit; }
   }
   return null;
 }
@@ -311,10 +410,10 @@ export async function resolvePackage(slugs: string[], m: RepoManifests, f: Fetch
  * internally). Returns null when a registry call failed outright, so callers leave existing values
  * untouched rather than overwrite them with unknowns.
  */
-export async function checkPackageSignals(slugs: string[], manifests: RepoManifests, f: FetchLike = fetch, now = new Date()): Promise<PackageSignals | null> {
+export async function checkPackageSignals(slugs: string[], manifests: RepoManifests, f: FetchLike = fetch, now = new Date(), opts: { language?: string | null } = {}): Promise<PackageSignals | null> {
   try {
-    const hit = await resolvePackage(slugs, manifests, f);
-    if (!hit) return noPackageSignals(now);
+    const hit = await resolvePackage(slugs, manifests, f, opts);
+    if (!hit) return noPackageSignals(now, await confirmNoPackage(slugs[0] ?? "", manifests, f));
     const advisoriesOpen = hit.version ? await osvOpenAdvisories({ ecosystem: hit.ecosystem, name: hit.name }, hit.version, f) : null;
     return { packageEcosystem: hit.ecosystem, packageName: hit.name, deprecated: hit.deprecated, deprecationMessage: hit.deprecationMessage, advisoriesOpen, signalsCheckedAt: now, registryLicense: hit.license ?? null };
   } catch {
@@ -322,11 +421,35 @@ export async function checkPackageSignals(slugs: string[], manifests: RepoManife
   }
 }
 
-export const noPackageSignals = (now: Date): PackageSignals =>
-  ({ packageEcosystem: null, packageName: null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now });
+/**
+ * Whether "no package found" is a confirmed absence: every supported manifest was fetched with a
+ * definite answer, and the repo has no root manifest of an ecosystem we cannot check yet. Any error
+ * answers false (unknown), never true.
+ */
+export async function confirmNoPackage(slug: string, manifests: RepoManifests, f: FetchLike = fetch): Promise<boolean> {
+  if (manifests.complete !== true) return false;
+  const [owner, name] = slug.replace(/~[0-9a-f]{8}$/, "").split("/");
+  if (!owner || !name) return false;
+  try {
+    for (const file of UNSUPPORTED_MANIFESTS) {
+      const r = await f(`https://raw.githubusercontent.com/${owner}/${name}/HEAD/${file}`, { method: "HEAD", headers: { "user-agent": SIGNALS_USER_AGENT } });
+      if (r.ok) return false;
+      if (r.status !== 404) return false;
+    }
+    return true;
+  } catch { return false; }
+}
 
-export const MANIFEST_FILES: Record<Exclude<keyof RepoManifests, "subPackageJsons">, string> = {
-  packageJson: "package.json", pyproject: "pyproject.toml", setupCfg: "setup.cfg", setupPy: "setup.py", cargoToml: "Cargo.toml",
+/**
+ * No verified package. `confirmed` (every manifest fetched with a definite answer, and every registry
+ * lookup answered) stores package_ecosystem = 'none', which makes deprecation and advisories not
+ * applicable in the trust score. Unconfirmed leaves them unknown.
+ */
+export const noPackageSignals = (now: Date, confirmed = false): PackageSignals =>
+  ({ packageEcosystem: confirmed ? NO_PACKAGE : null, packageName: null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now });
+
+export const MANIFEST_FILES: Record<Exclude<keyof RepoManifests, "subPackageJsons" | "complete">, string> = {
+  packageJson: "package.json", pyproject: "pyproject.toml", setupCfg: "setup.cfg", setupPy: "setup.py", cargoToml: "Cargo.toml", goMod: "go.mod",
 };
 
 /**
@@ -335,13 +458,17 @@ export const MANIFEST_FILES: Record<Exclude<keyof RepoManifests, "subPackageJson
  * null here; pass `strict` to have those throw instead, so a batch job can retry the repo later.
  */
 export async function fetchManifestsRaw(owner: string, name: string, f: FetchLike = fetch, opts: { strict?: boolean } = {}): Promise<RepoManifests> {
+  let complete = true;
   const get = async (file: string) => {
     try {
       const r = await f(`https://raw.githubusercontent.com/${owner}/${name}/HEAD/${file}`, { headers: { "user-agent": SIGNALS_USER_AGENT } });
       if (r.ok) return (await r.text()).slice(0, 200_000);
-      if (opts.strict && (r.status === 429 || r.status >= 500)) throw new Error(`raw ${owner}/${name}/${file} ${r.status}`);
+      if (r.status !== 404) {
+        complete = false;
+        if (opts.strict && (r.status === 429 || r.status >= 500)) throw new Error(`raw ${owner}/${name}/${file} ${r.status}`);
+      }
       return null;
-    } catch (e) { if (opts.strict) throw e; return null; }
+    } catch (e) { complete = false; if (opts.strict) throw e; return null; }
   };
   const keys = Object.keys(MANIFEST_FILES) as (keyof typeof MANIFEST_FILES)[];
   const texts = await Promise.all(keys.map((k) => get(MANIFEST_FILES[k])));
@@ -351,5 +478,6 @@ export async function fetchManifestsRaw(owner: string, name: string, f: FetchLik
   if (out.packageJson && packageNameFromPackageJson(out.packageJson) === null) {
     out.subPackageJsons = await Promise.all([`${name}/package.json`, `packages/${name}/package.json`].map(get));
   }
+  out.complete = complete;
   return out;
 }

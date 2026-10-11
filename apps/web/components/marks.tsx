@@ -2,8 +2,8 @@ import { SIGNAL_ORDER, type SignalCell, type CellState } from "./score";
 import { AGENT_LABEL, REASON_LABEL, CORE_AGENTS } from "./labels";
 import type { Compat } from "@/app/_data/items";
 
-const STATE_WORD: Record<CellState, string> = { good: "holds", slipping: "slipping", failing: "failing", unknown: "unknown" };
-const STATE_CLASS: Record<CellState, string> = { good: "ok", slipping: "mid", failing: "bad", unknown: "unk" };
+const STATE_WORD: Record<CellState, string> = { good: "holds", slipping: "slipping", failing: "failing", unknown: "unknown", not_applicable: "not applicable" };
+const STATE_CLASS: Record<CellState, string> = { good: "ok", slipping: "mid", failing: "bad", unknown: "unk", not_applicable: "na" };
 
 /** The six-cell signal strip. Grey cells are unknown, never a pass. */
 export function Strip({ cells, className }: { cells: SignalCell[]; className?: string }) {
@@ -30,7 +30,7 @@ export function StripKey() {
     <div className="stripkey">
       <div className="strip" aria-hidden="true"><i className="ok" /><i className="ok" /><i className="ok" /><i className="mid" /><i className="bad" /><i className="unk" /></div>
       <b>=</b> {SIGNAL_ORDER.map((s) => s.short).join(" \u00b7 ")}.
-      <span>Blue holds, amber slipping, rust failing, grey unknown.</span>
+      <span>Blue holds, amber slipping, rust failing, grey unknown, outline not applicable.</span>
     </div>
   );
 }

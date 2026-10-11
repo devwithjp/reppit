@@ -52,7 +52,7 @@ export const POST = route("items POST", async (req) => {
   // Upsert by github_id: if GitHub answered under a new name we already hold, this updates that row
   // (and records the submitted name as an alias) instead of creating a duplicate.
   const res = await upsertRepoItem(d, { ...row, embedding, embeddedAt: new Date(), submittedBy: user.id }, { requestedSlug: slug });
-  const signals = await checkPackageSignals([res.slug, slug], await fetchManifestsRaw(row.owner, row.name));
+  const signals = await checkPackageSignals([res.slug, slug], await fetchManifestsRaw(row.owner, row.name), fetch, new Date(), { language: row.language });
   await applySignals(d, res.id, signals);
   return json({ item: { id: res.id, slug: res.slug }, existed: res.action !== "inserted" }, { status: res.action === "inserted" ? 201 : 200 });
 });

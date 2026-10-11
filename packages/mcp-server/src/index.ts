@@ -34,7 +34,7 @@ export function buildServer(client = new ReppitClient()) {
       item.redirect ? `(${item.redirect.from} is now ${item.redirect.to})` : "",
       item.description ?? "",
       `${formatTrust(item.trust)} · votes +${item.upvotes}/-${item.downvotes} · ★${item.stars} · ${item.license ?? "no license"}`,
-      item.trust ? item.trust.cells.map((c) => `  ${c.state === "unknown" ? "?" : c.state === "good" ? "✓" : c.state === "slipping" ? "~" : "✗"} ${c.short}: ${c.label}`).join("\n") : "",
+      item.trust ? item.trust.cells.map((c) => `  ${c.state === "not_applicable" ? "-" : c.state === "unknown" ? "?" : c.state === "good" ? "✓" : c.state === "slipping" ? "~" : "✗"} ${c.short}: ${c.label}`).join("\n") : "",
       `topics: ${item.topics.join(", ")}`, `install: ${installCommand(item)}`,
       item.comments?.length ? `\nrecent comments:\n${item.comments.map((c) => `- @${c.user}: ${c.body}`).join("\n")}` : "",
       item.readme ? `\nREADME (excerpt):\n${item.readme.slice(0, 3000)}` : "",

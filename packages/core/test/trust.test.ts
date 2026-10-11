@@ -44,10 +44,17 @@ describe("trustScore", () => {
     const twoUnknown = trustScore({ ...healthy, deprecated: null, advisoriesOpen: null }, 0, now).score!;
     expect(known - twoUnknown).toBe(15); // (15 + 15) / 2 lost
   });
-  it("returns no number when three or more signals are unknown", () => {
-    const t = trustScore({ ...healthy, deprecated: null, advisoriesOpen: null, openIssues: null }, 0, now);
-    expect(t).toMatchObject({ score: null, reason: "not enough data", base: null, unknownCount: 3 });
-    expect(t.cells).toHaveLength(6);
+  it("reports measured and applicable counts", () => {
+    expect(trustScore(healthy, 0, now)).toMatchObject({ measured: 6, applicable: 6, unknownCount: 0 });
+  });
+  it("returns no number when fewer than half the applicable signals are measured", () => {
+    const four = trustScore({ ...healthy, lastReleaseAt: null, deprecated: null, advisoriesOpen: null, openIssues: null }, 0, now);
+    expect(four).toMatchObject({ score: null, reason: "not enough data", base: null, unknownCount: 4, measured: 2, applicable: 6 });
+    expect(four.cells).toHaveLength(6);
+    // Exactly half measured (3 of 6) is enough for a number.
+    const three = trustScore({ ...healthy, deprecated: null, advisoriesOpen: null, openIssues: null }, 0, now);
+    expect(three).toMatchObject({ measured: 3, applicable: 6 });
+    expect(three.score).not.toBeNull();
   });
   it("does not take stars as an input", () => {
     const withStars = { ...healthy, stars: 1_000_000 } as TrustItem;
@@ -85,5 +92,31 @@ describe("trustScore", () => {
     const fresh = trustScore({ ...healthy, pushedAt: daysAgo(500) }, [{ direction: "up", weight: 2, createdAt: now }, { direction: "up", weight: 2, createdAt: now }], now);
     const stale = trustScore({ ...healthy, pushedAt: daysAgo(500) }, [{ direction: "up", weight: 2, createdAt: daysAgo(720) }, { direction: "up", weight: 2, createdAt: daysAgo(720) }], now);
     expect(fresh.voteAdjust).toBeGreaterThan(stale.voteAdjust);
+  });
+});
+
+describe("not applicable: confirmed to publish no package", () => {
+  const app: TrustItem = { pushedAt: daysAgo(5), archived: false, packageEcosystem: "none", deprecated: null, advisoriesOpen: null, openIssues: null, closedIssues: null, lastReleaseAt: null };
+  it("marks deprecation and advisories not_applicable with the label, in fixed order", () => {
+    const cells = signalCells(app, now);
+    expect(cells.map((c) => c.key)).toEqual(SIGNAL_ORDER.map((s) => s.key));
+    for (const k of ["deprecated", "advisories"]) expect(cells.find((c) => c.key === k)).toMatchObject({ state: "not_applicable", label: "publishes no package", points: 0 });
+  });
+  it("scores over the applicable signals, rescaled to 100", () => {
+    // push 25/25 + release 7.5/15 (unknown) + archived 15/15 + issues 7.5/15 (unknown) = 55/70.
+    const t = trustScore(app, 0, now);
+    expect(t).toMatchObject({ applicable: 4, measured: 2, unknownCount: 2, score: Math.round((100 * 55) / 70) });
+    // The same repo with an unconfirmed check: 4 of 6 unknown, no number.
+    expect(trustScore({ ...app, packageEcosystem: null }, 0, now)).toMatchObject({ score: null, measured: 2, applicable: 6 });
+  });
+  it("a fully measured no-package repo can reach 100", () => {
+    expect(trustScore({ ...app, lastReleaseAt: daysAgo(10), openIssues: 10, closedIssues: 990 }, 0, now)).toMatchObject({ score: 100, applicable: 4, measured: 4 });
+  });
+  it("still needs half the applicable signals", () => {
+    expect(trustScore({ ...app, pushedAt: null }, 0, now)).toMatchObject({ score: null, reason: "not enough data", measured: 1, applicable: 4 });
+  });
+  it("archived still decides, over applicable signals", () => {
+    expect(trustScore({ ...app, archived: true }, 0, now)).toMatchObject({ reason: "archived", applicable: 4 });
+    expect(trustScore({ ...app, archived: true }, 0, now).score!).toBeLessThanOrEqual(25);
   });
 });

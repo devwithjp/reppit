@@ -3,6 +3,7 @@ import {
   packageNameFromPackageJson, packageNameFromPyproject, githubSlugFromUrl, checkNpm, checkPypi, osvOpenAdvisories,
   countDistinctAdvisories, checkPackageSignals, type FetchLike,
   packageNameFromSetupCfg, packageNameFromSetupPy, packageNameFromCargoToml, checkCrates, osvOpenAdvisoriesBatch, resolvePackage,
+  fetchManifestsRaw, goModInfo, goProxyEscape, checkGo, confirmNoPackage,
 } from "../src/signals";
 
 /** Route table fake. Bodies below follow shapes recorded from the live APIs on 2026-10-11. */
@@ -234,5 +235,87 @@ describe("package resolution for monorepos and renamed packages", () => {
     expect(spdxish({ type: "BSD-3-Clause" })).toBe("BSD-3-Clause");
     expect(spdxish("Copyright (c) 2020 someone. All rights reserved and more text here")).toBeNull();
     expect(spdxish("UNLICENSED")).toBeNull();
+  });
+});
+
+describe("confirmed absence of a package", () => {
+  const now = new Date("2026-10-11T00:00:00Z");
+  it("stores 'none' only when every manifest fetch answered found or 404", async () => {
+    const raw404 = async () => new Response("", { status: 404 });
+    const m = await fetchManifestsRaw("acme", "awesome-list", raw404);
+    expect(m.complete).toBe(true);
+    expect(await checkPackageSignals(["acme/awesome-list"], m, raw404, now)).toMatchObject({ packageEcosystem: "none", deprecated: null, advisoriesOpen: null });
+  });
+  it("stays unknown when any manifest fetch failed or was rate limited", async () => {
+    let n = 0;
+    const flaky = async () => (++n === 2 ? new Response("", { status: 503 }) : new Response("", { status: 404 }));
+    const m = await fetchManifestsRaw("acme", "app", flaky);
+    expect(m.complete).toBe(false);
+    expect(await checkPackageSignals(["acme/app"], m, async () => new Response("", { status: 404 }), now)).toMatchObject({ packageEcosystem: null });
+    const thrown = await fetchManifestsRaw("acme", "app", async () => { throw new Error("network"); });
+    expect(thrown.complete).toBe(false);
+  });
+  it("manifests from GraphQL (no completeness claim) never confirm absence", async () => {
+    expect(await checkPackageSignals(["acme/app"], { packageJson: null, pyproject: null }, async () => new Response("", { status: 404 }), now)).toMatchObject({ packageEcosystem: null });
+  });
+  it("a monorepo whose folders could not be fetched is not confirmed", async () => {
+    const f = async (url: string) => url.endsWith("/HEAD/package.json") ? new Response('{"name":"root","private":true}') : url.includes("/HEAD/app/") ? new Response("", { status: 500 }) : new Response("", { status: 404 });
+    expect((await fetchManifestsRaw("acme", "app", f)).complete).toBe(false);
+  });
+});
+
+describe("Go modules", () => {
+  it("reads the module path and Go's Deprecated convention", () => {
+    expect(goModInfo("module github.com/ollama/ollama\n\ngo 1.24")).toEqual({ module: "github.com/ollama/ollama", deprecated: null });
+    expect(goModInfo("// Deprecated: use github.com/x/y/v2 instead.\nmodule github.com/x/y\n")).toEqual({ module: "github.com/x/y", deprecated: "use github.com/x/y/v2 instead." });
+    expect(goModInfo("go 1.22")).toBeNull();
+    expect(goProxyEscape("github.com/BurntSushi/toml")).toBe("github.com/!burnt!sushi/toml");
+  });
+  it("verifies vanity paths through the proxy's Origin URL", async () => {
+    const f = fake({ "https://proxy.golang.org/gorm.io/gorm/@latest": { Version: "v1.31.2", Origin: { URL: "https://github.com/go-gorm/gorm" } } });
+    expect(await checkGo("module gorm.io/gorm", ["go-gorm/gorm"], f)).toMatchObject({ ecosystem: "Go", name: "gorm.io/gorm", version: "v1.31.2", deprecated: false });
+    expect(await checkGo("module gorm.io/gorm", ["someone/fork"], f)).toBeNull();
+  });
+  it("is not a package when the proxy has never seen it", async () => {
+    expect(await checkGo("module github.com/acme/tool", ["acme/tool"], fake({}))).toBeNull();
+  });
+  it("resolvePackage tries Go first when go.mod names this repo", async () => {
+    const f = fake({ "https://proxy.golang.org/github.com/ollama/ollama/@latest": { Version: "v0.12.0", Origin: { URL: "https://github.com/ollama/ollama" } } });
+    expect(await resolvePackage(["ollama/ollama"], { goMod: "module github.com/ollama/ollama" }, f)).toMatchObject({ ecosystem: "Go", name: "github.com/ollama/ollama" });
+  });
+});
+
+describe("absence is not confirmed beside an ecosystem we cannot check", () => {
+  it("a Java or Ruby repo with no npm/PyPI/crates/Go package stays unknown", async () => {
+    const f = async (url: string) => (url.endsWith("/pom.xml") ? new Response("", { status: 200 }) : new Response("", { status: 404 }));
+    expect(await confirmNoPackage("acme/javalib", { complete: true }, f)).toBe(false);
+    const none = async () => new Response("", { status: 404 });
+    expect(await confirmNoPackage("acme/list", { complete: true }, none)).toBe(true);
+    expect(await confirmNoPackage("acme/list", { complete: false }, none)).toBe(false);
+    expect(await confirmNoPackage("acme/list", { complete: true }, async () => new Response("", { status: 429 }))).toBe(false);
+  });
+});
+
+describe("self-declared repository links", () => {
+  it("rejects a thin repo-name package in an ecosystem that does not fit the repo's language", async () => {
+    const f = fake({
+      "https://registry.npmjs.org/rails/latest": { name: "rails", version: "4.1.0-beta", repository: { url: "git://github.com/rails/rails.git" } },
+      "https://registry.npmjs.org/rails": { versions: { "4.1.0-beta": {} } },
+    });
+    const m = { packageJson: '{"private":true,"workspaces":["actioncable"]}' };
+    expect(await resolvePackage(["rails/rails"], m, f, { language: "Ruby" })).toBeNull();
+    // Unknown language: no extra requirement (the link back still has to hold).
+    expect(await resolvePackage(["rails/rails"], m, f)).toMatchObject({ name: "rails" });
+  });
+  it("accepts an established cross-language package (typescript from a Go repo)", async () => {
+    const f = fake({
+      "https://registry.npmjs.org/typescript/latest": { name: "typescript", version: "6.0.2", repository: { url: "git+https://github.com/microsoft/TypeScript.git" } },
+      "https://registry.npmjs.org/typescript": { versions: { "5.9.0": {}, "6.0.0": {}, "6.0.1": {}, "6.0.2": {}, "6.1.0-beta": {} } },
+    });
+    expect(await resolvePackage(["microsoft/TypeScript"], { packageJson: '{"private":true}' }, f, { language: "Go" })).toMatchObject({ name: "typescript" });
+  });
+  it("still trusts a name the repo's own manifest gives, whatever the language", async () => {
+    const f = fake({ "https://registry.npmjs.org/tool/latest": { name: "tool", version: "1.0.0", repository: "acme/tool" } });
+    expect(await resolvePackage(["acme/tool"], { packageJson: '{"name":"tool"}' }, f, { language: "Go" })).toMatchObject({ name: "tool" });
   });
 });

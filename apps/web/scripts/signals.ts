@@ -6,15 +6,19 @@
  *
  * Per repo:
  *   1. Root manifests from raw.githubusercontent.com (content CDN, not the rate-limited API):
- *      package.json, pyproject.toml, setup.cfg, setup.py, Cargo.toml.
- *   2. The registry entry for the manifest's name (npm, PyPI, crates.io). It only counts if the
- *      registry's repository link points back at this repo (current slug or a known alias).
+ *      package.json, pyproject.toml, setup.cfg, setup.py, Cargo.toml, go.mod (plus monorepo folders
+ *      named like the repo when the root package.json is private).
+ *   2. The registry entry (npm, PyPI, crates.io, proxy.golang.org). It only counts if the registry
+ *      links back at this repo (current slug or a known alias).
  *   3. Deprecated: npm latest version's `deprecated`; PyPI every release yanked or
  *      "Development Status :: 7 - Inactive"; crates.io latest version yanked.
  *   4. Open advisories from OSV.dev querybatch (one call per chunk): distinct, non-withdrawn
  *      advisories affecting the latest published version.
  *
- * No verified package: deprecated and advisories stay null (unknown), never false/0, and
+ * No verified package, confirmed (every manifest answered found/404, every registry lookup
+ * answered, and no root manifest of an ecosystem we cannot check: pom.xml, build.gradle, Gemfile,
+ * composer.json, Package.swift, pubspec.yaml, mix.exs): package_ecosystem = 'none', and the trust score treats deprecation and advisories as
+ * not applicable. Unconfirmed: they stay null (unknown), never false/0. Either way
  * signals_checked_at is set so the repo is not re-fetched until --recheck-days passes.
  * A transport failure, 429 or 5xx leaves the row untouched, so a re-run retries it.
  *
@@ -37,7 +41,7 @@ import { and, eq, or, desc, inArray, sql } from "drizzle-orm";
 import { getDb, items, itemAliases, type Db } from "@gitit/db";
 import {
   fetchManifestsRaw, resolvePackage, osvOpenAdvisoriesBatch, applySignals, noPackageSignals, trustScore,
-  fetchReadmeRaw, embedderFromEnv, itemEmbeddingText,
+  fetchReadmeRaw, embedderFromEnv, itemEmbeddingText, confirmNoPackage,
   type FetchLike, type ResolvedPackage,
 } from "@gitit/core";
 
@@ -59,6 +63,7 @@ const SPACING: Record<string, number> = {
   "pypi.org": 250,
   "crates.io": 1000, // crates.io crawler policy: 1 req/s
   "api.osv.dev": 250,
+  "proxy.golang.org": 250,
 };
 const nextSlot = new Map<string, number>();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -98,6 +103,7 @@ async function trustCensus(db: Db) {
   const rows = await db.select({
     pushedAt: items.pushedAt, lastReleaseAt: items.lastReleaseAt, archived: items.archived, deprecated: items.deprecated,
     advisoriesOpen: items.advisoriesOpen, openIssues: items.openIssues, closedIssues: items.closedIssues, weightedScore: items.weightedScore,
+    packageName: items.packageName, packageEcosystem: items.packageEcosystem,
   }).from(items).where(eq(items.kind, "repo"));
   const scored = rows.map((r) => trustScore(r));
   return { repos: rows.length, notEnough: scored.filter((t) => t.score === null).length, scored: scored.filter((t) => t.score !== null).length };
@@ -120,7 +126,7 @@ async function main() {
   const embedder = embedderFromEnv();
   console.log(`visiting ${todo.length} repos: ${todo.filter((r) => r.signalsDue).length} due a signals check, ${todo.filter((r) => r.needsReadme).length} missing a README · embedder ${embedder.name}${dryRun ? " · DRY RUN" : ""}`);
 
-  const tally = { readmes: 0, readmeMissing: 0, checked: 0, failed: 0, packages: 0, npm: 0, PyPI: 0, "crates.io": 0, deprecated: 0, withAdvisories: 0, advisoriesUnknown: 0 };
+  const tally = { noPackage: 0, readmes: 0, readmeMissing: 0, checked: 0, failed: 0, packages: 0, npm: 0, PyPI: 0, "crates.io": 0, Go: 0, deprecated: 0, withAdvisories: 0, advisoriesUnknown: 0 };
   const osvCache = new Map();
   const t0 = Date.now();
 
@@ -129,7 +135,7 @@ async function main() {
     const aliasRows = await db.select({ itemId: itemAliases.itemId, slug: itemAliases.slug }).from(itemAliases).where(inArray(itemAliases.itemId, chunk.map((r) => r.id)));
 
     // 1-3: manifests and registry, CONCURRENCY repos at a time (pacing is per host, below this).
-    const resolved: { row: Row; hit: ResolvedPackage | null }[] = [];
+    const resolved: { row: Row; hit: ResolvedPackage | null; complete: boolean }[] = [];
     const readmes: { row: Row; readme: string }[] = [];
     for (let j = 0; j < chunk.length; j += CONCURRENCY) {
       await Promise.all(chunk.slice(j, j + CONCURRENCY).map(async (row) => {
@@ -145,7 +151,8 @@ async function main() {
         if (!row.signalsDue) return;
         try {
           const manifests = await fetchManifestsRaw(owner, name, paced, { strict: true });
-          resolved.push({ row, hit: await resolvePackage(slugs, manifests, paced) });
+          const hit = await resolvePackage(slugs, manifests, paced, { language: row.language });
+          resolved.push({ row, hit, complete: hit ? false : await confirmNoPackage(slug, manifests, paced) });
         } catch (e) {
           tally.failed++;
           console.warn(`  ${row.slug}: left for a later run (${(e as Error).message.slice(0, 80)})`);
@@ -159,10 +166,11 @@ async function main() {
     const advBy = new Map(withVersion.map((r, k) => [r.row.id, adv[k]]));
 
     const now = new Date();
-    for (const { row, hit } of resolved) {
+    for (const { row, hit, complete } of resolved) {
       const s = hit
         ? { packageEcosystem: hit.ecosystem, packageName: hit.name, deprecated: hit.deprecated, deprecationMessage: hit.deprecationMessage, advisoriesOpen: advBy.get(row.id) ?? null, signalsCheckedAt: now, registryLicense: hit.license ?? null }
-        : noPackageSignals(now);
+        : noPackageSignals(now, complete);
+      if (!hit && complete) tally.noPackage++;
       if (hit) {
         tally.packages++; tally[hit.ecosystem]++;
         if (hit.deprecated) tally.deprecated++;
@@ -191,7 +199,8 @@ async function main() {
   console.log(`\nafter:  ${after.repos} repos · ${after.scored} scored · ${after.notEnough} "not enough data"`);
   console.log(`moved to a real score: ${before.notEnough - after.notEnough}`);
   console.log(`READMEs filled and re-embedded: ${tally.readmes} · no README file found: ${tally.readmeMissing}`);
-  console.log(`packages verified ${tally.packages} (npm ${tally.npm}, PyPI ${tally.PyPI}, crates.io ${tally["crates.io"]}) · deprecated ${tally.deprecated} · with open advisories ${tally.withAdvisories} · advisories unknown ${tally.advisoriesUnknown} · failed ${tally.failed} · retries ${counts.retries} · ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+  console.log(`confirmed no package ${tally.noPackage}`);
+  console.log(`packages verified ${tally.packages} (npm ${tally.npm}, PyPI ${tally.PyPI}, crates.io ${tally["crates.io"]}, Go ${tally.Go}) · deprecated ${tally.deprecated} · with open advisories ${tally.withAdvisories} · advisories unknown ${tally.advisoriesUnknown} · failed ${tally.failed} · retries ${counts.retries} · ${((Date.now() - t0) / 1000).toFixed(0)}s`);
   process.exit(0);
 }
 main().catch((e) => { console.error("signals failed:", (e as Error).message); process.exit(1); });

@@ -22,6 +22,13 @@
       "when": 1791721244295,
       "tag": "0002_search_tsv",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791722640115,
+      "tag": "0003_search_tsv_reapply",
+      "breakpoints": true
     }
   ]
 }

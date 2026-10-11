@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 const QUERY = "extract tables from pdf";
 const C = { ok: "c-steel", mid: "c-amber", bad: "c-rust" } as const;
 
-const CC = { good: "c-steel", slipping: "c-amber", failing: "c-rust", unknown: "c-faint" } as const;
+const CC = { good: "c-steel", slipping: "c-amber", failing: "c-rust", unknown: "c-faint", not_applicable: "c-faint" } as const;
 
 function TermStrip({ cells }: { cells: SignalCell[] }) {
   return <>{cells.map((s) => <span key={s.key} className={CC[s.state]}>{"▆"}</span>)}</>;

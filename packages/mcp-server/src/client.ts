@@ -51,11 +51,13 @@ export const GititClient = ReppitClient;
 /** Shape of @gitit/core TrustScore as served by the API. */
 export interface Trust {
   score: number | null;
-  reason?: "not enough data";
+  reason?: "not enough data" | "archived" | "deprecated";
   base: number | null;
   voteAdjust: number;
   unknownCount: number;
-  cells: { key: string; short: string; state: "good" | "slipping" | "failing" | "unknown"; label: string; points: number; max: number }[];
+  measured?: number;
+  applicable?: number;
+  cells: { key: string; short: string; state: "good" | "slipping" | "failing" | "unknown" | "not_applicable"; label: string; points: number; max: number }[];
 }
 
 export interface SearchResult {
@@ -78,7 +80,9 @@ export type ItemDetail = SearchResult["item"] & {
 /** "trust 87/100" or "trust: not enough data". The number comes from the API, never recomputed here. */
 export function formatTrust(t: Trust | undefined): string {
   if (!t) return "trust: n/a";
-  return t.score === null ? "trust: not enough data" : `trust ${t.score}/100`;
+  const of = typeof t.measured === "number" && typeof t.applicable === "number" ? ` (${t.measured} of ${t.applicable} measured)` : "";
+  if (t.score === null) return `trust: not enough data${of}`;
+  return `trust ${t.score}/100${t.reason === "archived" || t.reason === "deprecated" ? ` (${t.reason})` : of}`;
 }
 
 /**
@@ -92,6 +96,7 @@ export function installCommand(r: SearchResult["item"]): string {
   if (name && r.packageEcosystem === "npm") return `npm install ${name}`;
   if (name && r.packageEcosystem === "PyPI") return `pip install ${name}`;
   if (name && r.packageEcosystem === "crates.io") return `cargo add ${name}`;
+  if (name && r.packageEcosystem === "Go") return `go get ${name}`;
   if ((r.language ?? "").toLowerCase() === "go") return `go get github.com/${r.slug}`;
   return `# no published package verified for ${r.slug}; see ${r.url}`;
 }
