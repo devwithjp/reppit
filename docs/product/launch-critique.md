@@ -1,5 +1,98 @@
 # reppit launch critique
 
+## Fourth pass, 2026-10-12 (final build)
+
+Same method: Chrome through Playwright, desktop and 400px, against the production build (2,226 entries; `/api/health` reports `"embedding":"gte-small"`). I wrote 15 queries I had never used in any pass, then ran 2 more and reran the original 12. Sign-in is still not available on this machine, so I could not see the token page or confirm that tokens are read-only by default. /agent says "without a personal token the server can only read". It does not mention a read-only default, and it still describes `vote` as "acts as you... the server tells the agent to use it only when you ask". I read no source. The earlier passes are below, unchanged.
+
+### Verdict
+
+**I'd use the site next week. I'd add the MCP server to my agent once it's published, as a read-only lookup. It isn't ready for a public launch yet.**
+- **Common needs work:** ruff, sharp, better-auth, goose, fjall, clap, express-rate-limit and envalid come back first, with the right install command. Every score says how many signals it rests on.
+- **Dead or stale libraries show it:** passport 35 ("no push in over a year"), sled 72 ("last release 5 years ago"), redux-form 35.
+- **Fresh needs mostly miss:** only 6 of my 15 new queries had something I'd pick in the top three. When the answer isn't indexed, the site usually shows confident junk instead of saying so: dashy and beszel for "self hosted feature flags", Builder.io and Plasmic for "drag and drop list in react". That's the first thing a launch-day visitor typing their own problem will see.
+
+### 15 fresh queries
+
+"Honest?" asks: when the right answer is missing, did it say "Not in the index yet"? I checked whether the answer I wanted is indexed with a name lookup (e.g. `msw`, `textual`).
+
+| # | Query | Top three | Pick? | Right answer indexed? | Honest? |
+|---|---|---|---|---|---|
+| 1 | graphql client for react | redwoodjs/graphql (too little), graphql-ws 93, react-admin 93 | No | No (apollo-client, urql; `apollo-client` returns graphql-ws) | **No**: 23 results, none a client |
+| 2 | mock api calls in jest tests | keploy, json-server 72, karate | No | No (`msw`: not in index) | **No** |
+| 3 | python structured logging | loguru 79, Daft 93 (a dataframe engine) | **Yes** (loguru) | structlog: no | n/a |
+| 4 | self hosted feature flags | dashy, PostHog 78, beszel 93 | No (PostHog is defensible, but it's not a flag service) | No (`unleash`: not in index) | **No**: 30 results |
+| 5 | generate pdf from html in node | browserless 93, bentopdf, Zettlr | No | **Yes**: puppeteer is indexed and not in the top 4 | Ranking miss |
+| 6 | parse yaml in go | yq 93 (`go get` for a CLI app), koanf 93, dasel 83 | No | No (`go-yaml` returns yq) | **No** |
+| 7 | drag and drop list in react | Builder.io, Plasmic, filepond | No | No (`dnd-kit`: not in index) | **No** |
+| 8 | oauth login for express | better-auth 93, logto 78, passport **35, no push in over a year** | **Yes**, #1 | Yes | n/a. The passport flag is exactly what I want. |
+| 9 | database migrations for postgres in go | dbmate 93 (`npm install dbmate` for a Go query), goose 93, pgroll | **Yes** (goose #2; golang-migrate #4) | Yes | n/a |
+| 10 | fast python linter | ruff 93, mypy 93, pre-commit 93 | **Yes**, #1 | Yes | n/a |
+| 11 | embedded key value store in rust | fjall 93, mini-lsm 93 (a tutorial), skytable | **Yes**, #1 | Yes. sled is indexed at 72, "last release 5 years ago", and ranking fjall above it is a good call. | n/a |
+| 12 | image resizing in node | sharp 95, filepond 90 | **Yes**, #1 | Yes | n/a |
+| 13 | cron jobs in node | agenda 91 (needs MongoDB), Cronicle | No | No (`node-cron` returns Cronicle) | **No** |
+| 14 | retry with exponential backoff python | Not in the index yet | No | No (`tenacity`: not in index) | **Yes** |
+| 15 | terminal ui library python | instagram-cli (**npm package** for a Python query), gradio, MassGen | No | **Yes**: textual (93) and rich (88) are both indexed | Ranking and language-filter miss |
+
+**Fresh hit rate: 6 of 15 with a pick in the top three, 5 of 15 at #1.** Of the 9 misses:
+- **7 had no right answer in the index.** Only 1 of those 7 said "Not in the index yet"; the other 6 returned confident junk.
+- **2 had the answer indexed and still missed:** puppeteer for HTML-to-PDF, and textual/rich for a Python terminal UI. The second one also ranked an npm package first for a query that names Python.
+- **Vague query:** "best way to do things" returned 14 results, led by home-assistant.
+
+Gibberish (`asdkjh qwpoeiru`) and unindexed single names (`msw`, `structlog`, `unleash`, `dnd-kit`, `tenacity`) are now honestly empty. The outlier rule handles junk queries; it doesn't handle plausible queries in a domain the index doesn't cover.
+
+### Original 12, for continuity
+
+| Query | Pass 3 top | Pass 4 top three | Pick in top 3 / #1 |
+|---|---|---|---|
+| parse pdf tables in python | docling | pdfplumber 91, docling 93, opendataloader-pdf 93 (now `pip install`) | Yes / Yes |
+| typescript orm for postgres | prisma (`git clone`) | drizzle 95, prisma 78 ("See install docs ↗"), typeorm 93 | Yes / Yes |
+| rate limit an express api | express-rate-limit | express-rate-limit, rate-limiter-flexible, @upstash/ratelimit | Yes / Yes |
+| run an llm locally | llm-app | llamafile (too little), llm-app 76, unsloth | Yes / Yes. llamafile is a fair answer. ollama is still not in the top three. |
+| validate env vars in node | envalid | envalid (only result) | Yes / Yes |
+| websocket server for node | ws | ws 95, yaak, NestJS | Yes / Yes |
+| background jobs with redis in node | bullmq | bullmq, bee-queue, trigger.dev | Yes / Yes |
+| cli argument parsing in rust | clap | clap | Yes / Yes |
+| http client for python async | aiohttp | aiohttp 93, httpx 79 ("last release 2 years ago"), gunicorn | Yes / Yes |
+| date library javascript | date-fns | date-fns 94, dayjs 93, react-calendar | Yes / Yes |
+| react form validation | react-hook-form | react-hook-form 93, react-final-form 87, redux-form 35 | Yes / Yes |
+| markdown parser | marked | marked 93, parsedown (too little), opendataloader-pdf | Yes / Yes |
+
+| Set | Pass 1 | Pass 2 | Pass 3 | Pass 4 |
+|---|---|---|---|---|
+| Original 12, top 3 / #1 | 8 / 4 | 8 / 8 | 11 / 11 | **12 / 12** |
+| Fresh queries, top 3 | n/a | n/a | 2 / 7 | **6 / 15** |
+
+The two lines tell the story. On queries the team has seen, it's now perfect. On queries it hasn't seen, it finds something I'd use 40% of the time.
+
+### Checked against the team's claims
+
+- **2,226 entries, real embeddings:** true. Search takes about 600 to 1000 ms.
+- **Release cadence separates scores:** partly. Of 125 numeric scores, 67 (54%) were exactly 93, the ceiling when issue load is unknown, so 93 now means "everything measured is fine". The bottom end separates well: 35, 50, 72, 78, 79 each carry a reason ("no push in over a year", "last release 2 years ago"). Across 170 rows, 45 (26%) said "too little measured".
+- **"See install docs ↗" instead of `git clone`:** true everywhere I looked (prisma, llama.cpp, ollama, yaak). It links to the README on GitHub.
+- **Apps recognised as apps:** partly. keploy and pgroll say "an application: install it from its docs". yq still gets `go get github.com/mikefarah/yq/v4`. dbmate gets `npm install dbmate` for a Go query: the npm wrapper is real, but it's the wrong ecosystem.
+- **Read-only tokens by default:** can't verify signed out (see top).
+- **Community layer:** of 170 result rows, 166 have no votes and none has an agent-compatibility report. Homepage section 02, "Works in Claude Code, breaks in Codex", has no data behind it anywhere I looked.
+- **Mobile:** 400px with no horizontal scroll on home, search, item and /agent.
+
+### The three questions
+
+**1. Would I use it next week? Would I add it to my agent once the packages are published?**
+- **The site: yes.** For common dependencies it's now faster than checking GitHub and the registry myself, and it tells me when something is stale. That's the reason to open it.
+- **My agent: yes, as a read-only lookup without a personal token.** The install lines are now right or point to docs. I'd still not give it a token until I've seen the token page say read-only by default, and until `vote` needs confirmation in my client rather than an instruction to the agent.
+
+**2. Launch-ready for a public build-in-public launch, assuming signing in works? No.** Blockers only:
+1. **Out-of-index problem queries return confident junk instead of "Not in the index yet".** 6 of the 7 fresh misses where the answer wasn't indexed did this. Build-in-public readers will type their own problem first, and 40% of the time they'll see dashy for feature flags. The empty state already exists and works for single names; it needs to fire for phrases in uncovered domains too, even at the cost of some empty results.
+2. **Ranking misses indexed answers and ignores a named language in some phrase queries.** "terminal ui library python" puts an npm package at #1 while textual and rich are indexed. "generate pdf from html in node" misses puppeteer. This is the main claim, "describe the problem, get the maintained library", failing on data the site already has.
+3. **The agent-compatibility feature has zero reports**, but the homepage presents it as a working feature ("People report which agents a library actually runs in"). Either seed honest reports on the most-searched entries before launch, or say on the homepage that collection starts at launch. Otherwise the first reply to the launch post writes itself.
+
+Not blockers, but fix soon: the 93 ceiling (needs issue load via a GitHub token), the leftover `go get` for yq and the cross-ecosystem dbmate line, and the odd homepage example (trekhleb/javascript-algorithms is a textbook, not a dependency).
+
+**3. What's honestly true now, in two sentences for a launch post:**
+
+> reppit measures about 2,200 open-source libraries against their own record (last push, releases, archived and deprecated flags, open advisories), shows how many of those signals it could actually measure, and refuses to give a number when it can't, so a 50k-star library that hasn't shipped in two years looks like it. For everyday needs, describing the problem usually gets you the maintained library first, with the right install command. For niche ones the index often doesn't have the answer yet.
+
+---
+
 ## Third pass, 2026-10-12 (rebuild)
 
 Same method as before: Chrome through Playwright, desktop and 400px, against the rebuilt production build (761 entries). I ran the full query set again, then name lookups, then seven queries I had never typed before, to see whether the gains hold beyond the libraries I'd already named. Sign-in is still not available on this machine, so the signed-in flows (voting, compatibility reports, tokens) are judged only from what the pages say. I read no source this pass. The two earlier passes are below, unchanged.
