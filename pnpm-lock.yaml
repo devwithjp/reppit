@@ -190,6 +190,9 @@ importers:
       '@gitit/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@huggingface/transformers':
+        specifier: 3.7.5
+        version: 3.7.5
       '@supabase/ssr':
         specifier: 0.12.7
         version: 0.12.7(@supabase/supabase-js@2.117.3)

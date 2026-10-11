@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createDb, items, type Db } from "@gitit/db";
-import { search, parseQuery, explain, semanticFloor } from "../src/search";
+import { search, parseQuery, explain, outlierRule, robustStats, OUTLIER_DEFAULTS } from "../src/search";
 import { LocalEmbedder, itemEmbeddingText } from "../src/embeddings";
 
 const e = new LocalEmbedder();
@@ -117,10 +117,18 @@ describe("query parsing and wording", () => {
     expect(q.terms).not.toContain("python");
     expect([...q.languages]).toEqual(["python"]);
   });
-  it("never lets the local embedder match on similarity alone", () => {
-    expect(semanticFloor("local-hash-256", {})).toBe(Number.POSITIVE_INFINITY);
-    expect(semanticFloor("openai:text-embedding-3-small", {})).toBe(0.45);
-    expect(semanticFloor("local", { SEARCH_SEMANTIC_FLOOR: "0.3" })).toBe(0.3);
+  it("never lets the local embedder admit on meaning; real embedders use the outlier rule", () => {
+    expect(outlierRule("local", {})).toBeNull();
+    expect(outlierRule("gte-small", {})).toEqual(OUTLIER_DEFAULTS);
+    expect(outlierRule("gte-small", { SEARCH_OUTLIER_K: "4", SEARCH_OUTLIER_MARGIN: "0.05" })).toEqual({ k: 4, margin: 0.05 });
+  });
+  it("measures the pack robustly: one extreme value does not move the median or spread much", () => {
+    const flat = Array.from({ length: 300 }, (_, i) => 0.8 + (i % 10) * 0.001);
+    const a = robustStats(flat);
+    const b = robustStats([...flat.slice(1), 0.99]);
+    expect(a.median).toBeCloseTo(0.8045, 3);
+    expect(Math.abs(a.spread - b.spread)).toBeLessThan(0.001);
+    expect(robustStats([])).toEqual({ median: 0, spread: 0 });
   });
   it("explanations carry decision facts, not stars or 'good match'", () => {
     const w = explain({ archived: false, deprecated: false, advisoriesOpen: 0, pushedAt: new Date(Date.now() - 3 * 86_400_000), lastReleaseAt: null,

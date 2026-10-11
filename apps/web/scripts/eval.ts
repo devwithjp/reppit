@@ -29,9 +29,12 @@ const verbose = args.includes("--verbose");
 const FIXTURES = path.resolve("eval/queries.json");
 const CACHE = path.resolve("eval/identity-cache.json");
 
-type Fixture = { q: string; expect: string[] };
+/** negative: a junk query that must return nothing (keyboard mash, random words). */
+type Fixture = { q: string; expect: string[]; negative?: boolean };
 type Identity = { githubId: number; nameWithOwner: string; checkedAt: string } | { missing: true; checkedAt: string };
-const fixtures = JSON.parse(fs.readFileSync(FIXTURES, "utf8")) as Fixture[];
+const allFixtures = JSON.parse(fs.readFileSync(FIXTURES, "utf8")) as Fixture[];
+const fixtures = allFixtures.filter((f) => !f.negative);
+const negatives = allFixtures.filter((f) => f.negative);
 const cache: Record<string, Identity> = fs.existsSync(CACHE) ? JSON.parse(fs.readFileSync(CACHE, "utf8")) : {};
 const key = (s: string) => s.trim().toLowerCase();
 
@@ -117,12 +120,20 @@ async function main() {
     }
   }
 
+  let negEmpty = 0;
+  for (const f of negatives) {
+    const res = await search(db, embedder, f.q, { limit: 5 });
+    const ok = res.results.length === 0;
+    if (ok) negEmpty++;
+    console.log(`${ok ? "✓" : "✗"} [negative] ${f.q}${ok ? "" : `\n    returned: ${res.results.map((x) => x.item.slug).join(", ")}`}`);
+  }
+
   const r = await db.execute(sql`select count(*)::int as n from items where embedding is not null`);
   const indexed = ((Array.isArray(r) ? r : (r as { rows: { n: number }[] }).rows) as { n: number }[])[0]?.n ?? 0;
   const inIndex = [...resolved.values()].filter((x) => x.id).length;
   const renamed = [...resolved.entries()].filter(([s, x]) => x.canonical && x.canonical.toLowerCase() !== s.toLowerCase());
   const unknown = all.filter((s) => !resolved.get(s)!.id && !cache[key(s)]);
-  console.log(`\nhit@1: ${hits1}/${fixtures.length} · empty (not indexed): ${empty}/${fixtures.length}`);
+  console.log(`\nhit@1: ${hits1}/${fixtures.length} · empty (not indexed): ${empty}/${fixtures.length} · negatives empty: ${negEmpty}/${negatives.length}`);
   console.log(`hit@5: ${hits}/${fixtures.length} · ceiling: ${ceiling}/${fixtures.length} (queries with ≥1 expected repo indexed) · expected repos indexed: ${inIndex}/${all.length}`);
   console.log(`indexed items: ${indexed} · embedder: ${embedder.name} · ${((Date.now() - t0) / fixtures.length).toFixed(0)} ms/query`);
   if (renamed.length) console.log(`renamed/transferred since the fixture was written: ${renamed.map(([s, x]) => `${s} → ${x.canonical}`).join(", ")}`);
@@ -130,7 +141,7 @@ async function main() {
 
   if (fixFixtures) {
     let changed = 0;
-    const next = fixtures.map((f) => ({ ...f, expect: f.expect.map((e) => { const c = cache[key(e)]; if (c && "nameWithOwner" in c && c.nameWithOwner !== e) { changed++; return c.nameWithOwner; } return e; }) }));
+    const next = allFixtures.map((f) => ({ ...f, expect: f.expect.map((e) => { const c = cache[key(e)]; if (c && "nameWithOwner" in c && c.nameWithOwner !== e) { changed++; return c.nameWithOwner; } return e; }) }));
     fs.writeFileSync(FIXTURES, "[\n" + next.map((f) => `  ${JSON.stringify(f).replace(/^\{"q":/, '{ "q": ').replace(/,"expect":/, ', "expect": ').replace(/\}$/, " }").replace(/","/g, '", "')}`).join(",\n") + "\n]\n");
     console.log(`--fix-fixtures: updated ${changed} slug(s) in eval/queries.json`);
   }

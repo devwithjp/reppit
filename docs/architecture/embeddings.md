@@ -31,11 +31,30 @@ Code: `packages/core/src/embeddings.ts`. `EMBEDDING_PROVIDER` picks the provider
 
 ## Search calibration
 
-gte-small similarities sit in a narrow band: unrelated pairs often score 0.80 or more. Two constants in `packages/core/src/search.ts` handle that, both tuned on the 30 eval fixtures only, never on the held-out queries:
-- **Rescale:** similarity is mapped from [0.82, 0.92] to [0, 1] before it is blended with lexical relevance (`GTE_SMALL_SEMANTIC_SCALE`, override with `SEARCH_SEMANTIC_SCALE=lo,hi`). Raw similarity gave hit@5 25/30 and hit@1 16/30; the rescale gives 28/30 and 20/30.
-- **Floor:** a result can pass on similarity alone only at 0.88 or above (`GTE_SMALL_SEMANTIC_FLOOR`, override with `SEARCH_SEMANTIC_FLOOR`). Floors from 0.85 to 0.92 scored the same on eval, so the floor sits high to keep weak matches out.
+gte-small similarities sit in a narrow band: unrelated pairs often score 0.80 or more. `packages/core/src/search.ts` deals with that in two ways. Both were tuned on the 30 eval fixtures plus 7 junk negatives that must return nothing, never on the held-out queries.
+
+- **Rescale for ranking:** before similarity is blended with lexical relevance, it is mapped from [0.82, 0.92] to [0, 1] (`GTE_SMALL_SEMANTIC_SCALE`, override with `SEARCH_SEMANTIC_SCALE=lo,hi`). Raw similarity gave hit@5 25/30 and hit@1 16/30; the rescale gives 28/30 and 20/30.
+- **Admission by meaning, relative to each query** (`outlierRule`):
+  - Per query, the similarity of a fixed pseudo-random baseline of 300 indexed items (ordered by `md5(id)`, so results are reproducible) gives a median and a spread (MAD × 1.4826).
+  - A candidate that fails the full-text floor still passes if its similarity is at least median + k × spread, and within `margin` of the query's best match.
+  - Keyboard mash gives a flat distribution, so nothing clears it.
+  - Chosen: k = 5, margin = 0.03 (`SEARCH_OUTLIER_K`, `SEARCH_OUTLIER_MARGIN`).
+- **The sweep that chose those values:**
+  - With admission by meaning off: hit@5 27/30, hit@1 20/30, negatives empty 7/7.
+  - k = 5: 28/30, 20/30, 7/7.
+  - k = 4: one negative leaks.
+  - k = 6 and above: 27/30.
+  - The margin barely matters between 0.01 and 0.08.
+  - k = 5 is one step above the value that leaks: keep watching the negatives as the index grows.
+- **Untouched:** the local hashed embedder never admits on meaning. One-word queries and identifiers stay name lookups.
 
 If the query embedder fails (the model can't load, or the function is down), search logs it and falls back to full-text only.
+
+## Running under Next.js
+
+`@huggingface/transformers`, `onnxruntime-node` and `sharp` are in `serverExternalPackages`. `@huggingface/transformers` is also a direct dependency of `apps/web`: with pnpm's strict layout, Next can keep a package out of the bundle only if the app itself resolves it. Otherwise webpack tries to bundle the native `.node` binding and the build fails.
+
+Checked with `next build` + `next start -p 3100`: `/api/health` reports `gte-small`, the first search answered in 0.27 s (model load included), later ones in about 0.06 s, and keyboard mash returned `notIndexed: true`.
 
 ## Production plan (Vercel + Supabase)
 

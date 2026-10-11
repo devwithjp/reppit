@@ -28,5 +28,12 @@
   { "q": "speech to text transcription", "expect": ["openai/whisper", "SYSTRAN/faster-whisper", "ggml-org/whisper.cpp", "m-bain/whisperX"] },
   { "q": "terminal user interface framework", "expect": ["charmbracelet/bubbletea", "Textualize/textual", "ratatui/ratatui", "vadimdemedes/ink"] },
   { "q": "parse command line arguments in Rust", "expect": ["clap-rs/clap"] },
-  { "q": "MCP server to access GitHub from an agent", "expect": ["github/github-mcp-server", "modelcontextprotocol/servers"] }
+  { "q": "MCP server to access GitHub from an agent", "expect": ["github/github-mcp-server", "modelcontextprotocol/servers"] },
+  { "q": "asdkjh qwpoeiru", "expect": [], "negative": true },
+  { "q": "asdkjhqwe", "expect": [], "negative": true },
+  { "q": "qwerty uiop zxcv", "expect": [], "negative": true },
+  { "q": "purple elephant dances quietly", "expect": [], "negative": true },
+  { "q": "banana telescope umbrella", "expect": [], "negative": true },
+  { "q": "lorem ipsum dolor sit amet", "expect": [], "negative": true },
+  { "q": "blorf the snargle quickly", "expect": [], "negative": true }
 ]

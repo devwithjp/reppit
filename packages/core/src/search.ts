@@ -59,16 +59,40 @@ const LANGUAGE_WORDS: Record<string, string[]> = {
 };
 
 /**
- * Semantic floor (see the relevance floor in search()). The
- * local hashed embedder gives keyboard mash a similarity of 0.3+, so it never qualifies on its own.
- * The real-embedder floor (0.45) is provisional until calibrated against eval; override with
- * SEARCH_SEMANTIC_FLOOR.
+ * Admission by meaning: a query-relative outlier rule, not a fixed floor.
+ *
+ * For each query, the similarity of a fixed pseudo-random baseline of BASELINE_SIZE indexed items
+ * (ordered by md5(id), so results are reproducible) gives the "pack": its median and a robust spread
+ * (MAD × 1.4826). A candidate may pass on meaning alone when its similarity is
+ *   - at least median + k × spread (a clear outlier for this query), and
+ *   - within `margin` of the query's best match.
+ * Real queries put a few items far above the pack; keyboard mash gives a flat distribution, so nothing
+ * clears it. The local hashed embedder never admits on meaning (null). k and margin are tuned on the
+ * eval fixtures, including junk negatives that must stay empty, never on held-out queries; override
+ * with SEARCH_OUTLIER_K and SEARCH_OUTLIER_MARGIN.
  */
-/**
- * gte-small similarities are compressed (unrelated pairs often score 0.80+), so its floor sits high.
- * Tuned on the eval fixtures only (scripts/eval.ts), never on the held-out queries.
- */
-export const GTE_SMALL_SEMANTIC_FLOOR = 0.88;
+export const BASELINE_SIZE = 300;
+// k = 6, one step safer than the sweep's best (5): at 4 a junk query already leaks, and with only seven
+// negative queries a one-step margin is too thin. Confident junk costs more trust than one eval miss.
+export const OUTLIER_DEFAULTS = { k: 6, margin: 0.03 };
+export function outlierRule(embedderName: string, env: Record<string, string | undefined> = process.env): { k: number; margin: number } | null {
+  if (embedderName.startsWith("local")) return null;
+  const k = Number(env.SEARCH_OUTLIER_K), margin = Number(env.SEARCH_OUTLIER_MARGIN);
+  return {
+    k: env.SEARCH_OUTLIER_K && Number.isFinite(k) ? k : OUTLIER_DEFAULTS.k,
+    margin: env.SEARCH_OUTLIER_MARGIN && Number.isFinite(margin) ? margin : OUTLIER_DEFAULTS.margin,
+  };
+}
+
+/** Median and MAD-based spread of a sample. */
+export function robustStats(xs: number[]): { median: number; spread: number } {
+  if (!xs.length) return { median: 0, spread: 0 };
+  const sorted = [...xs].sort((a, b) => a - b);
+  const med = (v: number[]) => (v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2);
+  const median = med(sorted);
+  const mad = med(xs.map((x) => Math.abs(x - median)).sort((a, b) => a - b));
+  return { median, spread: 1.4826 * mad };
+}
 
 /**
  * gte-small cosine similarities sit in a narrow band (about 0.75 to 0.95), so used raw they add a
@@ -83,14 +107,6 @@ export function semanticScale(embedderName: string, env: Record<string, string |
   const [lo, hi] = range;
   return (sim) => Math.max(0, Math.min(1, (sim - lo) / (hi - lo)));
 }
-export function semanticFloor(embedderName: string, env: Record<string, string | undefined> = process.env): number {
-  const o = Number(env.SEARCH_SEMANTIC_FLOOR);
-  if (env.SEARCH_SEMANTIC_FLOOR && Number.isFinite(o)) return o;
-  if (embedderName.startsWith("local")) return Number.POSITIVE_INFINITY;
-  if (embedderName === "gte-small") return GTE_SMALL_SEMANTIC_FLOOR;
-  return 0.45;
-}
-
 /** Registry ecosystem for each language family, so "in python" also admits PyPI packages. */
 const LANGUAGE_ECOSYSTEMS: Record<string, string> = { python: "PyPI", rust: "crates.io", go: "Go", typescript: "npm", javascript: "npm" };
 
@@ -217,7 +233,7 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     : sql<boolean>`false`;
 
   const [semRows, lexRows, exactRows] = await Promise.all([
-    vec ? db.select({ id: items.id }).from(items).where(and(sql`${items.embedding} is not null`, ...live)).orderBy(desc(similarity)).limit(n) : Promise.resolve([] as { id: string }[]),
+    vec ? db.select({ id: items.id, sim: similarity }).from(items).where(and(sql`${items.embedding} is not null`, ...live)).orderBy(desc(similarity)).limit(n) : Promise.resolve([] as { id: string; sim: number }[]),
     anyTerm
       ? db.select({ id: items.id }).from(items).where(and(sql`${tsv} @@ (${anyTerm})`, ...live)).orderBy(desc(sql`ts_rank(${tsv}, ${anyTerm})`)).limit(n)
       : Promise.resolve([] as { id: string }[]),
@@ -242,8 +258,15 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
   }).from(items).where(inArray(items.id, ids));
 
   const maxRank = Math.max(1e-9, ...rows.map((r) => Number(r.rank)));
-  const floor = semanticFloor(embedder.name);
   const scale = semanticScale(embedder.name);
+  const rule = vec ? outlierRule(embedder.name) : null;
+  let admitAt = Number.POSITIVE_INFINITY; // similarity needed to pass on meaning alone
+  if (rule && semRows.length) {
+    const sample = await db.select({ sim: similarity }).from(items).where(sql`${items.embedding} is not null`).orderBy(sql`md5(${items.id}::text)`).limit(BASELINE_SIZE);
+    const { median, spread } = robustStats(sample.map((r) => Number(r.sim)));
+    const best = Math.max(...semRows.map((r) => Number(r.sim)));
+    admitAt = spread > 0 ? Math.max(median + rule.k * spread, best - rule.margin) : Number.POSITIVE_INFINITY;
+  }
   const scored = rows.map((r) => {
     const semantic = Math.max(0, Number(r.semantic));
     const hits = (r.hits ?? []).map(Number);
@@ -270,7 +293,8 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
      *   - a problem query: the content words (qualifiers like "library" or "faster" dropped, synonyms
      *     allowed) must be found, at least one in the head, with weighted coverage of 0.7 for one or two
      *     content words and 0.6 for three or more (head 1, README-only 0.4); or the content words as a
-     *     phrase in the head; or, with a real embedder, semantic similarity at the floor.
+     *     phrase in the head; or, with a real embedder, a clear semantic outlier for this query
+     *     (see outlierRule).
      *   - a language named in the query filters; a mismatch never passes.
      */
     const needed = hits.length <= 2 ? 0.7 : 0.6;
@@ -278,7 +302,7 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     const isMatch = exact || (
       !pq.singleWord &&
       !langMismatch &&
-      (pq.identifier ? phrase || (hits.length === 1 && headAll) : lexicalPass || phrase || semantic >= floor)
+      (pq.identifier ? phrase || (hits.length === 1 && headAll) : lexicalPass || phrase || semantic >= admitAt)
     );
     const isRelated = !exact && pq.singleWord && r.tagged === true && !langMismatch;
     const inputs = { semantic: relevance, weightedScore: r.item.weightedScore, health: r.item.healthScore, stars: r.item.stars, installs: r.item.installs, archived: r.item.archived, deprecated: r.item.deprecated };
