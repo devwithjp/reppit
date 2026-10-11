@@ -1,11 +1,11 @@
-# @gitit/skill
+# reppit skill (@gitit/skill)
 
 Claude Code plugin (this directory) and a portable `SKILL.md` that also works in Codex, Cursor and any agentskills.io-compatible harness.
 
 ## Claude Code
 ```
 /plugin marketplace add jp/gitit
-/plugin install gitit@gitit
+/plugin install reppit@gitit
 ```
 Or from a local checkout: `claude --plugin-dir ./packages/skill`.
 
@@ -15,9 +15,10 @@ mkdir -p ~/.codex/skills && cp -r skills/find-repo ~/.codex/skills/
 ```
 Add the MCP server to `~/.codex/config.toml`:
 ```toml
-[mcp_servers.gitit]
+[mcp_servers.reppit]
 command = "npx"
-args = ["-y", "@gitit/mcp-server"]
+args = ["-y", "reppit-mcp"]
+env = { REPPIT_API_KEY = "<personal token from reppit.dev/account, only needed for votes and compat reports>" }
 ```
 
 ## Any agent via skills CLI

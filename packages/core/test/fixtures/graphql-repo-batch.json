@@ -1,0 +1,142 @@
+{
+  "_note": "Shape of a GitHub GraphQL aliased repository batch response (field set = REPO_FRAGMENT in src/graphql.ts). Measured facts from docs/architecture/data-sources.md (2026-10-08): r0 vercel/next.js issues 1,072 vs REST open_issues_count 3,566 (difference = 2,494 open PRs), databaseId 70107786; r1 asked as facebook/react, answered as react/react with databaseId 10270250; r2 nonexistent -> null + NOT_FOUND error while other aliases resolve. All other counts, dates and README text are illustrative, not recorded. This fixture has not been checked against a live response: no token was available.",
+  "data": {
+    "rateLimit": {
+      "cost": 1,
+      "remaining": 4987,
+      "resetAt": "2026-10-08T13:00:00Z"
+    },
+    "r0": {
+      "databaseId": 70107786,
+      "nameWithOwner": "vercel/next.js",
+      "name": "next.js",
+      "owner": {
+        "login": "vercel"
+      },
+      "url": "https://github.com/vercel/next.js",
+      "description": "The React Framework",
+      "primaryLanguage": {
+        "name": "JavaScript"
+      },
+      "licenseInfo": {
+        "spdxId": "MIT"
+      },
+      "stargazerCount": 143241,
+      "forkCount": 30512,
+      "issues": {
+        "totalCount": 1072
+      },
+      "pullRequests": {
+        "totalCount": 2494
+      },
+      "pushedAt": "2026-10-08T09:12:44Z",
+      "isArchived": false,
+      "repositoryTopics": {
+        "nodes": [
+          {
+            "topic": {
+              "name": "react"
+            }
+          },
+          {
+            "topic": {
+              "name": "nextjs"
+            }
+          }
+        ]
+      },
+      "latestRelease": {
+        "publishedAt": "2026-10-06T18:35:31Z"
+      },
+      "readme0": null,
+      "readme1": {
+        "text": "packages/next/README.md"
+      },
+      "readme2": null,
+      "readme3": null,
+      "readme4": null,
+      "readme5": null,
+      "packageJson": {
+        "text": "{\"name\":\"nextjs-project\",\"private\":true}"
+      },
+      "pyproject": null,
+      "closedIssues": {
+        "totalCount": 24310
+      }
+    },
+    "r1": {
+      "databaseId": 10270250,
+      "nameWithOwner": "react/react",
+      "name": "react",
+      "owner": {
+        "login": "react"
+      },
+      "url": "https://github.com/react/react",
+      "description": "The library for web and native user interfaces.",
+      "primaryLanguage": {
+        "name": "JavaScript"
+      },
+      "licenseInfo": {
+        "spdxId": "MIT"
+      },
+      "stargazerCount": 241000,
+      "forkCount": 49800,
+      "issues": {
+        "totalCount": 820
+      },
+      "pullRequests": {
+        "totalCount": 310
+      },
+      "pushedAt": "2026-10-07T22:01:10Z",
+      "isArchived": false,
+      "repositoryTopics": {
+        "nodes": [
+          {
+            "topic": {
+              "name": "javascript"
+            }
+          },
+          {
+            "topic": {
+              "name": "ui"
+            }
+          }
+        ]
+      },
+      "latestRelease": {
+        "publishedAt": "2026-09-20T17:00:00Z"
+      },
+      "readme0": {
+        "text": "# React \u00b7 React is a JavaScript library for building user interfaces. Declarative: React makes it painless to create interactive UIs. Design simple views for each state in your application, and React will efficiently update and render just the right components when your data changes."
+      },
+      "readme1": null,
+      "readme2": null,
+      "readme3": null,
+      "readme4": null,
+      "readme5": null,
+      "packageJson": {
+        "text": "{\"private\":true,\"workspaces\":[\"packages/*\"]}"
+      },
+      "pyproject": null,
+      "closedIssues": {
+        "totalCount": 12940
+      }
+    },
+    "r2": null
+  },
+  "errors": [
+    {
+      "type": "NOT_FOUND",
+      "path": [
+        "r2"
+      ],
+      "locations": [
+        {
+          "line": 4,
+          "column": 1
+        }
+      ],
+      "message": "Could not resolve to a Repository with the name 'nobody/does-not-exist-xyz'."
+    }
+  ]
+}

@@ -40,6 +40,8 @@ export class GitHubClient {
 }
 
 export interface GhRepo {
+  /** Numeric databaseId. REST follows 301s for renamed/transferred repos, so this is canonical. */
+  id: number;
   full_name: string; name: string; owner: { login: string }; html_url: string; description: string | null;
   language: string | null; topics?: string[]; license: { spdx_id: string } | null; stargazers_count: number;
   forks_count: number; open_issues_count: number; pushed_at: string; archived: boolean;
@@ -54,18 +56,17 @@ export async function ingestRepo(gh: GitHubClient, owner: string, name: string):
 }
 
 /**
- * KNOWN BUG, measured 2026-10-08: `r.open_issues_count` from the REST API counts open pull
- * requests as issues. vercel/next.js reports 3,566 there, which is 1,072 real issues plus
- * 2,494 open PRs. That inflates the issue-load term in healthScore and penalises any repo
- * with an active PR queue, which is the opposite of what the signal is meant to reward.
- * The fix is the GraphQL migration in docs/architecture/data-sources.md, where
- * `issues(states:OPEN)` returns the correct count. Until then this number is wrong.
+ * Shape a REST repo as an item row. REST `open_issues_count` counts open pull requests as issues
+ * (vercel/next.js: 3,566 = 1,072 issues + 2,494 PRs, measured 2026-10-08), and there is no cheap
+ * REST call for the true number, so on this path openIssues is stored as null (unknown) and the
+ * health score ignores issue load. The GraphQL path (graphqlNodeToItem) stores the true count.
  */
 export function repoToItem(r: GhRepo, readme: string | null, lastReleaseAt: Date | null): NewItem {
-  const pushedAt = new Date(r.pushed_at);
+  const pushedAt = r.pushed_at ? new Date(r.pushed_at) : null;
   const license = r.license?.spdx_id ?? null;
   return {
     kind: "repo",
+    githubId: r.id,
     slug: r.full_name,
     owner: r.owner.login,
     name: r.name,
@@ -77,11 +78,13 @@ export function repoToItem(r: GhRepo, readme: string | null, lastReleaseAt: Date
     license,
     stars: r.stargazers_count,
     forks: r.forks_count,
-    openIssues: r.open_issues_count,
+    openIssues: null,
+    closedIssues: null,
+    openPullRequests: null,
     pushedAt,
     lastReleaseAt,
     archived: r.archived,
-    healthScore: healthScore({ pushedAt, lastReleaseAt, openIssues: r.open_issues_count, stars: r.stargazers_count, archived: r.archived, license }),
+    healthScore: healthScore({ pushedAt, lastReleaseAt, openIssues: null, stars: r.stargazers_count, archived: r.archived, license }),
   };
 }
 
@@ -103,7 +106,7 @@ export async function ingestSkillsFromRepo(gh: GitHubClient, owner: string, repo
     if (!res.ok) continue;
     const md = await res.text();
     const fm = parseFrontmatter(md);
-    const pushedAt = new Date(r.pushed_at);
+    const pushedAt = r.pushed_at ? new Date(r.pushed_at) : null;
     out.push({
       kind: "skill",
       slug: `${owner}/${repo}/${e.path}`,
@@ -117,11 +120,13 @@ export async function ingestSkillsFromRepo(gh: GitHubClient, owner: string, repo
       license: r.license?.spdx_id ?? null,
       stars: r.stargazers_count,
       forks: r.forks_count,
-      openIssues: r.open_issues_count,
+      // Skills are paths inside a repo: no github_id of their own, and the repo's issue count is not
+      // the skill's. Unknown, not zero.
+      openIssues: null,
       pushedAt,
       lastReleaseAt: null,
       archived: r.archived,
-      healthScore: healthScore({ pushedAt, lastReleaseAt: pushedAt, openIssues: 0, stars: r.stargazers_count, archived: r.archived, license: r.license?.spdx_id ?? null }),
+      healthScore: healthScore({ pushedAt, lastReleaseAt: null, openIssues: null, stars: r.stargazers_count, archived: r.archived, license: r.license?.spdx_id ?? null }),
     });
   }
   return out;

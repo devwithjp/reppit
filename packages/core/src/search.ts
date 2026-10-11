@@ -1,7 +1,8 @@
 import { sql, eq, and, inArray, desc } from "drizzle-orm";
 import { items, votes, agentCompatReports, type Db, type Item } from "@gitit/db";
-import { blendedRank } from "./ranking";
+import { blendedRank, rankTier, compareRank } from "./ranking";
 import type { Embedder } from "./embeddings";
+import { trustScore, type TrustScore } from "./trust";
 
 export interface SearchOptions {
   language?: string;
@@ -11,19 +12,26 @@ export interface SearchOptions {
 }
 
 export interface SearchResult {
-  item: Pick<Item, "id" | "kind" | "slug" | "owner" | "name" | "url" | "description" | "language" | "stars" | "installs" | "healthScore" | "upvotes" | "downvotes" | "weightedScore" | "license" | "pushedAt">;
+  item: Pick<Item, "id" | "kind" | "slug" | "owner" | "name" | "url" | "description" | "language" | "stars" | "installs" | "healthScore" | "upvotes" | "downvotes" | "weightedScore" | "license" | "pushedAt"
+    | "githubId" | "lastReleaseAt" | "closedIssues" | "archived" | "deprecated" | "deprecationMessage" | "advisoriesOpen" | "openIssues" | "openPullRequests" | "packageEcosystem" | "packageName" | "signalsCheckedAt">;
   score: number;
   semantic: number;
   why: string;
   downvoteReasons: Record<string, number>;
   compat: Record<string, { works: number; broken: number }>;
+  /** The shared trust score (core/trust.ts): same number the web, MCP server and CLI show. */
+  trust: TrustScore;
 }
 
 export function normalizeQuery(q: string) {
   return q.toLowerCase().replace(/[^a-z0-9+#. ]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** Semantic candidates → blended rerank → explanations. Pure data path, no paid placement. */
+/**
+ * Semantic candidates → blended rerank → explanations. Pure data path, no paid placement.
+ * Archived items are excluded; deprecated items are demoted below every non-deprecated candidate
+ * (rankTier) so relevance alone can never put them on top.
+ */
 export async function search(db: Db, embedder: Embedder, query: string, opts: SearchOptions = {}): Promise<SearchResult[]> {
   const limit = opts.limit ?? 5;
   const candidates = opts.candidates ?? 50;
@@ -68,9 +76,9 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
 
   const ranked = rows.map((r) => {
     const semantic = Number(r.semantic);
-    const score = blendedRank({ semantic, weightedScore: r.item.weightedScore, health: r.item.healthScore, stars: r.item.stars, installs: r.item.installs });
-    return { r, semantic, score };
-  }).sort((a, b) => b.score - a.score).slice(0, limit);
+    const inputs = { semantic, weightedScore: r.item.weightedScore, health: r.item.healthScore, stars: r.item.stars, installs: r.item.installs, archived: r.item.archived, deprecated: r.item.deprecated };
+    return { r, semantic, score: blendedRank(inputs), tier: rankTier(inputs) };
+  }).sort(compareRank).slice(0, limit);
 
   return ranked.map(({ r, semantic, score }) => ({
     item: pick(r.item),
@@ -79,17 +87,22 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     why: explain(r.item, semantic, reasons.get(r.item.id) ?? {}, compat.get(r.item.id) ?? {}),
     downvoteReasons: reasons.get(r.item.id) ?? {},
     compat: compat.get(r.item.id) ?? {},
+    trust: trustScore(r.item),
   }));
 }
 
 /** Template explanation. Swapped for an LLM-written line when ANTHROPIC_API_KEY is set (see apps/web). */
 export function explain(i: Item, semantic: number, reasons: Record<string, number>, compat: Record<string, { works: number; broken: number }>): string {
   const parts: string[] = [];
+  // Zero-user flags first. Unknown (null) signals are never stated, and never as "0 advisories".
+  if (i.archived) parts.push("archived by its owner");
+  if (i.deprecated === true) parts.push(`deprecated on ${i.packageEcosystem ?? "its registry"}${i.deprecationMessage ? ` (${truncate(i.deprecationMessage, 80)})` : ""}`);
+  if (typeof i.advisoriesOpen === "number" && i.advisoriesOpen > 0) parts.push(`${i.advisoriesOpen} open security ${i.advisoriesOpen === 1 ? "advisory" : "advisories"} on the latest ${i.packageName ?? "release"}`);
   const net = i.upvotes - i.downvotes;
   if (net >= 5) parts.push(`+${net} community votes`);
   else if (net <= -3) parts.push(`${net} community votes`);
   if (i.healthScore >= 0.7) parts.push("actively maintained");
-  else if (i.healthScore < 0.3) parts.push("low maintenance activity");
+  else if (i.healthScore < 0.3 && !i.archived && i.deprecated !== true) parts.push("low maintenance activity");
   if (i.stars >= 1000) parts.push(`${fmt(i.stars)} stars`);
   if (i.installs >= 1000) parts.push(`${fmt(i.installs)} installs`);
   const topReason = Object.entries(reasons).sort((a, b) => b[1] - a[1])[0];
@@ -103,8 +116,11 @@ export function explain(i: Item, semantic: number, reasons: Record<string, numbe
 }
 
 function pick(i: Item): SearchResult["item"] {
-  const { id, kind, slug, owner, name, url, description, language, stars, installs, healthScore, upvotes, downvotes, weightedScore, license, pushedAt } = i;
-  return { id, kind, slug, owner, name, url, description, language, stars, installs, healthScore, upvotes, downvotes, weightedScore, license, pushedAt };
+  const { id, kind, slug, owner, name, url, description, language, stars, installs, healthScore, upvotes, downvotes, weightedScore, license, pushedAt,
+    githubId, lastReleaseAt, closedIssues, archived, deprecated, deprecationMessage, advisoriesOpen, openIssues, openPullRequests, packageEcosystem, packageName, signalsCheckedAt } = i;
+  return { id, kind, slug, owner, name, url, description, language, stars, installs, healthScore, upvotes, downvotes, weightedScore, license, pushedAt,
+    githubId, lastReleaseAt, closedIssues, archived, deprecated, deprecationMessage, advisoriesOpen, openIssues, openPullRequests, packageEcosystem, packageName, signalsCheckedAt };
 }
+function truncate(s: string, n: number) { return s.length > n ? `${s.slice(0, n - 1)}…` : s; }
 function fmt(n: number) { return n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n); }
 function round(n: number, d: number) { const f = 10 ** d; return Math.round(n * f) / f; }

@@ -1,11 +1,11 @@
 {
-  "name": "@gitit/mcp-server",
+  "name": "reppit-mcp",
   "version": "0.1.0",
-  "description": "MCP server for gitit: community-ranked repo and skill recommendations inside your coding agent.",
+  "description": "MCP server for reppit: community-ranked repo and skill recommendations inside your coding agent.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "gitit-mcp": "./dist/index.js"
+    "reppit-mcp": "./dist/index.js"
   },
   "main": "./dist/index.js",
   "files": [

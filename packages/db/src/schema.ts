@@ -1,6 +1,7 @@
 import {
-  pgTable, text, integer, real, timestamp, boolean, uuid, primaryKey, index, uniqueIndex, jsonb, vector, pgEnum,
+  pgTable, text, integer, bigint, real, timestamp, boolean, uuid, primaryKey, index, uniqueIndex, jsonb, vector, pgEnum,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const EMBEDDING_DIMENSIONS = 256;
 
@@ -14,6 +15,8 @@ export const compatStatus = pgEnum("compat_status", ["works", "broken"]);
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   githubId: text("github_id").unique(),
+  // Supabase Auth user (auth.users.id) mapped to this row. Wired by the auth layer.
+  authUserId: uuid("auth_user_id").unique(),
   login: text("login").notNull(),
   name: text("name"),
   avatarUrl: text("avatar_url"),
@@ -29,7 +32,11 @@ export const users = pgTable("users", {
 export const items = pgTable("items", {
   id: uuid("id").primaryKey().defaultRandom(),
   kind: itemKind("kind").notNull().default("repo"),
-  // "owner/name" for repos; "owner/repo/path" for skills.
+  // GitHub repository databaseId. The identity of a repo (DECISIONS.md: "Repository identity is the
+  // numeric id"). Null for skills, which are paths inside a repo, and for legacy rows not yet resolved.
+  githubId: bigint("github_id", { mode: "number" }).unique(),
+  // "owner/name" for repos; "owner/repo/path" for skills. A mutable label: renames and transfers
+  // update it and move the old value to item_aliases.
   slug: text("slug").notNull(),
   owner: text("owner").notNull(),
   name: text("name").notNull(),
@@ -41,11 +48,29 @@ export const items = pgTable("items", {
   license: text("license"),
   stars: integer("stars").default(0).notNull(),
   forks: integer("forks").default(0).notNull(),
-  openIssues: integer("open_issues").default(0).notNull(),
+  // True open issues, excluding pull requests (GraphQL issues(states:OPEN)). Null = unknown: REST
+  // open_issues_count includes PRs and is never stored here.
+  openIssues: integer("open_issues"),
+  // Closed issues, all time (GraphQL issues(states:CLOSED)). With open_issues gives the stars-free
+  // issue-load share used by the trust score. Null = unknown.
+  closedIssues: integer("closed_issues"),
+  // Open pull requests (GraphQL pullRequests(states:OPEN)). Null = unknown.
+  openPullRequests: integer("open_pull_requests"),
   installs: integer("installs").default(0).notNull(),
   pushedAt: timestamp("pushed_at", { withTimezone: true }),
   lastReleaseAt: timestamp("last_release_at", { withTimezone: true }),
   archived: boolean("archived").default(false).notNull(),
+  // Zero-user signals (DECISIONS.md "Ranking must be useful at zero users"). Null always means
+  // "not checked / no source", never "clean".
+  // The package this repo publishes, verified to point back at this repo. Null = none found.
+  packageEcosystem: text("package_ecosystem"), // "npm" | "PyPI"
+  packageName: text("package_name"),
+  // true = registry marks the latest release deprecated (npm `deprecated`, PyPI yanked / Inactive).
+  deprecated: boolean("deprecated"),
+  deprecationMessage: text("deprecation_message"),
+  // Advisories (OSV) affecting the latest published version. Null = not checked; never default to 0.
+  advisoriesOpen: integer("advisories_open"),
+  signalsCheckedAt: timestamp("signals_checked_at", { withTimezone: true }),
   healthScore: real("health_score").default(0).notNull(),
   // Denormalised, recomputed on every vote.
   upvotes: integer("upvotes").default(0).notNull(),
@@ -60,10 +85,22 @@ export const items = pgTable("items", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   uniqueIndex("items_slug_kind_idx").on(t.slug, t.kind),
+  index("items_slug_lower_idx").on(sql`lower(${t.slug})`),
   index("items_hot_idx").on(t.hotScore),
   index("items_weighted_idx").on(t.weightedScore),
   index("items_language_idx").on(t.language),
   index("items_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
+]);
+
+// Previous slugs of an item, so old URLs and fixtures keep resolving after a rename or transfer.
+// seen_until = when we last observed the item under this slug.
+export const itemAliases = pgTable("item_aliases", {
+  itemId: uuid("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+  slug: text("slug").notNull(),
+  seenUntil: timestamp("seen_until", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.itemId, t.slug] }),
+  index("item_aliases_slug_lower_idx").on(sql`lower(${t.slug})`),
 ]);
 
 export const votes = pgTable("votes", {
@@ -143,6 +180,7 @@ export const searchLog = pgTable("search_log", {
 export type User = typeof users.$inferSelect;
 export type Item = typeof items.$inferSelect;
 export type NewItem = typeof items.$inferInsert;
+export type ItemAlias = typeof itemAliases.$inferSelect;
 export type Vote = typeof votes.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type CompatReport = typeof agentCompatReports.$inferSelect;

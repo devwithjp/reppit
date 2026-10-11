@@ -1,4 +1,4 @@
-/** Manual smoke test: spawn the stdio server, list tools, run one search. Usage: GITIT_API_URL=http://localhost:3100 node dist/smoke.js "problem" */
+/** Manual smoke test: spawn the stdio server, list tools, run one search. Usage: REPPIT_API_URL=http://localhost:3100 node dist/smoke.js "problem" */
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import path from "node:path";
@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const transport = new StdioClientTransport({ command: "node", args: [path.join(here, "index.js")], env: { ...process.env } as Record<string, string> });
-const client = new Client({ name: "gitit-smoke", version: "0.0.0" });
+const client = new Client({ name: "reppit-smoke", version: "0.0.0" });
 await client.connect(transport);
 const tools = await client.listTools();
 console.log("tools:", tools.tools.map((t) => t.name).join(", "));

@@ -5,8 +5,16 @@ export interface RateLimitStore {
 
 export class MemoryStore implements RateLimitStore {
   private buckets = new Map<string, { count: number; resetAt: number }>();
+  private lastSweep = 0;
+  constructor(private now: () => number = Date.now, private sweepEveryMs = 60_000) {}
+  get size() { return this.buckets.size; }
   async incr(key: string, windowMs: number) {
-    const now = Date.now();
+    const now = this.now();
+    // Drop expired buckets periodically so one-off keys (IPs) do not accumulate forever.
+    if (now - this.lastSweep >= this.sweepEveryMs) {
+      this.lastSweep = now;
+      for (const [k, b] of this.buckets) if (b.resetAt <= now) this.buckets.delete(k);
+    }
     const b = this.buckets.get(key);
     if (!b || b.resetAt <= now) { this.buckets.set(key, { count: 1, resetAt: now + windowMs }); return 1; }
     b.count += 1; return b.count;
@@ -20,7 +28,8 @@ export const RULES = {
   votePerIp: { limit: 120, windowMs: 60 * 60_000 },
   commentPerUser: { limit: 30, windowMs: 60 * 60_000 },
   submitPerUser: { limit: 10, windowMs: 24 * 60 * 60_000 },
-  searchAnon: { limit: 30, windowMs: 60 * 60_000 },         // anonymous search / hour / ip
+  searchAnon: { limit: 30, windowMs: 60 * 60_000 },
+  readPerIp: { limit: 600, windowMs: 60 * 60_000 },         // item list / detail reads / hour / ip         // anonymous search / hour / ip
   searchFreeKey: { limit: 1000, windowMs: 30 * 24 * 60 * 60_000 },
 } satisfies Record<string, RateLimitRule>;
 

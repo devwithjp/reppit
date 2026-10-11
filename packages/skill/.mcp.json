@@ -1,9 +1,15 @@
 {
   "mcpServers": {
-    "gitit": {
+    "reppit": {
       "command": "npx",
-      "args": ["-y", "@gitit/mcp-server"],
-      "env": { "GITIT_API_URL": "${GITIT_API_URL:-https://gitit.dev}", "GITIT_API_KEY": "${GITIT_API_KEY:-}" }
+      "args": [
+        "-y",
+        "reppit-mcp"
+      ],
+      "env": {
+        "REPPIT_API_URL": "${REPPIT_API_URL:-https://reppit.dev}",
+        "REPPIT_API_KEY": "${REPPIT_API_KEY:-}"
+      }
     }
   }
 }

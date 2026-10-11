@@ -1,2 +1,2 @@
-{ "name": "@gitit/skill", "version": "0.1.0", "private": true, "description": "Claude Code plugin and cross-agent SKILL.md for gitit", "license": "MIT",
+{ "name": "@gitit/skill", "version": "0.1.0", "private": true, "description": "Claude Code plugin and cross-agent SKILL.md for reppit", "license": "MIT",
   "scripts": { "typecheck": "echo skip", "test": "echo skip", "build": "echo skip" } }

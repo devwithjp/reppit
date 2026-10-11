@@ -4,14 +4,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer } from "node:http";
 import { z } from "zod";
-import { GititClient, formatResults, installCommand } from "./client.js";
+import { ReppitClient, formatResults, formatTrust, installCommand } from "./client.js";
 
-export function buildServer(client = new GititClient()) {
-  const server = new McpServer({ name: "gitit", version: "0.1.0" });
+export function buildServer(client = new ReppitClient()) {
+  const server = new McpServer({ name: "reppit", version: "0.1.0" });
 
   server.registerTool("search_repos", {
     title: "Find the best repo or skill for a problem",
-    description: "Describe a programming problem in plain language. Returns the top community-ranked GitHub repos, agent skills or MCP servers with a one-line reason each, downvote flags, per-agent compatibility reports and an install command. Ranking blends community votes, maintenance health, popularity and semantic relevance. Use this before recommending a library or writing something from scratch.",
+    description: "Describe a programming problem in plain language. Returns the top community-ranked GitHub repos, agent skills or MCP servers with a one-line reason each, downvote flags, per-agent compatibility reports and an install command. Each result carries a trust score (0-100, or 'not enough data') built from maintenance, archived/deprecated status, security advisories and issue load, adjusted by community votes. Archived and deprecated items never outrank healthy ones. Use this before recommending a library or writing something from scratch.",
     inputSchema: {
       problem: z.string().min(3).describe("The problem, e.g. 'parse PDF tables in Python' or 'a skill for writing Playwright tests'"),
       language: z.string().optional().describe("Filter by primary language, e.g. python, typescript"),
@@ -25,13 +25,16 @@ export function buildServer(client = new GititClient()) {
 
   server.registerTool("get_repo", {
     title: "Get details for a repo or skill",
-    description: "Full details for one item by slug (owner/name): description, README excerpt, votes, downvote reasons, agent compatibility, recent comments.",
+    description: "Full details for one item by slug (owner/name): description, trust score and its signals, README excerpt, votes, agent compatibility, recent comments. Old slugs of renamed or transferred repos resolve to the current one.",
     inputSchema: { slug: z.string().describe("owner/name") },
   }, async ({ slug }) => {
     const item = await client.item(slug);
     const text = [
-      `${item.slug} (${item.kind}) — ${item.url}`, item.description ?? "",
-      `votes +${item.upvotes}/-${item.downvotes} · health ${(item.healthScore * 100).toFixed(0)}% · ★${item.stars} · ${item.license ?? "no license"}`,
+      `${item.slug} (${item.kind}) — ${item.url}`,
+      item.redirect ? `(${item.redirect.from} is now ${item.redirect.to})` : "",
+      item.description ?? "",
+      `${formatTrust(item.trust)} · votes +${item.upvotes}/-${item.downvotes} · ★${item.stars} · ${item.license ?? "no license"}`,
+      item.trust ? item.trust.cells.map((c) => `  ${c.state === "unknown" ? "?" : c.state === "good" ? "✓" : c.state === "slipping" ? "~" : "✗"} ${c.short}: ${c.label}`).join("\n") : "",
       `topics: ${item.topics.join(", ")}`, `install: ${installCommand(item)}`,
       item.comments?.length ? `\nrecent comments:\n${item.comments.map((c) => `- @${c.user}: ${c.body}`).join("\n")}` : "",
       item.readme ? `\nREADME (excerpt):\n${item.readme.slice(0, 3000)}` : "",
@@ -41,7 +44,7 @@ export function buildServer(client = new GititClient()) {
 
   server.registerTool("vote", {
     title: "Upvote or downvote a repo or skill",
-    description: "Cast the user's vote. Downvotes require a reason tag. Only call this when the user explicitly asks to vote; never vote on the user's behalf unprompted. Requires GITIT_API_KEY.",
+    description: "Cast the user's vote. Downvotes require a reason tag. Only call this when the user explicitly asks to vote; never vote on the user's behalf unprompted. Requires REPPIT_API_KEY (a personal token from reppit.dev/account).",
     inputSchema: {
       slug: z.string(),
       direction: z.enum(["up", "down"]),
@@ -54,7 +57,7 @@ export function buildServer(client = new GititClient()) {
 
   server.registerTool("report_compat", {
     title: "Report whether a skill or repo works on an agent",
-    description: "Record that an item works or is broken on a specific coding agent (claude-code, codex, cursor, gemini-cli, copilot, windsurf). Call this after the user confirms the outcome of trying it. Requires GITIT_API_KEY.",
+    description: "Record that an item works or is broken on a specific coding agent (claude-code, codex, cursor, gemini-cli, copilot, windsurf). Call this after the user confirms the outcome of trying it. Requires REPPIT_API_KEY (a personal token from reppit.dev/account).",
     inputSchema: { slug: z.string(), agent: z.string(), status: z.enum(["works", "broken"]), note: z.string().optional() },
   }, async ({ slug, agent, status, note }) => {
     await client.reportCompat(slug, agent, status, note);
@@ -86,7 +89,7 @@ async function main() {
         req.on("data", (c) => (body += c));
         req.on("end", () => transport.handleRequest(req, res, body ? JSON.parse(body) : undefined));
       } else { res.writeHead(404).end(); }
-    }).listen(port, () => console.error(`gitit MCP (streamable http) on :${port}/mcp`));
+    }).listen(port, () => console.error(`reppit MCP (streamable http) on :${port}/mcp`));
   } else {
     await server.connect(new StdioServerTransport());
   }

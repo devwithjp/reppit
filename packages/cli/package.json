@@ -1,12 +1,27 @@
 {
-  "name": "gitit-cli",
+  "name": "reppit",
   "version": "0.1.0",
-  "description": "gitit: find the community's top repo or skill for your problem from the terminal.",
+  "description": "reppit: find the community's top repo or skill for your problem from the terminal.",
   "license": "MIT",
   "type": "module",
-  "bin": { "gitit": "./dist/index.js" },
-  "files": ["dist"],
-  "scripts": { "build": "tsc", "typecheck": "tsc --noEmit", "dev": "tsx src/index.ts", "test": "vitest run --passWithNoTests" },
-  "dependencies": { "@gitit/mcp-server": "workspace:*" },
-  "devDependencies": { "typescript": "^5.6.0", "tsx": "^4.19.0", "vitest": "^3.0.0" }
+  "bin": {
+    "reppit": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "reppit-mcp": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0",
+    "vitest": "^3.0.0"
+  }
 }

@@ -1,9 +1,17 @@
 {
-  "name": "gitit",
+  "name": "reppit",
   "version": "0.1.0",
   "description": "Community-ranked repo and agent-skill recommendations inside Claude Code. Ask 'what should I use for X' and get the top repos with votes, health and install commands.",
-  "author": { "name": "gitit contributors" },
-  "homepage": "https://github.com/jp/gitit",
+  "author": {
+    "name": "reppit contributors"
+  },
+  "homepage": "https://reppit.dev",
   "license": "MIT",
-  "keywords": ["discovery", "repos", "skills", "recommendations", "mcp"]
+  "keywords": [
+    "discovery",
+    "repos",
+    "skills",
+    "recommendations",
+    "mcp"
+  ]
 }

@@ -32,7 +32,10 @@ export interface DbOptions {
   url?: string;
   /** PGlite data directory. Unset = in-memory (tests). */
   dataDir?: string;
-  /** Run migrations on connect. Default true. */
+  /**
+   * Run migrations on connect. Default true, unless GITIT_AUTO_MIGRATE=0 (recommended in production,
+   * where apps/web/scripts/migrate.ts runs once per deploy against the direct connection).
+   */
   migrate?: boolean;
   /** Override the drizzle migrations folder (needed when bundlers rewrite import.meta.url). */
   migrationsFolder?: string;
@@ -40,10 +43,18 @@ export interface DbOptions {
 
 export async function createDb(opts: DbOptions = {}): Promise<Db> {
   const url = opts.url ?? process.env.DATABASE_URL;
-  const shouldMigrate = opts.migrate ?? true;
+  const shouldMigrate = opts.migrate ?? process.env.GITIT_AUTO_MIGRATE !== "0";
   const migrationsFolder = opts.migrationsFolder ?? process.env.GITIT_MIGRATIONS_DIR ?? defaultMigrationsFolder();
   if (url) {
-    const pool = new pg.Pool({ connectionString: url });
+    // Supabase: the app should use the pooler URL (transaction mode, port 6543); migrations should use
+    // the direct or session URL. Every serverless instance holds its own pool, so keep it small.
+    // DATABASE_SSL_CA (PEM, "\n" escapes allowed) pins Supabase's CA; otherwise TLS follows sslmode in the URL.
+    const pool = new pg.Pool({
+      connectionString: url,
+      max: Number(process.env.DATABASE_POOL_MAX ?? 5),
+      idleTimeoutMillis: 10_000,
+      ...(process.env.DATABASE_SSL_CA ? { ssl: { ca: process.env.DATABASE_SSL_CA.replace(/\\n/g, "\n") } } : {}),
+    });
     const db = drizzlePg(pool, { schema });
     if (shouldMigrate) {
       await pool.query("CREATE EXTENSION IF NOT EXISTS vector");

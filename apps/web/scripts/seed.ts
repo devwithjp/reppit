@@ -1,37 +1,44 @@
 /**
- * Seed the index. Usage: pnpm seed [--limit 1000] [--no-readme] [--skills]
- * Without GITHUB_TOKEN GitHub allows 60 req/h; use --no-readme and a small --limit.
+ * Seed the index through the GitHub REST API: the no-token path.
+ * Usage: pnpm seed [--limit 1000] [--no-readme] [--no-signals] [--skills]
+ *
+ * Without GITHUB_TOKEN GitHub allows 60 req/h and 10 searches/min; use --no-readme and a small --limit.
+ * With a token, prefer scripts/backfill.ts (GraphQL, ~54x the throughput and true issue counts).
+ *
+ * Open issues are stored as null (unknown) on this path: REST open_issues_count includes open pull
+ * requests, and health scoring ignores issue load when it is unknown. Package signals (npm/PyPI
+ * deprecation, OSV advisories) are read from raw.githubusercontent.com manifests, which costs no
+ * GitHub API quota.
  */
 import { config } from "./vendor/dotenv-lite.js";
 import { getDb, items } from "@gitit/db";
-import { GitHubClient, repoToItem, ingestSkillsFromRepo, itemEmbeddingText, embedderFromEnv, type GhRepo } from "@gitit/core";
+import {
+  GitHubClient, repoToItem, ingestSkillsFromRepo, itemEmbeddingText, embedderFromEnv, storeRepos, emptyCounts, fetchManifestsRaw,
+  type GhRepo,
+} from "@gitit/core";
 import path from "node:path";
+import { TOPICS, LANGS, SKILL_REPOS } from "./topics";
 
 config();
 const args = process.argv.slice(2);
 const flag = (n: string) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
 const limit = Number(flag("--limit") ?? 300);
 const withReadme = !args.includes("--no-readme");
+const withSignals = !args.includes("--no-signals");
 const withSkills = args.includes("--skills");
-
-const LANGS = ["python", "typescript", "javascript", "go", "rust", "java", "c++", "c#", "ruby", "swift", "kotlin", "php"];
-// Problem-shaped queries so the index covers what people actually ask for.
-const TOPICS = [
-  "pdf", "web-scraping", "orm", "authentication", "cli", "testing", "http-client", "web-framework", "state-management",
-  "charts", "markdown", "image-processing", "queue", "cache", "search-engine", "vector-database", "llm", "agents", "rag",
-  "websocket", "graphql", "validation", "date", "logging", "config", "cron", "email", "payments", "i18n", "ocr",
-  "speech-to-text", "video", "game-engine", "terminal-ui", "parser", "compiler", "mcp", "mcp-server", "claude-code",
-];
-const SKILL_REPOS = [["anthropics", "skills"], ["vercel-labs", "skills"], ["obra", "superpowers"]];
 
 async function main() {
   const db = await getDb({ migrationsFolder: path.resolve(process.cwd(), process.env.GITIT_MIGRATIONS_DIR ?? "../../packages/db/drizzle") });
   const gh = new GitHubClient();
   const embedder = embedderFromEnv();
-  const seen = new Set<string>();
-  const existing = await db.select({ slug: items.slug }).from(items);
-  for (const e of existing) seen.add(e.slug);
-  console.log(`existing: ${seen.size}, target: +${limit}, readme: ${withReadme}, embedder: ${embedder.name}, token: ${!!process.env.GITHUB_TOKEN}`);
+  const seenSlugs = new Set<string>();
+  const seenIds = new Set<number>();
+  for (const e of await db.select({ slug: items.slug, githubId: items.githubId }).from(items)) {
+    seenSlugs.add(e.slug.toLowerCase());
+    if (e.githubId) seenIds.add(e.githubId);
+  }
+  console.log(`existing: ${seenSlugs.size}, target: +${limit}, readme: ${withReadme}, signals: ${withSignals}, embedder: ${embedder.name}, token: ${!!process.env.GITHUB_TOKEN}`);
+  if (process.env.GITHUB_TOKEN) console.log("GITHUB_TOKEN is set: scripts/backfill.ts is the faster, more complete path.");
 
   const queue: GhRepo[] = [];
   // Unauthenticated GitHub search allows 10 req/min; with a token, 30 req/min.
@@ -47,7 +54,10 @@ async function main() {
     try {
       const found = await gh.search(q, 15);
       let added = 0;
-      for (const r of found) if (!seen.has(r.full_name)) { seen.add(r.full_name); queue.push(r); added++; }
+      for (const r of found) {
+        if (seenIds.has(r.id) || seenSlugs.has(r.full_name.toLowerCase())) continue;
+        seenIds.add(r.id); seenSlugs.add(r.full_name.toLowerCase()); queue.push(r); added++;
+      }
       console.log(`  ${q}: +${added} (queue ${queue.length})`);
     } catch (e) {
       const msg = (e as Error).message;
@@ -57,17 +67,15 @@ async function main() {
     await sleep(pauseMs);
   }
 
-  let inserted = 0;
+  const counts = emptyCounts();
   for (let i = 0; i < queue.length; i += 20) {
     const batch = queue.slice(i, i + 20);
-    const rows = await Promise.all(batch.map(async (r) => {
+    const prepared = await Promise.all(batch.map(async (r) => {
       const readme = withReadme ? await gh.readme(r.owner.login, r.name).catch(() => null) : null;
-      return repoToItem(r, readme, null);
+      return { row: repoToItem(r, readme, null), manifests: () => fetchManifestsRaw(r.owner.login, r.name) };
     }));
-    const vecs = await embedder.embed(rows.map(itemEmbeddingText));
-    const res = await db.insert(items).values(rows.map((r, j) => ({ ...r, embedding: vecs[j], embeddedAt: new Date() }))).onConflictDoNothing().returning({ id: items.id });
-    inserted += res.length;
-    console.log(`inserted ${inserted}/${queue.length}`);
+    await storeRepos(db, embedder, prepared, { checkSignals: withSignals, log: (m) => console.log(m) }, counts);
+    console.log(`stored ${Math.min(i + 20, queue.length)}/${queue.length} · ${JSON.stringify(counts)}`);
   }
 
   if (withSkills) {

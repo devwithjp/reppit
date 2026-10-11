@@ -1,0 +1,282 @@
+{
+  "aio-libs/aiohttp": {
+    "githubId": 13258039,
+    "nameWithOwner": "aio-libs/aiohttp",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "apache/echarts": {
+    "githubId": 9185792,
+    "nameWithOwner": "apache/echarts",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "bee-queue/bee-queue": {
+    "githubId": 29453461,
+    "nameWithOwner": "bee-queue/bee-queue",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "better-auth/better-auth": {
+    "githubId": 803014189,
+    "nameWithOwner": "better-auth/better-auth",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "camelot-dev/camelot": {
+    "githubId": 194679925,
+    "nameWithOwner": "camelot-dev/camelot",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "charmbracelet/bubbletea": {
+    "githubId": 233130089,
+    "nameWithOwner": "charmbracelet/bubbletea",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "chartjs/chart.js": {
+    "githubId": 8843683,
+    "nameWithOwner": "chartjs/Chart.js",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "chroma-core/chroma": {
+    "githubId": 546206616,
+    "nameWithOwner": "chroma-core/chroma",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "clerk/javascript": {
+    "githubId": 438331492,
+    "nameWithOwner": "clerk/javascript",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "cypress-io/cypress": {
+    "githubId": 31629751,
+    "nameWithOwner": "cypress-io/cypress",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "d3/d3": {
+    "githubId": 943149,
+    "nameWithOwner": "d3/d3",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "django/django": {
+    "githubId": 4164482,
+    "nameWithOwner": "django/django",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "drizzle-team/drizzle-orm": {
+    "githubId": 379865325,
+    "nameWithOwner": "drizzle-team/drizzle-orm",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "elastic/elasticsearch": {
+    "githubId": 507775,
+    "nameWithOwner": "elastic/elasticsearch",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "encode/httpx": {
+    "githubId": 179492861,
+    "nameWithOwner": "encode/httpx",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "encode/starlette": {
+    "githubId": 138597372,
+    "nameWithOwner": "Kludex/starlette",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "fastapi/fastapi": {
+    "githubId": 160919119,
+    "nameWithOwner": "fastapi/fastapi",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "ggml-org/llama.cpp": {
+    "githubId": 612354784,
+    "nameWithOwner": "ggml-org/llama.cpp",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "jimp-dev/jimp": {
+    "githubId": 24008065,
+    "nameWithOwner": "jimp-dev/jimp",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "jsvine/pdfplumber": {
+    "githubId": 41279279,
+    "nameWithOwner": "jsvine/pdfplumber",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "kysely-org/kysely": {
+    "githubId": 341139727,
+    "nameWithOwner": "kysely-org/kysely",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "lovell/sharp": {
+    "githubId": 12226786,
+    "nameWithOwner": "lovell/sharp",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "lucia-auth/lucia": {
+    "githubId": 515227801,
+    "nameWithOwner": "lucia-auth/lucia",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "markdown-it/markdown-it": {
+    "githubId": 28249537,
+    "nameWithOwner": "markdown-it/markdown-it",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "markedjs/marked": {
+    "githubId": 2096579,
+    "nameWithOwner": "markedjs/marked",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "meilisearch/meilisearch": {
+    "githubId": 130688011,
+    "nameWithOwner": "meilisearch/meilisearch",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "microsoft/playwright": {
+    "githubId": 221981891,
+    "nameWithOwner": "microsoft/playwright",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "microsoft/playwright-python": {
+    "githubId": 276414382,
+    "nameWithOwner": "microsoft/playwright-python",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "milvus-io/milvus": {
+    "githubId": 208728772,
+    "nameWithOwner": "milvus-io/milvus",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "nextauthjs/next-auth": {
+    "githubId": 119162419,
+    "nameWithOwner": "nextauthjs/next-auth",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "ollama/ollama": {
+    "githubId": 658928958,
+    "nameWithOwner": "ollama/ollama",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "optimalbits/bull": {
+    "githubId": 10999165,
+    "nameWithOwner": "OptimalBits/bull",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "pallets/flask": {
+    "githubId": 596892,
+    "nameWithOwner": "pallets/flask",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "pgvector/pgvector": {
+    "githubId": 359952601,
+    "nameWithOwner": "pgvector/pgvector",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "plotly/plotly.js": {
+    "githubId": 45646037,
+    "nameWithOwner": "plotly/plotly.js",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "pmndrs/jotai": {
+    "githubId": 286867459,
+    "nameWithOwner": "pmndrs/jotai",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "pmndrs/zustand": {
+    "githubId": 180328715,
+    "nameWithOwner": "pmndrs/zustand",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "prisma/prisma": {
+    "githubId": 192925833,
+    "nameWithOwner": "prisma/orm",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "psf/requests": {
+    "githubId": 1362490,
+    "nameWithOwner": "psf/requests",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "puppeteer/puppeteer": {
+    "githubId": 90796663,
+    "nameWithOwner": "puppeteer/puppeteer",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "py-pdf/pypdf": {
+    "githubId": 3119517,
+    "nameWithOwner": "py-pdf/pypdf",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "pymupdf/pymupdf": {
+    "githubId": 6105714,
+    "nameWithOwner": "pymupdf/PyMuPDF",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "qdrant/qdrant": {
+    "githubId": 268163609,
+    "nameWithOwner": "qdrant/qdrant",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "quickwit-oss/tantivy": {
+    "githubId": 49412556,
+    "nameWithOwner": "quickwit-oss/tantivy",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "recharts/recharts": {
+    "githubId": 40345658,
+    "nameWithOwner": "recharts/recharts",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "reduxjs/redux": {
+    "githubId": 36535156,
+    "nameWithOwner": "reduxjs/redux",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "remarkjs/remark": {
+    "githubId": 22355214,
+    "nameWithOwner": "remarkjs/remark",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "scrapy/scrapy": {
+    "githubId": 529502,
+    "nameWithOwner": "scrapy/scrapy",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "spf13/cobra": {
+    "githubId": 12574344,
+    "nameWithOwner": "spf13/cobra",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "tanstack/query": {
+    "githubId": 207645083,
+    "nameWithOwner": "TanStack/query",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "taskforcesh/bullmq": {
+    "githubId": 162494199,
+    "nameWithOwner": "taskforcesh/bullmq",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "typeorm/typeorm": {
+    "githubId": 52773157,
+    "nameWithOwner": "typeorm/typeorm",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "typesense/typesense": {
+    "githubId": 79317191,
+    "nameWithOwner": "typesense/typesense",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "unclecode/crawl4ai": {
+    "githubId": 798201435,
+    "nameWithOwner": "unclecode/crawl4ai",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "urfave/cli": {
+    "githubId": 11393110,
+    "nameWithOwner": "urfave/cli",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  },
+  "weaviate/weaviate": {
+    "githubId": 55072677,
+    "nameWithOwner": "weaviate/weaviate",
+    "checkedAt": "2026-10-11T12:00:13.563Z"
+  }
+}
