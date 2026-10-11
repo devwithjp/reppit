@@ -27,6 +27,11 @@ test.describe("signed out", () => {
     await expect(page.locator("body")).not.toContainText(/internal server error|application error/i);
   });
 
+  test("feed rows carry the signal strip", async ({ page }) => {
+    await page.goto("/?sort=top&kind=repo");
+    await expect(page.getByTestId("feed-row").first().getByTestId("signal-strip")).toBeVisible();
+  });
+
   test("feed sorts and filters by kind", async ({ page }) => {
     for (const sort of ["hot", "top", "new"]) {
       await page.goto(`/?sort=${sort}`);
@@ -40,7 +45,9 @@ test.describe("signed out", () => {
     const slug = await firstFeedSlug(page);
     await page.goto(`/r/${slug}`);
     await expect(page.getByTestId("trust-score").first()).toBeVisible();
-    await expect(page.getByTestId("signal-strip").first()).toBeVisible();
+    // The item page shows the full six-signal table; the compact strip is for list rows.
+    await expect(page.getByTestId("signal-table")).toBeVisible();
+    await expect(page.getByTestId("signal-table").locator("tbody tr")).toHaveCount(6);
     await expect(page.getByTestId("install-command").first()).not.toBeEmpty();
     await expectNoHorizontalScroll(page);
   });
@@ -49,7 +56,9 @@ test.describe("signed out", () => {
     const slug = await firstFeedSlug(page);
     await page.goto(`/r/${slug}`);
     await page.getByTestId("vote-up").first().click();
-    await expect(page.getByTestId("sign-in-link").first().or(page.getByTestId("vote-error").first())).toBeVisible();
+    const msg = page.getByTestId("vote-error").first();
+    await expect(msg).toBeVisible();
+    await expect(msg.getByTestId("sign-in-link")).toHaveAttribute("href", new RegExp(`next=.*${slug.split("/")[1]}`));
   });
 
   test("unknown pages get a real 404", async ({ page }) => {

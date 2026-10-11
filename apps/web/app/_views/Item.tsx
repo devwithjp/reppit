@@ -186,7 +186,7 @@ export async function ItemView({ slug }: { slug: string }) {
 
             <section className="sec">
               {cold && <h2>The six measurements <em>from the repo itself</em></h2>}
-              <table className="sig boxed" style={cold ? undefined : { marginTop: -12 }}>
+              <table className="sig boxed" data-testid="signal-table" style={cold ? undefined : { marginTop: -12 }}>
                 <thead><tr><th scope="col">Signal</th><th scope="col">Observed</th><th scope="col" style={{ textAlign: "right" }}>Points</th></tr></thead>
                 <tbody>
                   {t.cells.map((c) => (
