@@ -147,6 +147,8 @@ export async function applySignals(db: Db, itemId: string, s: {
   packageEcosystem: string | null; packageName: string | null; deprecated: boolean | null; deprecationMessage: string | null;
   advisoriesOpen: number | null; signalsCheckedAt: Date; registryLicense?: string | null;
   installPackage?: string | null; publishedPackages?: { ecosystem: string; name: string }[] | null;
+  installOptions?: { ecosystem: string; name: string }[] | null; installKind?: "package" | "app" | "docs" | null;
+  lastReleaseAt?: Date; releasesLastYear?: number;
 } | null, now: Date = new Date()) {
   if (!s) return false;
   const { registryLicense, ...cols } = s;

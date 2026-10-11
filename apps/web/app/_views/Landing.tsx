@@ -87,7 +87,7 @@ export async function Landing() {
               <h2 className="h3">Measured, not voted</h2>
               <p>Last push, release cadence, the archived and deprecated flags, open advisories and issue load.
                 Six measurements of the repo itself, no human input. When too few of them can be measured, the page
-                says &ldquo;not enough data&rdquo; instead of guessing a number.</p>
+                says &ldquo;too little measured&rdquo; instead of guessing a number.</p>
               {example && (
                 <div className="evidence">
                   <Strip cells={signalCells(example)} />

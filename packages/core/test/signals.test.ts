@@ -4,6 +4,7 @@ import {
   countDistinctAdvisories, checkPackageSignals, type FetchLike,
   packageNameFromSetupCfg, packageNameFromSetupPy, packageNameFromCargoToml, checkCrates, osvOpenAdvisoriesBatch, resolvePackage,
   fetchManifestsRaw, goModInfo, goProxyEscape, checkGo, confirmNoPackage, resolvePackages, combinePackageSignals,
+  registryReleases, isPrerelease,
 } from "../src/signals";
 
 /** Route table fake. Bodies below follow shapes recorded from the live APIs on 2026-10-11. */
@@ -109,7 +110,7 @@ describe("checkPackageSignals", () => {
   const now = new Date("2026-10-11T00:00:00Z");
   it("repo with no package: everything unknown, but the check is recorded", async () => {
     const s = await checkPackageSignals(["torvalds/linux"], { packageJson: null, pyproject: null }, fake({}), now);
-    expect(s).toEqual({ packageEcosystem: null, packageName: null, installPackage: null, publishedPackages: null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now });
+    expect(s).toEqual({ packageEcosystem: null, packageName: null, installPackage: null, installOptions: null, installKind: null, publishedPackages: null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now });
   });
   it("deprecated npm package with an advisory", async () => {
     const f = fake({
@@ -395,14 +396,71 @@ describe("signals across every published package", () => {
   const now = new Date("2026-10-12T00:00:00Z");
   const pkg = (name: string, deprecated = false) => ({ ecosystem: "npm" as const, name, version: "1.0.0", deprecated, deprecationMessage: deprecated ? "gone" : null });
   it("sums advisories over all packages, and is unknown if any count is unknown", () => {
-    const r = { packages: [pkg("@x/core"), pkg("@x/react")], install: null };
+    const r = { packages: [pkg("@x/core"), pkg("@x/react")], install: null, options: [], installKind: "docs" as const };
     expect(combinePackageSignals(r, [1, 2], now)).toMatchObject({ advisoriesOpen: 3, installPackage: null, packageName: "@x/core", publishedPackages: [{ ecosystem: "npm", name: "@x/core" }, { ecosystem: "npm", name: "@x/react" }] });
     expect(combinePackageSignals(r, [1, null], now).advisoriesOpen).toBeNull();
   });
   it("deprecation follows the install package, else needs every package deprecated", () => {
-    expect(combinePackageSignals({ packages: [pkg("a", true), pkg("b")], install: null }, [0, 0], now).deprecated).toBe(false);
-    expect(combinePackageSignals({ packages: [pkg("a", true), pkg("b", true)], install: null }, [0, 0], now).deprecated).toBe(true);
+    expect(combinePackageSignals({ packages: [pkg("a", true), pkg("b")], install: null, options: [], installKind: "docs" }, [0, 0], now).deprecated).toBe(false);
+    expect(combinePackageSignals({ packages: [pkg("a", true), pkg("b", true)], install: null, options: [], installKind: "docs" }, [0, 0], now).deprecated).toBe(true);
     const main = pkg("main", true);
-    expect(combinePackageSignals({ packages: [main, pkg("side")], install: main }, [0, 0], now)).toMatchObject({ deprecated: true, installPackage: "main" });
+    expect(combinePackageSignals({ packages: [main, pkg("side")], install: main, options: [main], installKind: "package" }, [0, 0], now)).toMatchObject({ deprecated: true, installPackage: "main" });
+  });
+});
+
+describe("release cadence from registries (deps.dev)", () => {
+  const now = new Date("2026-10-12T00:00:00Z");
+  const v = (version: string, publishedAt: string) => ({ versionKey: { version }, publishedAt });
+  it("takes the newest stable release and counts stable releases in the past year", async () => {
+    const f = fake({ "https://api.deps.dev/v3/systems/npm/packages/zod": { versions: [
+      v("3.0.0", "2024-01-01T00:00:00Z"), v("4.6.4", "2026-08-01T00:00:00Z"), v("4.6.5", "2026-09-13T23:25:14Z"), v("4.7.0-beta.1", "2026-10-01T00:00:00Z"),
+    ] } });
+    expect(await registryReleases("npm", "zod", f, now)).toEqual({ lastReleaseAt: new Date("2026-09-13T23:25:14Z"), releasesLastYear: 2 });
+  });
+  it("ignores Go pseudo-versions and PyPI pre-releases, encodes scoped and module names", async () => {
+    expect(isPrerelease("Go", "v1.31.3-0.20260914162115-b3d3bf219f02")).toBe(true);
+    expect(isPrerelease("PyPI", "2.0.0rc1")).toBe(true);
+    expect(isPrerelease("PyPI", "2.0.0")).toBe(false);
+    const f = fake({ "https://api.deps.dev/v3/systems/go/packages/gorm.io%2Fgorm": { versions: [v("v1.31.2", "2026-06-22T03:37:04Z"), v("v1.31.3-0.20260914162115-b3d3bf219f02", "2026-09-14T00:00:00Z")] } });
+    expect((await registryReleases("Go", "gorm.io/gorm", f, now))?.lastReleaseAt).toEqual(new Date("2026-06-22T03:37:04Z"));
+    expect(await registryReleases("npm", "nothing", fake({}), now)).toBeNull();
+  });
+  it("is applied from the install package only, never a side package", () => {
+    const pkg = { ecosystem: "npm" as const, name: "@x/core", version: "1", deprecated: false, deprecationMessage: null };
+    const rel = { lastReleaseAt: now, releasesLastYear: 9 };
+    expect(combinePackageSignals({ packages: [pkg], install: null, options: [], installKind: "docs" }, [0], now, rel)).not.toHaveProperty("lastReleaseAt");
+    expect(combinePackageSignals({ packages: [pkg], install: pkg, options: [pkg], installKind: "package" }, [0], now, rel)).toMatchObject({ lastReleaseAt: now, releasesLastYear: 9 });
+  });
+});
+
+describe("apps and registry choice", () => {
+  const pypi = (name: string, repo: string) => ({ info: { name, version: "1.0", project_urls: { Source: `https://github.com/${repo}` } }, releases: { "1.0": [{}], "1.1": [{}], "1.2": [{}] } });
+  const crate = (name: string, repo: string, bins: string[] = []) => ({ crate: { name, repository: `https://github.com/${repo}`, max_stable_version: "1.0.0" }, versions: [{ num: "1.0.0", yanked: false, created_at: "2026-09-01T00:00:00Z", bin_names: bins }, { num: "0.9.0", yanked: false, created_at: "2026-08-01T00:00:00Z" }, { num: "0.8.0", yanked: false, created_at: "2026-07-01T00:00:00Z" }] });
+  it("a Go module whose root is a main package is an app: no go get", async () => {
+    const f = fake({ "https://proxy.golang.org/github.com/ollama/ollama/@latest": { Version: "v0.12.0", Origin: { URL: "https://github.com/ollama/ollama" } } });
+    const r = await resolvePackages(["ollama/ollama"], { goMod: "module github.com/ollama/ollama", goRootIsMain: true }, f, { language: "Go" });
+    expect(r).toMatchObject({ install: null, installKind: "app", options: [] });
+    expect(r.packages[0].name).toBe("github.com/ollama/ollama"); // still used for advisories
+    const lib = await resolvePackages(["ollama/ollama"], { goMod: "module github.com/ollama/ollama" }, f, { language: "Go" });
+    expect(lib).toMatchObject({ installKind: "package", install: { name: "github.com/ollama/ollama" } });
+  });
+  it("a crate whose binary carries its name is an app (hurl); a fixture binary is not (clap)", async () => {
+    const hurl = await resolvePackages(["Orange-OpenSource/hurl"], { cargoToml: "[workspace]" }, fake({ "https://crates.io/api/v1/crates/hurl": crate("hurl", "Orange-OpenSource/hurl", ["hurl"]) }), { language: "Rust" });
+    expect(hurl).toMatchObject({ install: null, installKind: "app" });
+    const clap = await resolvePackages(["clap-rs/clap"], { cargoToml: '[package]\nname = "clap"' }, fake({ "https://crates.io/api/v1/crates/clap": crate("clap", "clap-rs/clap", ["stdio-fixture"]) }), { language: "Rust" });
+    expect(clap).toMatchObject({ installKind: "package", install: { name: "clap" } });
+  });
+  it("offers one install per registry, the repo language's first (polars)", async () => {
+    const f = fake({ "https://crates.io/api/v1/crates/polars": crate("polars", "pola-rs/polars"), "https://pypi.org/pypi/polars/json": pypi("polars", "pola-rs/polars") });
+    const r = await resolvePackages(["pola-rs/polars"], { cargoToml: "[workspace]" }, f, { language: "Rust" });
+    expect(r.options.map((o) => o.ecosystem)).toEqual(["crates.io", "PyPI"]);
+    expect(r.install?.ecosystem).toBe("crates.io");
+    const asPython = await resolvePackages(["pola-rs/polars"], { cargoToml: "[workspace]" }, f, { language: "Python" });
+    expect(asPython.install?.ecosystem).toBe("PyPI");
+  });
+  it("skips an app entry for a library entry elsewhere (uv: the crate is a binary, pip install uv is the install)", async () => {
+    const f = fake({ "https://crates.io/api/v1/crates/uv": crate("uv", "astral-sh/uv", ["uv"]), "https://pypi.org/pypi/uv/json": pypi("uv", "astral-sh/uv") });
+    const r = await resolvePackages(["astral-sh/uv"], { cargoToml: "[workspace]", pyproject: '[project]\nname = "uv"' }, f, { language: "Rust" });
+    expect(r).toMatchObject({ installKind: "package", install: { ecosystem: "PyPI", name: "uv" } });
   });
 });

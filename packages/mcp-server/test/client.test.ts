@@ -30,6 +30,13 @@ describe("installCommand", () => {
       .toBe("# no single package to install verified; see the install docs at https://github.com/TanStack/query#readme");
     expect(installCommand(base)).not.toMatch(/git clone|npm install/);
   });
+  it("follows the query's registry choice and sends apps to their docs", () => {
+    const polars = { ...base, slug: "pola-rs/polars", url: "https://github.com/pola-rs/polars", packageEcosystem: "crates.io", installPackage: "polars", installKind: "package" as const };
+    expect(installCommand(polars)).toBe("cargo add polars");
+    expect(installCommand(polars, { ecosystem: "PyPI", name: "polars" })).toBe("pip install polars");
+    const ollama = { ...base, slug: "ollama/ollama", url: "https://github.com/ollama/ollama", packageEcosystem: "Go", packageName: "github.com/ollama/ollama", installPackage: null, installKind: "app" as const };
+    expect(installCommand(ollama)).toBe("# an application, not a library: install it from https://github.com/ollama/ollama#readme");
+  });
   it("says not indexed instead of listing weak matches", () => {
     expect(formatResults([], true)).toMatch(/Not in the reppit index yet/);
   });

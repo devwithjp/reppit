@@ -1,0 +1,7 @@
+{
+  "_note": "Held-out queries from the coordinator (2026-10-12). Do not tune ranking or the topic list against these. They have no expected answers on purpose: results are judged by a person, and an honest 'not in the index' is acceptable.",
+  "queries": [
+    "feature flags", "structured logging for node", "mock http requests in tests", "sqlalchemy alternative", "pino",
+    "dataframe library faster than pandas", "state machine library", "markdown to pdf", "image resizing in python", "graphql client for react"
+  ]
+}

@@ -5,7 +5,8 @@
  *
  *   1. push        25  pushed_at. Points: full to 30 days, linear to 0 at 730.
  *                      good <= 90 days, slipping <= 365, failing beyond. Null = unknown.
- *   2. release     15  last_release_at. Points: full to 90 days, linear to 0 at 730.
+ *   2. release     15  last_release_at: the install package's newest stable registry release (deps.dev
+ *                      publish times), else the GitHub release date. Points: full to 90 days, linear to 0 at 730.
  *                      good <= 180 days, slipping <= 365, failing beyond. Null = unknown (many projects
  *                      never cut GitHub releases, and the REST ingest path does not fetch them).
  *   3. archived    15  archived flag. Always known. Archived = 0, failing.
@@ -74,6 +75,8 @@ export interface TrustItem {
   closedIssues?: number | null;
   packageName?: string | null;
   packageEcosystem?: string | null;
+  /** Stable releases of the install package in the past year (registry), when measured. */
+  releasesLastYear?: number | null;
   weightedScore?: number | null;
 }
 
@@ -147,7 +150,8 @@ export function signalCells(i: TrustItem, now: Date = new Date()): SignalCell[] 
   const released = toDate(i.lastReleaseAt);
   if (released) {
     const days = (now.getTime() - released.getTime()) / DAY;
-    out.push(cell("release", days <= 180 ? "good" : days <= 365 ? "slipping" : "failing", `last release ${ago(released, now)}`, 15 * decay(days, 90, 730)));
+    const cadence = typeof i.releasesLastYear === "number" ? `, ${i.releasesLastYear} in the past year` : "";
+    out.push(cell("release", days <= 180 ? "good" : days <= 365 ? "slipping" : "failing", `last release ${ago(released, now)}${cadence}`, 15 * decay(days, 90, 730)));
   } else out.push(cell("release", "unknown", "no release data"));
 
   out.push(i.archived ? cell("archived", "failing", "archived by its owner", 0) : cell("archived", "good", "not archived", 15));

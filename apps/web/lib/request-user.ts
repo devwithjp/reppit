@@ -4,8 +4,11 @@ import { apiKeys, users, type User } from "@gitit/db";
 import { getViewerUser } from "./viewer";
 import { db } from "./db";
 
-/** Resolve the acting user from a session cookie or `Authorization: Bearer gitit_...` API key. */
-export async function requestUser(req: Request): Promise<{ user: User | null; apiKeyId?: string }> {
+/**
+ * Resolve the acting user from a session cookie or `Authorization: Bearer <token>`. Token callers
+ * also get the token's scopes; check writes with core's `writeRefusal`.
+ */
+export async function requestUser(req: Request): Promise<{ user: User | null; apiKeyId?: string; scopes?: string[] }> {
   const authz = req.headers.get("authorization");
   if (authz?.startsWith("Bearer ")) {
     const key = authz.slice(7).trim();
@@ -13,7 +16,7 @@ export async function requestUser(req: Request): Promise<{ user: User | null; ap
     const d = await db();
     const hash = createHash("sha256").update(key).digest("hex");
     const [row] = await d.select({ k: apiKeys, u: users }).from(apiKeys).innerJoin(users, eq(users.id, apiKeys.userId)).where(and(eq(apiKeys.keyHash, hash), isNull(apiKeys.revokedAt)));
-    return row ? { user: row.u, apiKeyId: row.k.id } : { user: null };
+    return row ? { user: row.u, apiKeyId: row.k.id, scopes: row.k.scopes ?? ["read"] } : { user: null };
   }
   return { user: await getViewerUser() };
 }

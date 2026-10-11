@@ -686,3 +686,12 @@ a.btn{text-decoration:none}
 .tools code{flex:0 0 120px;color:var(--t-white);font-family:var(--mono);font-size:12.5px}
 @media(max-width:520px){.tools li{flex-direction:column;gap:2px}.tools code{flex:none}}
 .term-h2{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--t-white);margin:22px 0 8px}
+.token-form{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin:0}
+.token-form .check{font-size:13px}
+.token-scope{color:var(--ink-2)}
+.cmd-docs{gap:12px;flex-wrap:wrap}
+.cmd-docs .docs-link{font-family:var(--mono);color:var(--rust-ink);text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+.cmd-docs .docs-link:hover{color:var(--rust)}
+.cmd-docs .docs-label{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.trust .capnote{font-family:var(--mono);font-size:10px;color:var(--amber);white-space:nowrap}
+.compat-none{font-size:13.5px;color:var(--ink-2);margin:0 0 9px;max-width:68ch}

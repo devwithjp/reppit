@@ -14,6 +14,8 @@ import { NO_PACKAGE } from "./trust";
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
+const norm = (n: string) => n.toLowerCase().replace(/[-_.]+/g, "-");
+
 export const SIGNALS_USER_AGENT = "reppit-ingest (+https://reppit.dev)";
 
 /** Ecosystem names exactly as OSV spells them. */
@@ -36,6 +38,11 @@ export interface PackageSignals {
   installPackage?: string | null;
   /** Every verified package; null = not checked, [] = none. */
   publishedPackages?: { ecosystem: string; name: string }[] | null;
+  installOptions?: { ecosystem: string; name: string }[] | null;
+  installKind?: InstallKind | null;
+  /** From the install package's registry publish times. Absent = leave the stored value. */
+  lastReleaseAt?: Date;
+  releasesLastYear?: number;
 }
 
 /** `name` from a package.json, or null when absent, unparsable, or `private: true`. */
@@ -221,7 +228,7 @@ export const UNSUPPORTED_MANIFESTS = ["pom.xml", "build.gradle", "build.gradle.k
 
 interface CratesResponse {
   crate?: { name?: string; repository?: string | null; homepage?: string | null; max_version?: string; max_stable_version?: string | null };
-  versions?: { num: string; yanked: boolean; created_at: string; license?: string | null }[];
+  versions?: { num: string; yanked: boolean; created_at: string; license?: string | null; bin_names?: string[] | null }[];
 }
 
 /**
@@ -240,7 +247,11 @@ export async function checkCrates(name: string, slugs: string[], f: FetchLike = 
   const live = j.crate?.max_stable_version || (j.crate?.max_version && j.crate.max_version !== "0.0.0" ? j.crate.max_version : null) || versions.find((v) => !v.yanked)?.num || newest?.num || null;
   const deprecated = !!newest?.yanked;
   const stableReleases = versions.filter((v) => !v.yanked && !PRERELEASE.test(v.num)).length;
-  return { ecosystem: "crates.io" as const, name: j.crate?.name ?? name, version: live, deprecated, deprecationMessage: deprecated ? `latest version ${newest.num} yanked` : null, license: spdxish(newest?.license), stableReleases };
+  const binNames = (newest?.bin_names ?? []).filter(Boolean);
+  const crateName = j.crate?.name ?? name;
+  // A crate whose binary carries its own name (hurl) is a tool you install, not a dependency you add.
+  const kind = binNames.some((b) => norm(b) === norm(crateName)) ? "app" as const : "package" as const;
+  return { ecosystem: "crates.io" as const, name: crateName, version: live, deprecated, deprecationMessage: deprecated ? `latest version ${newest.num} yanked` : null, license: spdxish(newest?.license), stableReleases, binNames, kind };
 }
 
 interface OsvVuln { id: string; aliases?: string[]; withdrawn?: string }
@@ -316,6 +327,8 @@ export interface RepoManifests {
   goMod?: string | null;
   /** package.json files from monorepo folders named like the repo (`<name>/`, `packages/<name>/`). */
   subPackageJsons?: (string | null)[];
+  /** The root directory is a Go `main` package (main.go at the root): the module is an app. */
+  goRootIsMain?: boolean;
   /**
    * True only when every manifest file (root, and monorepo folders when the root is private) was
    * fetched with a definite answer: found, or 404. Only then can "no package" be a confirmed absence.
@@ -327,6 +340,10 @@ export interface ResolvedPackage {
   ecosystem: Ecosystem; name: string; version: string | null; deprecated: boolean; deprecationMessage: string | null; license?: string | null;
   /** Non-prerelease versions published, when the registry response already carries them. */
   stableReleases?: number;
+  /** crates.io: binaries the latest version builds. */
+  binNames?: string[];
+  /** "app" when the package is an application rather than a library to depend on. */
+  kind?: "package" | "app";
 }
 
 const PRERELEASE = /[-+](alpha|beta|rc|pre|dev|canary|next|nightly)|(a|b|rc|dev)\d+$/i;
@@ -350,14 +367,23 @@ const ECOSYSTEM_LANGUAGES: Record<Exclude<Ecosystem, "Go">, string[]> = {
 const fitsLanguage = (eco: Ecosystem, language?: string | null) =>
   eco === "Go" || !language || ECOSYSTEM_LANGUAGES[eco].includes(language.toLowerCase());
 
+export type InstallKind = "package" | "app" | "docs";
+
 export interface ResolvedPackages {
   /** Every verified package this repo publishes (registry links back), primary first. */
   packages: ResolvedPackage[];
-  /** The package to install, or null when none is demonstrably the repo's primary one. */
+  /** The package to install, or null when none is demonstrably the repo's primary one or it is an app. */
   install: ResolvedPackage | null;
+  /** Installable primary packages, one per registry, the repo language's registry first. */
+  options: ResolvedPackage[];
+  /**
+   * "package": `install` is the thing to add. "app": the primary package is an application (a Go main
+   * package at the root, a crate whose binary carries its name): install it from the repo's docs.
+   * "docs": the repo publishes packages but none is demonstrably the one to install (monorepo side
+   * packages). null: no package found.
+   */
+  installKind: InstallKind | null;
 }
-
-const norm = (n: string) => n.toLowerCase().replace(/[-_.]+/g, "-");
 
 /**
  * The packages a repo publishes, and separately the one to install. Every candidate must be
@@ -427,11 +453,16 @@ export async function resolvePackages(slugs: string[], m: RepoManifests, f: Fetc
     return stable >= ESTABLISHED_MIN_RELEASES ? hit : null;
   };
 
-  if (m.goMod) keep(await checkGo(m.goMod, slugs, f));
-  if (repoName) {
-    if (hasNpm) { keep(await ungrounded("npm", repoName)); keep(await ungrounded("npm", `@${owner.toLowerCase()}/${repoName}`)); }
-    if (hasPy) keep(await ungrounded("PyPI", repoName));
-    if (hasCargo) keep(await ungrounded("crates.io", repoName));
+  if (m.goMod) { const go = await checkGo(m.goMod, slugs, f); keep(go ? { ...go, kind: m.goRootIsMain ? "app" : "package" } : null); }
+  // The repo's own name is tried in every registry once the repo has any package manifest: polars is
+  // a Rust repo whose PyPI package (the one Python users install) has no root pyproject. The
+  // ungrounded rule above keeps squats out.
+  const hasAny = hasNpm || hasPy || hasCargo || !!m.goMod;
+  if (repoName && hasAny) {
+    keep(await ungrounded("npm", repoName));
+    if (hasNpm) keep(await ungrounded("npm", `@${owner.toLowerCase()}/${repoName}`));
+    keep(await ungrounded("PyPI", repoName));
+    keep(await ungrounded("crates.io", repoName));
   }
   keep(await attempt("npm", rootNames.npm));
   for (const py of rootNames.py) keep(await attempt("PyPI", py));
@@ -441,16 +472,51 @@ export async function resolvePackages(slugs: string[], m: RepoManifests, f: Fetc
     for (const name of (await npmSearchByRepo(repoName, slugs, f)).slice(0, 5)) keep(await ungrounded("npm", name));
   }
 
-  const ranked = found.map((p) => ({ p, r: primaryRank(p) }));
-  const primary = ranked.filter((x) => x.r !== null).sort((a, b) => a.r! - b.r!)[0]?.p ?? null;
-  const packages = primary ? [primary, ...found.filter((p) => p !== primary)] : found;
-  return { packages, install: primary };
+  // Primary packages, best rank first; one per registry.
+  const primaries = found.map((p) => ({ p, r: primaryRank(p) })).filter((x) => x.r !== null).sort((a, b) => a.r! - b.r!).map((x) => x.p);
+  const perRegistry = primaries.filter((p, i) => primaries.findIndex((q) => q.ecosystem === p.ecosystem) === i);
+  // Installable options exclude apps; the repo language's registry goes first.
+  const libs = perRegistry.filter((p) => p.kind !== "app");
+  const options = [...libs.filter((p) => fitsLanguage(p.ecosystem, opts.language) && opts.language), ...libs.filter((p) => !(fitsLanguage(p.ecosystem, opts.language) && opts.language))];
+  const install = options[0] ?? null;
+  const installKind: InstallKind | null = install ? "package" : perRegistry.length ? "app" : found.length ? "docs" : null;
+  const lead = install ?? perRegistry[0] ?? null;
+  const packages = lead ? [lead, ...found.filter((p) => p !== lead)] : found;
+  return { packages, install, options, installKind };
 }
 
 /** The install package, else the first verified one. Kept for callers that need a single package. */
 export async function resolvePackage(slugs: string[], m: RepoManifests, f: FetchLike = fetch, opts: { language?: string | null } = {}): Promise<ResolvedPackage | null> {
   const r = await resolvePackages(slugs, m, f, opts);
   return r.install ?? r.packages[0] ?? null;
+}
+
+const DEPS_DEV_SYSTEM: Record<Ecosystem, string> = { npm: "npm", PyPI: "pypi", "crates.io": "cargo", Go: "go" };
+
+/** Pre-release or pseudo-version: semver "-" suffixes (npm, cargo, Go), PEP 440 a/b/rc/dev for PyPI. */
+export function isPrerelease(eco: Ecosystem, version: string): boolean {
+  return eco === "PyPI" ? /(a|b|rc|dev)\d*$|\.dev|alpha|beta/i.test(version) : version.includes("-");
+}
+
+export interface ReleaseInfo { lastReleaseAt: Date; releasesLastYear: number }
+
+/**
+ * Release cadence from registry publish times via deps.dev (no key, one call covers npm, PyPI,
+ * crates.io and Go): the newest stable version's publish date, and how many stable versions were
+ * published in the 365 days before `now`. Null when the package has no dated stable release.
+ */
+export async function registryReleases(eco: Ecosystem, name: string, f: FetchLike = fetch, now = new Date()): Promise<ReleaseInfo | null> {
+  const res = await f(`https://api.deps.dev/v3/systems/${DEPS_DEV_SYSTEM[eco]}/packages/${encodeURIComponent(name)}`, { headers: { accept: "application/json", "user-agent": SIGNALS_USER_AGENT } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`deps.dev ${eco} ${name} ${res.status}`);
+  const j = (await res.json()) as { versions?: { versionKey?: { version?: string }; publishedAt?: string }[] };
+  const yearAgo = now.getTime() - 365 * 86_400_000;
+  const stable = (j.versions ?? [])
+    .map((v) => ({ v: v.versionKey?.version ?? "", t: v.publishedAt ? Date.parse(v.publishedAt) : NaN }))
+    .filter((x) => x.v && Number.isFinite(x.t) && x.t <= now.getTime() && !isPrerelease(eco, x.v));
+  if (!stable.length) return null;
+  const last = Math.max(...stable.map((x) => x.t));
+  return { lastReleaseAt: new Date(last), releasesLastYear: stable.filter((x) => x.t >= yearAgo).length };
 }
 
 /**
@@ -460,7 +526,7 @@ export async function resolvePackage(slugs: string[], m: RepoManifests, f: Fetch
  * flag when there is one; otherwise true only when every verified package is deprecated (a dead side
  * package does not make the project dead).
  */
-export function combinePackageSignals(r: ResolvedPackages, advisories: (number | null)[], now: Date): PackageSignals {
+export function combinePackageSignals(r: ResolvedPackages, advisories: (number | null)[], now: Date, releases?: ReleaseInfo | null): PackageSignals {
   const lead = r.install ?? r.packages[0];
   const sum = advisories.length === r.packages.length && advisories.every((n) => typeof n === "number") ? advisories.reduce<number>((a, n) => a + (n as number), 0) : null;
   const deprecated = r.install ? r.install.deprecated : r.packages.every((p) => p.deprecated);
@@ -468,7 +534,11 @@ export function combinePackageSignals(r: ResolvedPackages, advisories: (number |
   return {
     packageEcosystem: lead.ecosystem, packageName: lead.name,
     installPackage: r.install?.name ?? null,
+    installOptions: r.options.map((p) => ({ ecosystem: p.ecosystem, name: p.name })),
+    installKind: r.installKind,
     publishedPackages: r.packages.map((p) => ({ ecosystem: p.ecosystem, name: p.name })),
+    // Release cadence comes from the install package only, never a side package.
+    ...(r.install && releases ? { lastReleaseAt: releases.lastReleaseAt, releasesLastYear: releases.releasesLastYear } : {}),
     deprecated, deprecationMessage: message, advisoriesOpen: sum, signalsCheckedAt: now,
     registryLicense: (r.install ?? lead).license ?? null,
   };
@@ -484,7 +554,8 @@ export async function checkPackageSignals(slugs: string[], manifests: RepoManife
     const r = await resolvePackages(slugs, manifests, f, opts);
     if (!r.packages.length) return noPackageSignals(now, await confirmNoPackage(slugs[0] ?? "", manifests, f));
     const adv = await osvOpenAdvisoriesBatch(r.packages.map((p) => ({ ecosystem: p.ecosystem, name: p.name, version: p.version ?? "" })), f);
-    return combinePackageSignals(r, r.packages.map((p, i) => (p.version ? adv[i] : null)), now);
+    const releases = r.install ? await registryReleases(r.install.ecosystem, r.install.name, f, now).catch(() => null) : null;
+    return combinePackageSignals(r, r.packages.map((p, i) => (p.version ? adv[i] : null)), now, releases);
   } catch {
     return null;
   }
@@ -515,9 +586,9 @@ export async function confirmNoPackage(slug: string, manifests: RepoManifests, f
  * applicable in the trust score. Unconfirmed leaves them unknown.
  */
 export const noPackageSignals = (now: Date, confirmed = false): PackageSignals =>
-  ({ packageEcosystem: confirmed ? NO_PACKAGE : null, packageName: null, installPackage: null, publishedPackages: confirmed ? [] : null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now });
+  ({ packageEcosystem: confirmed ? NO_PACKAGE : null, packageName: null, installPackage: null, installOptions: null, installKind: null, publishedPackages: confirmed ? [] : null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now });
 
-export const MANIFEST_FILES: Record<Exclude<keyof RepoManifests, "subPackageJsons" | "complete">, string> = {
+export const MANIFEST_FILES: Record<Exclude<keyof RepoManifests, "subPackageJsons" | "complete" | "goRootIsMain">, string> = {
   packageJson: "package.json", pyproject: "pyproject.toml", setupCfg: "setup.cfg", setupPy: "setup.py", cargoToml: "Cargo.toml", goMod: "go.mod",
 };
 
@@ -546,6 +617,10 @@ export async function fetchManifestsRaw(owner: string, name: string, f: FetchLik
   // in a folder. Only folders named like the repo are fetched, to keep this to two requests.
   if (out.packageJson && packageNameFromPackageJson(out.packageJson) === null) {
     out.subPackageJsons = await Promise.all([`${name}/package.json`, `packages/${name}/package.json`].map(get));
+  }
+  if (out.goMod) {
+    const mainGo = await get("main.go");
+    out.goRootIsMain = !!mainGo && /^package\s+main\b/m.test(mainGo);
   }
   out.complete = complete;
   return out;

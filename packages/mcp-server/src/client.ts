@@ -66,8 +66,11 @@ export interface SearchResult {
     stars: number; installs: number; healthScore: number; upvotes: number; downvotes: number; license: string | null;
     archived?: boolean; deprecated?: boolean | null; advisoriesOpen?: number | null;
     packageEcosystem?: string | null; packageName?: string | null; installPackage?: string | null;
+    installKind?: "package" | "app" | "docs" | null;
   };
   score: number; semantic: number; why: string; match?: "exact" | "strong" | "partial";
+  /** What to install for this query (the registry the query's language implies), or null. */
+  install?: { ecosystem: string; name: string } | null;
   downvoteReasons: Record<string, number>;
   compat: Record<string, { works: number; broken: number }>;
   trust?: Trust;
@@ -85,20 +88,22 @@ export function formatTrust(t: Trust | undefined): string {
   return `trust ${t.score}/100${t.reason === "archived" || t.reason === "deprecated" ? ` (${t.reason})` : of}`;
 }
 
+const COMMAND: Record<string, (n: string) => string> = {
+  npm: (n) => `npm install ${n}`, PyPI: (n) => `pip install ${n}`, "crates.io": (n) => `cargo add ${n}`, Go: (n) => `go get ${n}`,
+};
+
 /**
- * The install command for a result. Only the repo's primary package (`installPackage`, verified and
- * named like the repo or its root manifest) gets a package-manager command. A monorepo whose verified
- * packages are side packages (@tanstack/query-core, @prisma/orm-toolchain) gets the repo's install
- * docs instead: a wrong install run by an agent is worse than none. Never `git clone`.
+ * The install command for a result. Only a verified primary package gets a package-manager command;
+ * a search result's `install` (chosen for the query's language) wins over the item's default. Apps
+ * and monorepos without an obvious package get the repo's install docs. Never `git clone`.
  */
-export function installCommand(r: SearchResult["item"]): string {
+export function installCommand(r: SearchResult["item"], install?: { ecosystem: string; name: string } | null): string {
   if (r.kind === "skill") return `npx skills add ${r.slug}`;
   if (r.kind === "mcp") return `# add to your MCP config: see ${r.url}`;
-  const name = r.installPackage;
-  if (name && r.packageEcosystem === "npm") return `npm install ${name}`;
-  if (name && r.packageEcosystem === "PyPI") return `pip install ${name}`;
-  if (name && r.packageEcosystem === "crates.io") return `cargo add ${name}`;
-  if (name && r.packageEcosystem === "Go") return `go get ${name}`;
+  if (r.installKind === "app") return `# an application, not a library: install it from ${r.url}#readme`;
+  const pick = install ?? (r.installPackage && r.packageEcosystem ? { ecosystem: r.packageEcosystem, name: r.installPackage } : null);
+  const cmd = pick && COMMAND[pick.ecosystem];
+  if (pick && cmd) return cmd(pick.name);
   return `# no single package to install verified; see the install docs at ${r.url}#readme`;
 }
 
@@ -120,7 +125,7 @@ export function formatResults(results: SearchResult[], notIndexed = false): stri
       `   ${formatTrust(r.trust)} · votes ${net >= 0 ? "+" : ""}${net} · ★${r.item.stars}${r.item.installs ? ` · ${r.item.installs} installs` : ""}${r.item.license ? ` · ${r.item.license}` : ""}`,
       flags ? `   flags: ${flags}` : null,
       compat ? `   agents: ${compat}` : null,
-      `   install: ${installCommand(r.item)}`,
+      `   install: ${installCommand(r.item, r.install)}`,
     ].filter(Boolean).join("\n");
   }).join("\n\n");
 }

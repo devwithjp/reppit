@@ -13,6 +13,7 @@ import { Footer } from "@/components/Footer";
 import { ago } from "@/components/trust";
 import { REASON_LABEL, AGENT_LABEL, itemHref } from "@/components/labels";
 import { InstallCmd } from "@/components/InstallCmd";
+import { SCOPES_SUPPORTED, scopeValues, scopeLabel } from "./scopes";
 
 export const metadata: Metadata = { title: "Account" };
 export const dynamic = "force-dynamic";
@@ -21,14 +22,16 @@ const FLASH = "reppit_new_token";
 const sha = (t: string) => createHash("sha256").update(t).digest("hex");
 
 /** One personal token per person. The plain value exists only in this response; we store its sha256. */
-async function createToken() {
+async function createToken(fd: FormData) {
   "use server";
   const v = await getViewer(); if (!v) redirect("/login?next=%2Faccount");
   const d = await db();
   const [existing] = await d.select({ id: apiKeys.id }).from(apiKeys).where(and(eq(apiKeys.userId, v.id), isNull(apiKeys.revokedAt))).limit(1);
   if (existing) redirect("/account#token");
   const token = `reppit_${randomBytes(24).toString("base64url")}`;
-  await d.insert(apiKeys).values({ userId: v.id, keyHash: sha(token), label: "personal token" });
+  // Read only unless the box was ticked. The checkbox is off by default.
+  const write = fd.get("write") === "on";
+  await d.insert(apiKeys).values({ userId: v.id, keyHash: sha(token), label: "personal token", ...scopeValues(write) } as typeof apiKeys.$inferInsert);
   // Shown once: a 60-second httpOnly cookie scoped to this page, never the URL (history, logs, referrers).
   (await cookies()).set(FLASH, token, { httpOnly: true, sameSite: "strict", secure: process.env.NODE_ENV === "production", path: "/account", maxAge: 60 });
   redirect("/account#token");
@@ -47,7 +50,7 @@ export default async function AccountPage() {
   if (!viewer) redirect("/login?next=%2Faccount");
   const d = await db();
   const [keys, myVotes, myReports] = await Promise.all([
-    d.select({ id: apiKeys.id, createdAt: apiKeys.createdAt, keyHash: apiKeys.keyHash }).from(apiKeys).where(and(eq(apiKeys.userId, viewer.id), isNull(apiKeys.revokedAt))).orderBy(desc(apiKeys.createdAt)).limit(1),
+    d.select().from(apiKeys).where(and(eq(apiKeys.userId, viewer.id), isNull(apiKeys.revokedAt))).orderBy(desc(apiKeys.createdAt)).limit(1),
     d.select({ slug: items.slug, direction: votes.direction, reason: votes.reason, createdAt: votes.createdAt })
       .from(votes).innerJoin(items, eq(items.id, votes.itemId)).where(eq(votes.userId, viewer.id)).orderBy(desc(votes.createdAt)).limit(25),
     d.select({ slug: items.slug, agent: agentCompatReports.agent, status: agentCompatReports.status, createdAt: agentCompatReports.createdAt })
@@ -114,7 +117,8 @@ export default async function AccountPage() {
             <div className="panel" id="token">
               <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>Personal token</span></div>
               <div className="panel-b">
-                <p className="meta" style={{ margin: "0 0 10px" }}>Lets the reppit CLI and MCP server vote and file agent reports as you.</p>
+                <p className="meta" style={{ margin: "0 0 10px" }}>For the reppit CLI and MCP server.{" "}
+                  {SCOPES_SUPPORTED ? "A read token can search and look up repos only." : "Tokens are not scoped yet: a token can vote and file agent reports as you."}</p>
                 {created && (
                   <div style={{ margin: "0 0 12px" }}>
                     <p className="auth-msg ok" role="status" style={{ marginTop: 0, marginBottom: 6 }}>Copy it now. It is not shown again.</p>
@@ -123,16 +127,23 @@ export default async function AccountPage() {
                 )}
                 {token ? (
                   <div className="token-row">
-                    <span className="meta">Created {ago(token.createdAt)} &middot; {token.createdAt.toISOString().slice(0, 10)}</span>
+                    <span className="meta">Created {ago(token.createdAt)} &middot; {token.createdAt.toISOString().slice(0, 10)}<br />
+                      <span className="token-scope" data-testid="token-scope">{scopeLabel(token)}</span></span>
                     <form action={revokeToken}><input type="hidden" name="id" value={token.id} />
                       <button className="btn btn-sm" type="submit">Revoke</button></form>
                   </div>
                 ) : (
-                  <form action={createToken}>
+                  <form action={createToken} className="token-form">
+                    {SCOPES_SUPPORTED && (
+                      <label className="check">
+                        <input type="checkbox" name="write" data-testid="token-write" />
+                        <span>Let my agent vote and file agent reports as me</span>
+                      </label>
+                    )}
                     <button className="btn btn-sm" type="submit">Create a token</button>
                   </form>
                 )}
-                {token && <p className="meta" style={{ margin: "10px 0 0" }}>Lost it? Revoke this one and create another.</p>}
+                {token && <p className="meta" style={{ margin: "10px 0 0" }}>Lost it, or want a different scope? Revoke this one and create another.</p>}
               </div>
             </div>
           </aside>

@@ -2,10 +2,10 @@ import Link from "next/link";
 import type { RowItem, RowExtras } from "@/app/_data/items";
 import { flags, ago } from "./trust";
 import { trustScore, signalCells, type SignalCell } from "./score";
-import { itemHref, splitSlug, installCommand, cleanWhy } from "./labels";
-import { Strip, ScoreNum, Measured, ReasonLine, AgentLine, NoOpinions } from "./marks";
+import { itemHref, splitSlug, cleanWhy } from "./labels";
+import { Install } from "./Install";
+import { Strip, ScoreNum, Measured, CapNote, ReasonLine, AgentLine, NoOpinions } from "./marks";
 import { RailVote } from "./RailVote";
-import { InstallCmd } from "./InstallCmd";
 
 /** The trust block on the right of a row: TRUST label, score, strip, last push. */
 export function TrustBlock({ score, reason, measured, applicable, cells, pushedAt }: {
@@ -15,6 +15,7 @@ export function TrustBlock({ score, reason, measured, applicable, cells, pushedA
     <div className="trust">
       <div className="hd">Trust</div>
       <div className={`n${score === null ? " is-nd" : ""}`}><ScoreNum score={score} reason={reason} />{score !== null && <s>/100</s>}</div>
+      <CapNote score={score} reason={reason} />
       <Measured measured={measured} applicable={applicable} />
       <Strip cells={cells} />
       <div className="cap">{pushedAt ? `pushed ${ago(pushedAt)}` : "push date unknown"}</div>
@@ -78,7 +79,7 @@ export function ItemRow({
         <ReasonLine upvotes={item.upvotes} reasons={reasons} />
         <AgentLine compat={compat} />
         <NoOpinions votes={hasVotes} reports={hasReports} />
-        {variant === "search" && <InstallCmd command={installCommand(item)} compact />}
+        {variant === "search" && <Install item={item} compact />}
       </div>
       <TrustBlock score={score} reason={ts.reason} measured={ts.measured} applicable={ts.applicable} cells={cells} pushedAt={item.pushedAt} />
     </article>

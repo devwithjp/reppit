@@ -21,6 +21,9 @@ describe("signalCells", () => {
     expect(cells.filter((c) => c.state === "unknown").map((c) => c.key)).toEqual(["push", "release", "deprecated", "advisories", "issues"]);
     expect(cells.find((c) => c.key === "advisories")!.label).not.toMatch(/\b0\b|no open/);
   });
+  it("shows release cadence when measured", () => {
+    expect(signalCells({ ...healthy, releasesLastYear: 12 }, now)[1].label).toBe("last release 20 days ago, 12 in the past year");
+  });
   it("accepts ISO strings from JSON", () => {
     expect(signalCells({ ...healthy, pushedAt: daysAgo(5).toISOString() }, now)[0].state).toBe("good");
   });

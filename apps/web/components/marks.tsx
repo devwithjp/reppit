@@ -15,13 +15,24 @@ export function Strip({ cells, className }: { cells: SignalCell[]; className?: s
   );
 }
 
+const CAP_REASONS = new Set(["archived", "deprecated", "stale"]);
+
 /**
- * Why a score is null, in words. Core's reasons ("not enough data", "too little measured", and any it adds
- * later) are shown as they are; a cap reason ("archived", "deprecated") never reaches here because a
- * capped item still has a number.
+ * Why a score is null, in words. Core says "too little measured"; any other null reason it adds later is
+ * shown as it is. Cap reasons never reach here, because a capped item still has a number.
  */
 export function nullReason(reason: string | undefined): string {
-  return reason && reason !== "archived" && reason !== "deprecated" ? reason : "not enough data";
+  return reason && !CAP_REASONS.has(reason) ? reason : "too little measured";
+}
+
+/** Why a number was capped, when the flags beside the name do not already say it. */
+export function capNote(score: number | null, reason: string | undefined): string | null {
+  return score !== null && reason === "stale" ? "no push in over a year" : null;
+}
+
+export function CapNote({ score, reason }: { score: number | null; reason?: string }) {
+  const n = capNote(score, reason);
+  return n ? <span className="capnote" data-testid="cap-note">{n}</span> : null;
 }
 
 /** The score, or its null reason in words. Never a zero standing in for unknown. */

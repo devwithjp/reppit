@@ -7,7 +7,7 @@ import { getViewer } from "@/lib/viewer";
 import { embedder } from "@/lib/services";
 import { Masthead } from "@/components/Masthead";
 import { ReppitInstall } from "@/components/ReppitInstall";
-import { nullReason } from "@/components/marks";
+import { nullReason, capNote } from "@/components/marks";
 import { band } from "@/components/trust";
 import { trustScore, signalCells, type SignalCell } from "@/components/score";
 import { REASON_LABEL, MCP_INSTALL, CLI_EXAMPLE, REPPIT_PUBLISHED, installCommand } from "@/components/labels";
@@ -86,7 +86,7 @@ export default async function AgentPage() {
   const compat = Object.entries(extras.compat.get(row.id) ?? {});
   const facts = cells.filter((s) => s.key === "push" || s.key === "release" || s.key === "advisories" || s.state === "failing");
   return (
-    <span key={row.id}>{"\n     "}<span className="c-b">{row.slug.padEnd(pad)}</span><span className={score === null ? "c-faint" : C[band(score)]}>{score === null ? `trust: ${nullReason(ts.reason)}` : `trust ${String(score).padStart(2)}`}</span>  <TermStrip cells={cells} />  <span className="c-faint">{ts.measured} of {ts.applicable} measured</span>{"\n"}
+    <span key={row.id}>{"\n     "}<span className="c-b">{row.slug.padEnd(pad)}</span><span className={score === null ? "c-faint" : C[band(score)]}>{score === null ? `trust: ${nullReason(ts.reason)}` : `trust ${String(score).padStart(2)}`}</span>  <TermStrip cells={cells} />  <span className="c-faint">{ts.measured} of {ts.applicable} measured{capNote(ts.score, ts.reason) ? ` \u00b7 ${capNote(ts.score, ts.reason)}` : ""}</span>{"\n"}
 {"     "}<span className="c-dim">{"│"}</span> {facts.map((s, i) => <span key={s.key}>{i > 0 && " · "}<span className={CC[s.state] === "c-steel" ? undefined : CC[s.state]}>{s.label}</span></span>)}{"\n"}
 {"     "}<span className="c-dim">{"│"}</span> {row.upvotes + row.downvotes === 0
       ? <span className="c-faint">no votes yet</span>
@@ -94,7 +94,7 @@ export default async function AgentPage() {
 {"     "}<span className="c-dim">{"│"}</span> agents  {compat.length === 0
       ? <span className="c-faint">no reports yet</span>
       : compat.map(([a, c]) => <span key={a}><span className={c.works > c.broken ? "c-steel" : c.broken > c.works ? "c-rust" : "c-dim"}>{c.works > c.broken ? "✓" : c.broken > c.works ? "✗" : "?"}</span> {a} {c.works + c.broken}   </span>)}{"\n"}
-{"     "}<span className="c-dim">{"│"}</span> <span className="c-faint">{installCommand(row)}</span>{"\n"}
+{"     "}<span className="c-dim">{"│"}</span> <span className="c-faint">{installCommand(row) ?? `see install docs: ${row.url}#readme`}</span>{"\n"}
     </span>
   );
 })}

@@ -36,6 +36,20 @@
       "when": 1791725462067,
       "tag": "0004_install_package",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791727650728,
+      "tag": "0005_scopes_install_kind",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791727661124,
+      "tag": "0006_search_weights_readme_cap",
+      "breakpoints": true
     }
   ]
 }

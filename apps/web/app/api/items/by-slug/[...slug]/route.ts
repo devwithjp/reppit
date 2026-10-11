@@ -1,6 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import { comments, users, agentCompatReports } from "@gitit/db";
-import { castVote, bumpCommentCount, resolveItemBySlug, VoteError, RULES, type DownvoteReason } from "@gitit/core";
+import { castVote, bumpCommentCount, resolveItemBySlug, writeRefusal, VoteError, RULES, type DownvoteReason } from "@gitit/core";
 import { db } from "@/lib/db";
 import { rateLimiter, clientIp } from "@/lib/services";
 import { requestUser } from "@/lib/request-user";
@@ -55,13 +55,16 @@ export const GET = route<Ctx>("items/by-slug GET", async (req, ctx) => {
 /**
  * POST /api/items/by-slug/{slug}/vote|comments|compat
  * Auth: session cookie or `Authorization: Bearer <personal token>` (revoked tokens are refused by
- * requestUser). Writes are attributed to the token's owner. Old slugs resolve through aliases.
+ * requestUser). A token needs the "write" scope (403 otherwise); session users are unaffected.
+ * Writes are attributed to the token's owner. Old slugs resolve through aliases.
  */
 export const POST = route<Ctx>("items/by-slug POST", async (req, ctx) => {
   const p = await parse(ctx);
   if (!p || !p.action) return err("Not found", 404);
-  const { user } = await requestUser(req);
+  const { user, apiKeyId, scopes } = await requestUser(req);
   if (!user) return err(req.headers.get("authorization") ? "Invalid or revoked API token" : "Sign in required", 401);
+  const refused = writeRefusal({ apiKeyId, scopes });
+  if (refused) return err(refused, 403);
   const body = await readJsonObject(req);
   if (!body) return err("Body must be a JSON object");
   const d = await db();
@@ -118,8 +121,10 @@ export const POST = route<Ctx>("items/by-slug POST", async (req, ctx) => {
 export const DELETE = route<Ctx>("items/by-slug DELETE", async (req, ctx) => {
   const p = await parse(ctx);
   if (!p || p.action !== "vote") return err("Not found", 404);
-  const { user } = await requestUser(req);
+  const { user, apiKeyId, scopes } = await requestUser(req);
   if (!user) return err(req.headers.get("authorization") ? "Invalid or revoked API token" : "Sign in required", 401);
+  const refused = writeRefusal({ apiKeyId, scopes });
+  if (refused) return err(refused, 403);
   const [a, b] = await Promise.all([rateLimiter().check(RULES.votePerUser, `vote:u:${user.id}`), rateLimiter().check(RULES.votePerIp, `vote:ip:${clientIp(req)}`)]);
   if (!a.ok || !b.ok) return err("Too many votes, slow down", 429);
   const d = await db();

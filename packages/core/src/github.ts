@@ -154,13 +154,13 @@ export const README_FILES = ["README.md", "readme.md", "README.rst", "README", "
  * file names in order and returns the first, truncated like the REST ingester. Null when none exists.
  * With `strict`, a 429/5xx or network error throws so a batch job can retry the repo later.
  */
-export async function fetchReadmeRaw(owner: string, name: string, f: (url: string, init?: RequestInit) => Promise<Response> = fetch, opts: { strict?: boolean } = {}): Promise<string | null> {
+export async function fetchReadmeRaw(owner: string, name: string, f: (url: string, init?: RequestInit) => Promise<Response> = fetch, opts: { strict?: boolean; maxChars?: number } = {}): Promise<string | null> {
   for (const file of README_FILES) {
     let r: Response;
     try {
       r = await f(`https://raw.githubusercontent.com/${owner}/${name}/HEAD/${file}`, { headers: { "user-agent": "reppit-ingest (+https://reppit.dev)" } });
     } catch (e) { if (opts.strict) throw e; return null; }
-    if (r.ok) { const text = await r.text(); if (text.trim()) return text.slice(0, README_MAX_CHARS); continue; }
+    if (r.ok) { const text = await r.text(); if (text.trim()) return text.slice(0, opts.maxChars ?? README_MAX_CHARS); continue; }
     if (opts.strict && (r.status === 429 || r.status >= 500)) throw new Error(`raw ${owner}/${name}/${file} ${r.status}`);
   }
   return null;

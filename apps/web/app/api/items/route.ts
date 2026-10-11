@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { items } from "@gitit/db";
-import { GitHubClient, ingestRepo, parseRepoRef, itemEmbeddingText, resolveItemBySlug, upsertRepoItem, applySignals, checkPackageSignals, fetchManifestsRaw, trustScore, RULES } from "@gitit/core";
+import { GitHubClient, ingestRepo, parseRepoRef, itemEmbeddingText, resolveItemBySlug, upsertRepoItem, applySignals, checkPackageSignals, fetchManifestsRaw, trustScore, writeRefusal, RULES } from "@gitit/core";
 import { db } from "@/lib/db";
 import { embedder, rateLimiter } from "@/lib/services";
 import { requestUser } from "@/lib/request-user";
@@ -34,8 +34,10 @@ export const GET = route("items GET", async (req) => {
 
 /** POST /api/items {repo: "owner/name" | URL}: ingest from GitHub, embed, store. Session or Bearer token. */
 export const POST = route("items POST", async (req) => {
-  const { user } = await requestUser(req);
+  const { user, apiKeyId, scopes } = await requestUser(req);
   if (!user) return err(req.headers.get("authorization") ? "Invalid or revoked API token" : "Sign in to submit", 401);
+  const refused = writeRefusal({ apiKeyId, scopes });
+  if (refused) return err(refused, 403);
   const rl = await rateLimiter().check(RULES.submitPerUser, `submit:${user.id}`);
   if (!rl.ok) return err("Submission limit reached for today", 429);
   const body = await readJsonObject(req);

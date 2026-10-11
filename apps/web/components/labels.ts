@@ -52,33 +52,45 @@ type InstallRow = {
   kind: string; slug: string; url: string;
   installPackage?: string | null; packageEcosystem?: string | null;
   publishedPackages?: { ecosystem: string; name: string }[] | null;
+  /** "app" for applications (installed from a release or app store, not a package manager). Optional until the column lands. */
+  installKind?: string | null;
 };
 
+/** Either a command to paste, or a pointer to the project's own install docs. Never a `git clone`. */
+export type Install =
+  | { type: "command"; command: string; note?: string }
+  | { type: "docs"; href: string; label: string | null; note?: string };
+
 /**
- * What to paste to get the thing. A package install is offered only for the repo's primary
- * package (installPackage): one whose name matches the repo or its root manifest. A monorepo's
- * side packages are verified as belonging to the repo, but they are not "the thing to install",
- * so they never appear here. Without a primary package, clone the source.
+ * How to get the thing. A package install is offered only for the repo's primary package
+ * (installPackage): one whose name matches the repo or its root manifest. A monorepo's side packages
+ * belong to the repo but are not "the thing to install", so they never appear here. An application,
+ * or a repo with no primary package, gets a link to its README's install section instead: cloning
+ * the source is never an install, least of all when an agent reads the line.
  */
-export function installCommand(i: InstallRow): string {
-  if (i.kind === "skill") return `npx skills add ${i.slug}`;
+export function installFor(i: InstallRow): Install {
+  if (i.kind === "skill") return { type: "command", command: `npx skills add ${i.slug}` };
+  const docs = `${i.url.replace(/\/+$/, "")}#readme`;
+  if (i.installKind === "app") return { type: "docs", href: docs, label: "app", note: "An application, not a library. Install it the way its README says." };
   const pkg = i.installPackage;
   if (pkg) {
     const eco = i.publishedPackages?.find((p) => p.name === pkg)?.ecosystem ?? i.packageEcosystem;
-    if (eco === "npm") return `npm install ${pkg}`;
-    if (eco === "PyPI") return `pip install ${pkg}`;
-    if (eco === "crates.io") return `cargo add ${pkg}`;
-    if (eco === "Go") return `go get ${pkg}`;
+    const note = `Verified ${eco ? `${eco} ` : ""}package ${pkg}: its registry entry points back at this repo.`;
+    if (eco === "npm") return { type: "command", command: `npm install ${pkg}`, note };
+    if (eco === "PyPI") return { type: "command", command: `pip install ${pkg}`, note };
+    if (eco === "crates.io") return { type: "command", command: `cargo add ${pkg}`, note };
+    if (eco === "Go") return { type: "command", command: `go get ${pkg}`, note };
   }
-  return `git clone ${i.url}.git`;
+  const n = i.publishedPackages?.length ?? 0;
+  if (n > 1) return { type: "docs", href: docs, label: "several packages, none verified as primary", note: `It publishes ${n} packages and none is verified as the one to install.` };
+  if (n === 1) return { type: "docs", href: docs, label: "1 package, not verified as primary", note: "It publishes 1 package, not verified as the one to install." };
+  return { type: "docs", href: docs, label: null, note: "No published package points back at this repo." };
 }
 
-/** One plain sentence explaining the install line, so a clone is never mistaken for a package. */
-export function installNote(i: InstallRow): string | undefined {
-  if (i.kind !== "repo") return undefined;
-  if (i.installPackage) return `Verified ${i.packageEcosystem ?? ""} package ${i.installPackage}: its registry entry points back at this repo.`.replace("  ", " ");
-  if (i.publishedPackages?.length) return `This repo publishes ${i.publishedPackages.length} packages and none is verified as the one to install, so this clones the source. Check its install docs.`;
-  return "No published package points back at this repo, so this clones the source.";
+/** The command alone, or null when the answer is "see the install docs". */
+export function installCommand(i: InstallRow): string | null {
+  const r = installFor(i);
+  return r.type === "command" ? r.command : null;
 }
 
 /**

@@ -16,6 +16,10 @@ const rows = [
   { slug: "OptimalBits/bull", name: "bull", description: "Premium Queue package for handling distributed jobs and messages in NodeJS.", topics: ["job-queue", "rate-limiter", "nodejs"], language: "JavaScript", stars: 15000 },
   { slug: "encode/httpx-like", name: "pyhttp", description: "An async HTTP client", topics: ["http-client", "async"], language: null, packageEcosystem: "PyPI", packageName: "pyhttp", stars: 100 },
   { slug: "seanmonstar/reqwest", name: "reqwest", description: "An easy and powerful async HTTP client", topics: ["http-client"], language: "Rust", stars: 10000 },
+  { slug: "pola-rs/polars", name: "polars", description: "Extremely fast query engine for DataFrames, written in Rust", topics: ["dataframe", "arrow"], language: "Rust", stars: 35000,
+    packageEcosystem: "crates.io", packageName: "polars", installPackage: "polars", installKind: "package" as const,
+    installOptions: [{ ecosystem: "crates.io", name: "polars" }, { ecosystem: "PyPI", name: "polars" }], readme: "A faster pandas replacement for data frames." },
+  { slug: "acme/flags", name: "flags", description: "Redis client with feature-rich flags parsing", topics: ["redis"], language: "TypeScript", stars: 50 },
   { slug: "jsdoc/notes", name: "notes", description: "Personal notes", topics: [], language: null, stars: 10, readme: "this readme mentions orm once" },
 ];
 
@@ -61,11 +65,15 @@ describe("hybrid search", () => {
     expect(await search(db, e, "express-rate-limit")).toEqual({ results: [], notIndexed: true });
     expect((await search(db, e, "rate limiter for node jobs")).results.map((x) => x.item.slug)).toContain("OptimalBits/bull");
   });
-  it("labels a README-only hit partial, never strong", async () => {
-    const { results: r } = await search(db, e, "orm", { limit: 10 });
-    const notes = r.find((x) => x.item.slug === "jsdoc/notes");
-    if (notes) expect(notes.match).toBe("partial");
-    expect(r.find((x) => x.item.slug === "drizzle-team/drizzle-orm")!.match).not.toBe("partial");
+  it("a one-word query is a name lookup: no fuzzy results, tagged items only as related", async () => {
+    const r = await search(db, e, "orm", { limit: 10 });
+    expect(r.results).toEqual([]);
+    expect(r.notIndexed).toBe(true);
+    const related = (r.related ?? []).map((x) => x.item.slug);
+    expect(related).toContain("drizzle-team/drizzle-orm"); // tagged "orm"
+    expect(related).not.toContain("jsdoc/notes"); // README mention only
+    // A plain word that only appears in descriptions gives nothing at all.
+    expect(await search(db, e, "requests")).toEqual({ results: [], notIndexed: true });
   });
   it("shows an archived project on an exact lookup but never in topic results", async () => {
     const { results: exact } = await search(db, e, "localstack");
@@ -74,6 +82,30 @@ describe("hybrid search", () => {
     expect(exact[0].trust.reason).toBe("archived");
     const { results: topic } = await search(db, e, "local aws cloud stack");
     expect(topic.map((x) => x.item.slug)).not.toContain("localstack/localstack");
+  });
+});
+
+describe("problem queries", () => {
+  it("drops qualifier words and finds the content: dataframe library faster than pandas", async () => {
+    const r = await search(db, e, "dataframe library faster than pandas");
+    expect(r.results[0]?.item.slug).toBe("pola-rs/polars");
+  });
+  it("matches synonyms: a data frame query finds the dataframe tag", async () => {
+    expect((await search(db, e, "data frame engine")).results.map((x) => x.item.slug)).toContain("pola-rs/polars");
+  });
+  it("needs the content words in name, topics or description, not scattered", async () => {
+    // drizzle-orm has "postgres" in its description but neither "feature" nor "flags": 1 of 3 content
+    // words (coverage 0.33) is below the 0.6 floor for three-word queries.
+    const r = await search(db, e, "postgres feature flags");
+    expect(r.results.map((x) => x.item.slug)).not.toContain("drizzle-team/drizzle-orm");
+  });
+  it("picks the install for the language the query names", async () => {
+    const py = await search(db, e, "dataframe library in python");
+    expect(py.results[0]).toMatchObject({ item: { slug: "pola-rs/polars" }, install: { ecosystem: "PyPI", name: "polars" } });
+    const rust = await search(db, e, "dataframe library in rust");
+    expect(rust.results[0].install).toEqual({ ecosystem: "crates.io", name: "polars" });
+    const plain = await search(db, e, "polars");
+    expect(plain.results[0].install).toEqual({ ecosystem: "crates.io", name: "polars" });
   });
 });
 

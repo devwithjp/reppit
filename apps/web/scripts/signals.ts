@@ -27,6 +27,10 @@
  * re-embedded with the configured embedder (EMBEDDING_PROVIDER). A repo with no README file stays
  * null and is tried again on the next run.
  *
+ * Releases: for repos with a primary install package, the newest stable release date and the count
+ * of stable releases in the past year come from deps.dev (registry publish times; npm, PyPI,
+ * crates.io, Go). Side packages never set them.
+ *
  * Licence: when GitHub detected none (null or NOASSERTION), the verified package's declared SPDX
  * licence fills it (date-fns: no licence file GitHub recognises, npm says MIT).
  *
@@ -41,7 +45,7 @@ import { and, eq, or, desc, inArray, sql } from "drizzle-orm";
 import { getDb, items, itemAliases, type Db } from "@gitit/db";
 import {
   fetchManifestsRaw, resolvePackages, combinePackageSignals, osvOpenAdvisoriesBatch, applySignals, noPackageSignals, trustScore,
-  fetchReadmeRaw, embedderFromEnv, itemEmbeddingText, confirmNoPackage,
+  fetchReadmeRaw, embedderFromEnv, itemEmbeddingText, confirmNoPackage, registryReleases,
   type FetchLike, type ResolvedPackage, type ResolvedPackages,
 } from "@gitit/core";
 
@@ -64,7 +68,10 @@ const SPACING: Record<string, number> = {
   "crates.io": 1000, // crates.io crawler policy: 1 req/s
   "api.osv.dev": 250,
   "proxy.golang.org": 250,
+  "api.deps.dev": 250,
 };
+/** Stored README cap for this pass (disk budget for ~3,000 repos). */
+const README_CHARS = 16_384;
 const nextSlot = new Map<string, number>();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const counts = { requests: 0, retries: 0 };
@@ -103,16 +110,20 @@ async function trustCensus(db: Db) {
   const rows = await db.select({
     pushedAt: items.pushedAt, lastReleaseAt: items.lastReleaseAt, archived: items.archived, deprecated: items.deprecated,
     advisoriesOpen: items.advisoriesOpen, openIssues: items.openIssues, closedIssues: items.closedIssues, weightedScore: items.weightedScore,
-    packageName: items.packageName, packageEcosystem: items.packageEcosystem,
+    packageName: items.packageName, packageEcosystem: items.packageEcosystem, releasesLastYear: items.releasesLastYear,
   }).from(items).where(eq(items.kind, "repo"));
   const scored = rows.map((r) => trustScore(r));
-  return { repos: rows.length, notEnough: scored.filter((t) => t.score === null).length, scored: scored.filter((t) => t.score !== null).length };
+  const values = scored.flatMap((t) => (t.score === null ? [] : [t.score]));
+  const hist = new Map<number, number>();
+  for (const v of values) hist.set(v, (hist.get(v) ?? 0) + 1);
+  const common = [...hist.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([v, n]) => `${v}×${n}`).join(", ");
+  return { repos: rows.length, notEnough: scored.filter((t) => t.score === null).length, scored: values.length, at85: hist.get(85) ?? 0, distinct: hist.size, common };
 }
 
 async function main() {
   const db = await getDb({ migrationsFolder: path.resolve(process.cwd(), process.env.GITIT_MIGRATIONS_DIR ?? "../../packages/db/drizzle") });
   const before = await trustCensus(db);
-  console.log(`before: ${before.repos} repos · ${before.scored} scored · ${before.notEnough} "not enough data"`);
+  console.log(`before: ${before.repos} repos · ${before.scored} scored · ${before.notEnough} too little measured · ${before.at85} at exactly 85 · ${before.distinct} distinct scores · most common ${before.common}`);
 
   const cutoff = new Date(Date.now() - recheckDays * 86_400_000);
   const dueSql = all ? sql<boolean>`true` : sql<boolean>`(${items.signalsCheckedAt} is null or ${items.signalsCheckedAt} < ${cutoff})`;
@@ -126,7 +137,7 @@ async function main() {
   const embedder = embedderFromEnv();
   console.log(`visiting ${todo.length} repos: ${todo.filter((r) => r.signalsDue).length} due a signals check, ${todo.filter((r) => r.needsReadme).length} missing a README · embedder ${embedder.name}${dryRun ? " · DRY RUN" : ""}`);
 
-  const tally = { noPackage: 0, readmes: 0, readmeMissing: 0, checked: 0, failed: 0, packages: 0, npm: 0, PyPI: 0, "crates.io": 0, Go: 0, installable: 0, deprecated: 0, withAdvisories: 0, advisoriesUnknown: 0 };
+  const tally = { noPackage: 0, readmes: 0, readmeMissing: 0, checked: 0, failed: 0, packages: 0, npm: 0, PyPI: 0, "crates.io": 0, Go: 0, installable: 0, apps: 0, releaseDated: 0, releasesFailed: 0, deprecated: 0, withAdvisories: 0, advisoriesUnknown: 0 };
   const osvCache = new Map();
   const t0 = Date.now();
 
@@ -144,7 +155,7 @@ async function main() {
         const slugs = [slug, ...aliasRows.filter((a) => a.itemId === row.id).map((a) => a.slug)];
         if (row.needsReadme) {
           try {
-            const readme = await fetchReadmeRaw(owner, name, paced, { strict: true });
+            const readme = await fetchReadmeRaw(owner, name, paced, { strict: true, maxChars: README_CHARS });
             if (readme) readmes.push({ row, readme }); else tally.readmeMissing++;
           } catch (e) { console.warn(`  ${row.slug}: README left for a later run (${(e as Error).message.slice(0, 80)})`); }
         }
@@ -165,16 +176,26 @@ async function main() {
     const adv = await osvOpenAdvisoriesBatch(flat.map(({ p }) => ({ ecosystem: p.ecosystem, name: p.name, version: p.version! })), paced, osvCache);
     const advOf = (id: string, p: ResolvedPackage) => { const k = flat.findIndex((x) => x.id === id && x.p === p); return k >= 0 ? adv[k] : null; };
 
+    // 5: release cadence from registry publish times, install package only (never a side package).
     const now = new Date();
+    const releases = new Map<string, Awaited<ReturnType<typeof registryReleases>>>();
+    for (const { row, res } of resolved) {
+      if (!res.install) continue;
+      try { releases.set(row.id, await registryReleases(res.install.ecosystem, res.install.name, paced, now)); }
+      catch (e) { tally.releasesFailed++; console.warn(`  ${row.slug}: release dates left for a later run (${(e as Error).message.slice(0, 80)})`); }
+    }
+
     for (const { row, res, complete } of resolved) {
       const s = res.packages.length
-        ? combinePackageSignals(res, res.packages.map((p) => advOf(row.id, p)), now)
+        ? combinePackageSignals(res, res.packages.map((p) => advOf(row.id, p)), now, releases.get(row.id) ?? null)
         : noPackageSignals(now, complete);
       if (!res.packages.length && complete) tally.noPackage++;
       if (res.packages.length) {
         const lead = res.install ?? res.packages[0];
         tally.packages++; tally[lead.ecosystem]++;
         if (res.install) tally.installable++;
+        if (res.installKind === "app") tally.apps++;
+        if (releases.get(row.id)) tally.releaseDated++;
         if (s.deprecated) tally.deprecated++;
         if (s.advisoriesOpen === null) tally.advisoriesUnknown++; else if (s.advisoriesOpen > 0) tally.withAdvisories++;
       }
@@ -198,10 +219,10 @@ async function main() {
   }
 
   const after = await trustCensus(db);
-  console.log(`\nafter:  ${after.repos} repos · ${after.scored} scored · ${after.notEnough} "not enough data"`);
+  console.log(`\nafter:  ${after.repos} repos · ${after.scored} scored · ${after.notEnough} too little measured · ${after.at85} at exactly 85 · ${after.distinct} distinct scores · most common ${after.common}`);
   console.log(`moved to a real score: ${before.notEnough - after.notEnough}`);
   console.log(`READMEs filled and re-embedded: ${tally.readmes} · no README file found: ${tally.readmeMissing}`);
-  console.log(`confirmed no package ${tally.noPackage} · repos with a primary package to install ${tally.installable}`);
+  console.log(`confirmed no package ${tally.noPackage} · primary package to install ${tally.installable} · apps ${tally.apps} · registry release dates ${tally.releaseDated} (failed ${tally.releasesFailed})`);
   console.log(`packages verified ${tally.packages} (npm ${tally.npm}, PyPI ${tally.PyPI}, crates.io ${tally["crates.io"]}, Go ${tally.Go}) · deprecated ${tally.deprecated} · with open advisories ${tally.withAdvisories} · advisories unknown ${tally.advisoriesUnknown} · failed ${tally.failed} · retries ${counts.retries} · ${((Date.now() - t0) / 1000).toFixed(0)}s`);
   process.exit(0);
 }

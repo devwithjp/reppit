@@ -6,31 +6,30 @@ import { db } from "@/lib/db";
 import { getViewer } from "@/lib/viewer";
 import { Masthead } from "@/components/Masthead";
 import { Footer } from "@/components/Footer";
-import { InstallCmd } from "@/components/InstallCmd";
 import { ReppitInstall } from "@/components/ReppitInstall";
+import { Install } from "@/components/Install";
 import { VoteComposer } from "@/components/VoteComposer";
 import { CompatForm } from "@/components/CompatForm";
 import { AgentChip, agentState } from "@/components/marks";
 import { flags, ago, compact, band } from "@/components/trust";
-import { trustScore, VOTE_ADJUST_MAX, type SignalCell } from "@/components/score";
-import { ScoreNum, nullReason } from "@/components/marks";
-import { REASONS, REASON_LABEL, CORE_AGENTS, KIND_LABEL, MCP_INSTALL, installCommand, installNote, splitSlug, itemHref, parentRepo } from "@/components/labels";
+import { trustScore, VOTE_ADJUST_MAX, MIN_MEASURED, type SignalCell } from "@/components/score";
+import { ScoreNum, nullReason, capNote } from "@/components/marks";
+import { REASONS, REASON_LABEL, CORE_AGENTS, KIND_LABEL, MCP_INSTALL, splitSlug, itemHref, parentRepo } from "@/components/labels";
 import { rowColumns, indexCounts } from "../_data/items";
 
 const HALF_LIFE_DAYS = 180;
 const STATE_CLASS = { good: "", slipping: " mid", failing: " bad", unknown: "", not_applicable: "" } as const;
 
 /** One plain sentence on what the cells say. Words only; the number comes from core. */
-function verdict(cells: SignalCell[]): string {
+function verdict(cells: SignalCell[], scored: boolean): string {
   const failing = cells.filter((c) => c.state === "failing").map((c) => c.short);
   const slipping = cells.filter((c) => c.state === "slipping").map((c) => c.short);
   const list = (a: string[]) => (a.length <= 1 ? a[0] ?? "" : `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`);
   if (cells.find((c) => c.key === "archived")?.state === "failing") return "Archived. Nobody is maintaining it.";
   if (cells.find((c) => c.key === "deprecated")?.state === "failing") return "Deprecated by its maintainers.";
   const unknown = cells.filter((c) => c.state === "unknown").length;
-  const applicable = cells.filter((c) => c.state !== "not_applicable").length;
   if (failing.length === 0 && slipping.length === 0) {
-    return (applicable - unknown) * 2 < applicable ? "Too little is measured yet to give it a number." : unknown > 0 ? "What is measured is holding." : "Everything measured is holding.";
+    return !scored ? "Too little is measured yet to give it a number." : unknown > 0 ? "What is measured is holding." : "Everything measured is holding.";
   }
   if (failing.length === 0) return `It holds, with ${list(slipping)} slipping.`;
   const f = list(failing);
@@ -107,7 +106,7 @@ export async function ItemView({ slug }: { slug: string }) {
   const agentsReporting = Object.keys(byAgent).length;
   const unknownWords = t.cells.filter((c) => c.state === "unknown").map((c) => c.short);
   const unknownNote = unknownWords.length === 0 ? null : t.score === null
-    ? `${t.measured} of ${t.applicable} applicable signals are measured for this entry; ${unknownWords.join(", ")} ${unknownWords.length === 1 ? "is" : "are"} unknown. With fewer than half measured we show no number rather than guess one.`
+    ? `${t.measured} of ${t.applicable} applicable signals are measured for this entry; ${unknownWords.join(", ")} ${unknownWords.length === 1 ? "is" : "are"} unknown. With fewer than ${MIN_MEASURED} measured we show no number rather than guess one.`
     : `${unknownWords.join(" and ")} ${unknownWords.length === 1 ? "is" : "are"} unknown for this entry and ${unknownWords.length === 1 ? "counts" : "count"} as half points: neither a pass nor a zero.`;
 
   return (
@@ -138,8 +137,7 @@ export async function ItemView({ slug }: { slug: string }) {
               <a className="tag plain src" href={item.url} target="_blank" rel="noreferrer">source<span className="sr-only"> (opens GitHub)</span> &#8599;</a>
             </div>
             <div style={{ marginTop: 12, maxWidth: 460 }}>
-              <InstallCmd command={installCommand(item)}
-                note={installNote(item)} />
+              <Install item={item} withNote />
             </div>
           </div>
           <div className="r">
@@ -171,7 +169,7 @@ export async function ItemView({ slug }: { slug: string }) {
             {cold ? (
               <section className="sec" style={{ marginBottom: 22 }} aria-label="Trust score">
                 <div className="cold">
-                  <div className={`big${t.score === null ? " is-nd" : ""}`}><ScoreNum score={t.score} reason={t.reason} /><s>Trust{t.score === null ? "" : ", of 100"} &middot; {t.measured} of {t.applicable} measured</s></div>
+                  <div className={`big${t.score === null ? " is-nd" : ""}`}><ScoreNum score={t.score} reason={t.reason} /><s>Trust{t.score === null ? "" : ", of 100"} &middot; {t.measured} of {t.applicable} measured{capNote(t.score, t.reason) ? ` \u00b7 ${capNote(t.score, t.reason)}` : ""}</s></div>
                   <div className="txt">
                     <h2>Nobody has voted. Here is what the repo is doing.</h2>
                     <p>{t.score === null
@@ -187,8 +185,8 @@ export async function ItemView({ slug }: { slug: string }) {
               <section className="sec">
                 <h2>Trust score <em>computed from the repo, votes adjust it</em></h2>
                 <div className="score-hero">
-                  <div className={`big${t.score === null ? " is-nd" : ""}`}><ScoreNum score={t.score} reason={t.reason} /><s>{t.score === null ? "trust" : "of 100"} &middot; {t.measured} of {t.applicable} measured</s></div>
-                  <div className="txt"><b>{verdict(t.cells)}</b>{" "}
+                  <div className={`big${t.score === null ? " is-nd" : ""}`}><ScoreNum score={t.score} reason={t.reason} /><s>{t.score === null ? "trust" : "of 100"} &middot; {t.measured} of {t.applicable} measured{capNote(t.score, t.reason) ? ` \u00b7 ${capNote(t.score, t.reason)}` : ""}</s></div>
+                  <div className="txt"><b>{verdict(t.cells, t.score !== null)}</b>{" "}
                     {unknownNote && <>{unknownNote} </>}
                     {t.base !== null && <>The measurements give {t.base}; votes move it {t.voteAdjust >= 0 ? "+" : "\u2212"}{Math.abs(t.voteAdjust)}. </>}
                     Nothing in the measurements is a human opinion.</div>
@@ -278,6 +276,9 @@ export async function ItemView({ slug }: { slug: string }) {
 
             <section className="sec" id="compat" aria-labelledby="compat-h">
               <h2 id="compat-h">Agent compatibility <em>{compatRows.length === 0 ? "no reports yet" : `${compatRows.length} report${compatRows.length === 1 ? "" : "s"} from ${agentsReporting} agent${agentsReporting === 1 ? "" : "s"}`}</em></h2>
+              {compatRows.length === 0 && (
+                <p className="compat-none" data-testid="compat-none">No agent has been reported yet. Reports come from people running it in their agent.</p>
+              )}
               <table className="sig boxed">
                 <thead><tr><th scope="col">Agent</th><th scope="col">Reports</th><th scope="col" style={{ textAlign: "right" }}>Status</th></tr></thead>
                 <tbody>

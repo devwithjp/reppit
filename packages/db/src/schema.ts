@@ -73,6 +73,15 @@ export const items = pgTable("items", {
   // Every verified package this repo publishes, [{ ecosystem, name }]. Advisories and deprecation are
   // read across all of them. Null = not checked.
   publishedPackages: jsonb("published_packages").$type<{ ecosystem: string; name: string }[]>(),
+  // Primary packages per registry ([{ ecosystem, name }]), repo-language registry first; a query that
+  // names a language picks its registry's entry (polars: crates.io for Rust, PyPI for Python).
+  installOptions: jsonb("install_options").$type<{ ecosystem: string; name: string }[]>(),
+  // "package" (install_package is the thing to add), "app" (install from the repo's docs: a Go main
+  // package at the root, a crate whose binary is the product), "docs" (publishes packages, none of
+  // them the obvious install), or null (no package found / not checked).
+  installKind: text("install_kind").$type<"package" | "app" | "docs">(),
+  // Stable releases of the install package in the 365 days before the check (registry publish times).
+  releasesLastYear: integer("releases_last_year"),
   // true = registry marks the latest release deprecated (npm `deprecated`, PyPI yanked / Inactive).
   deprecated: boolean("deprecated"),
   deprecationMessage: text("deprecation_message"),
@@ -170,6 +179,9 @@ export const apiKeys = pgTable("api_keys", {
   label: text("label"),
   tier: text("tier").default("free").notNull(), // free | pro | team
   monthlyLimit: integer("monthly_limit").default(1000).notNull(),
+  // "read" (search, look up) always; "write" (vote, compat reports, submit) only when opted in.
+  // Session users are unaffected. Existing tokens become read-only.
+  scopes: text("scopes").array().notNull().default(sql`ARRAY['read']::text[]`),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
 });

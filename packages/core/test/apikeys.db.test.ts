@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createHash } from "node:crypto";
 import { createDb, users, items, type Db } from "@gitit/db";
-import { createApiKey, revokeApiKey, userForApiKey } from "../src/apikeys";
+import { createApiKey, revokeApiKey, userForApiKey, writeRefusal, TOKEN_SCOPES, WRITE_SCOPE_REQUIRED } from "../src/apikeys";
 import { castVote } from "../src/votes";
 
 let db: Db; let owner: string; let other: string; let item: string;
@@ -34,5 +34,22 @@ describe("personal API tokens", () => {
   it("refuses unknown and empty tokens", async () => {
     expect(await userForApiKey(db, "reppit_nope")).toBeNull();
     expect(await userForApiKey(db, "  ")).toBeNull();
+  });
+});
+
+describe("token scopes", () => {
+  it("creates read-only tokens by default and write tokens only on request", async () => {
+    expect(TOKEN_SCOPES).toEqual(["read", "write"]);
+    const ro = await createApiKey(db, owner, "agent");
+    expect(ro.scopes).toEqual(["read"]);
+    expect((await userForApiKey(db, ro.token))?.scopes).toEqual(["read"]);
+    const rw = await createApiKey(db, owner, "agent", { write: true });
+    expect((await userForApiKey(db, rw.token))?.scopes).toEqual(["read", "write"]);
+  });
+  it("refuses writes for a read token with a plain error, never for a session", async () => {
+    expect(writeRefusal({ apiKeyId: "k", scopes: ["read"] })).toBe(WRITE_SCOPE_REQUIRED);
+    expect(writeRefusal({ apiKeyId: "k" })).toBe(WRITE_SCOPE_REQUIRED);
+    expect(writeRefusal({ apiKeyId: "k", scopes: ["read", "write"] })).toBeNull();
+    expect(writeRefusal({})).toBeNull();
   });
 });

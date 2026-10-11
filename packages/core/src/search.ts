@@ -15,7 +15,7 @@ export type MatchKind = "exact" | "strong" | "partial";
 
 export interface SearchResult {
   item: Pick<Item, "id" | "kind" | "slug" | "owner" | "name" | "url" | "description" | "language" | "stars" | "installs" | "healthScore" | "upvotes" | "downvotes" | "weightedScore" | "license" | "pushedAt"
-    | "githubId" | "lastReleaseAt" | "closedIssues" | "archived" | "deprecated" | "deprecationMessage" | "advisoriesOpen" | "openIssues" | "openPullRequests" | "packageEcosystem" | "packageName" | "installPackage" | "publishedPackages" | "signalsCheckedAt">;
+    | "githubId" | "lastReleaseAt" | "closedIssues" | "archived" | "deprecated" | "deprecationMessage" | "advisoriesOpen" | "openIssues" | "openPullRequests" | "packageEcosystem" | "packageName" | "installPackage" | "installOptions" | "installKind" | "releasesLastYear" | "publishedPackages" | "signalsCheckedAt">;
   score: number;
   /** Vector similarity in [0, 1] (0 when the item has no embedding). */
   semantic: number;
@@ -30,10 +30,21 @@ export interface SearchResult {
   compat: Record<string, { works: number; broken: number }>;
   /** The shared trust score (core/trust.ts): same number the web, MCP server and CLI show. */
   trust: TrustScore;
+  /** What to install for this query, or null (an app, docs-only, or no verified primary package). */
+  install: { ecosystem: string; name: string } | null;
 }
 
 /** `notIndexed: true` (with `results: []`) when nothing cleared the relevance floor. */
-export interface SearchResults { results: SearchResult[]; notIndexed: boolean }
+export interface SearchResults {
+  results: SearchResult[];
+  notIndexed: boolean;
+  /**
+   * Only for a one-word query with no exact name match (a name lookup that missed): items tagged with
+   * the word in their name or topics, so the UI can say "requests is not in the index yet; related: …".
+   * Never presented as matches.
+   */
+  related?: SearchResult[];
+}
 
 export function normalizeQuery(q: string) {
   return q.toLowerCase().replace(/[^a-z0-9+#. ]+/g, " ").replace(/\s+/g, " ").trim();
@@ -48,13 +59,11 @@ const LANGUAGE_WORDS: Record<string, string[]> = {
 };
 
 /**
- * Relevance floor. A candidate is a match only if it is an exact name match, covers at least half of
- * the query's terms lexically, or (real embedders only) its vector similarity reaches the floor. The
+ * Semantic floor (see the relevance floor in search()). The
  * local hashed embedder gives keyboard mash a similarity of 0.3+, so it never qualifies on its own.
  * The real-embedder floor (0.45) is provisional until calibrated against eval; override with
  * SEARCH_SEMANTIC_FLOOR.
  */
-export const MIN_COVERAGE = 0.5;
 export function semanticFloor(embedderName: string, env: Record<string, string | undefined> = process.env): number {
   const o = Number(env.SEARCH_SEMANTIC_FLOOR);
   if (env.SEARCH_SEMANTIC_FLOOR && Number.isFinite(o)) return o;
@@ -72,7 +81,47 @@ export interface ParsedQuery {
   ecosystems: Set<string>;
   /** A single identifier-like token (express-rate-limit, socket.io, @scope/pkg): a name lookup. */
   identifier: boolean;
+  /** The query is one plain word (requests, fastapi, pdf): a name lookup, see search(). */
+  singleWord: boolean;
+  /** Per content term, the forms that count as a match (the term plus its synonyms). */
+  alts: string[][];
 }
+
+/**
+ * Generic qualifiers people add to problem queries. They say what kind of answer is wanted, not what
+ * it is about, so they are not content words for the relevance floor.
+ */
+export const QUALIFIER_WORDS = new Set([
+  "library", "libraries", "lib", "libs", "package", "packages", "framework", "frameworks", "tool", "tools", "module", "modules",
+  "best", "simple", "easy", "fast", "faster", "fastest", "lightweight", "alternative", "alternatives", "modern", "good", "small",
+  "tiny", "minimal", "popular", "better", "way", "than", "using", "use", "like", "similar", "recommended", "top",
+]);
+
+/**
+ * Small, generic synonym groups for problem phrasing (no entry exists for a particular query). Any form
+ * in a group matches any other. Multi-word forms match as phrases.
+ */
+export const SYNONYM_GROUPS: string[][] = [
+  ["dataframe", "dataframes", "data frame", "data frames"],
+  ["mock", "mocks", "mocking", "stub", "stubs", "fake", "fakes"],
+  ["logging", "logger", "loggers", "log", "logs"],
+  ["auth", "authentication", "authn", "login"],
+  ["db", "database", "databases"],
+  ["config", "configuration", "settings"],
+  ["env", "environment"],
+  ["cli", "command line", "command-line"],
+  ["k8s", "kubernetes"],
+  ["regex", "regexp", "regular expression", "regular expressions"],
+  ["i18n", "internationalization", "localization", "l10n"],
+  ["ml", "machine learning"],
+  ["llm", "llms", "large language model", "large language models"],
+  ["orm", "object relational mapper", "object relational mapping"],
+  ["fsm", "finite state machine"],
+  ["async", "asynchronous"],
+  ["resize", "resizing", "resizer"],
+];
+const SYNONYMS = new Map<string, string[]>();
+for (const g of SYNONYM_GROUPS) for (const w of g) SYNONYMS.set(w, g);
 
 export function parseQuery(query: string): ParsedQuery {
   const raw = query.trim().toLowerCase().replace(/\s+/g, " ");
@@ -87,11 +136,21 @@ export function parseQuery(query: string): ParsedQuery {
   const topical = all.filter((t) => !LANGUAGE_WORDS[t]);
   const ecosystems = new Set([...languages].map((l) => LANGUAGE_ECOSYSTEMS[l]).filter((x): x is string => !!x));
   const identifier = !raw.includes(" ") && /[-_.@/]/.test(raw);
-  return { raw, exactKeys: [...keys].filter((k) => k.length >= 2 && k.length <= 120), terms: (topical.length ? topical : all).slice(0, 8), languages, ecosystems, identifier };
+  const singleWord = !!raw && !raw.includes(" ") && !identifier;
+  const content = topical.filter((t) => !QUALIFIER_WORDS.has(t));
+  const terms = (content.length ? content : topical.length ? topical : all).slice(0, 8);
+  const alts = terms.map((t) => SYNONYMS.get(t) ?? [t]);
+  return { raw, exactKeys: [...keys].filter((k) => k.length >= 2 && k.length <= 120), terms, languages, ecosystems, identifier, singleWord, alts };
 }
 
-/** One query term against both configs the document uses (simple for names, english for prose). */
-const termQuery = (t: string) => sql`(plainto_tsquery('english', ${t}) || plainto_tsquery('simple', ${t}))`;
+/** One form against both configs the document uses (simple for names, english for prose). */
+const formQuery = (t: string) => t.includes(" ") || t.includes("-")
+  ? sql`(phraseto_tsquery('english', ${t}) || phraseto_tsquery('simple', ${t}))`
+  : sql`(plainto_tsquery('english', ${t}) || plainto_tsquery('simple', ${t}))`;
+/** A content term: any of its forms (synonyms) matches. */
+const termQuery = (forms: string[]) => sql.join(forms.map(formQuery), sql` || `);
+/** Head = name, package, slug (A), topics (B), description (C). README is D. */
+const HEAD = sql.raw(`'{a,b,c}'`);
 
 /**
  * Hybrid retrieval: vector candidates ∪ full-text candidates ∪ exact name matches, then a blended
@@ -115,8 +174,9 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
   if (pq.languages.size) {
     const langs = sql.join([...pq.languages].map((l) => sql`${l}`), sql`, `);
     const ecos = pq.ecosystems.size ? sql.join([...pq.ecosystems].map((e) => sql`${e}`), sql`, `) : null;
+    const optionFits = ecos ? sql.join([...pq.ecosystems].map((e) => sql`${items.installOptions} @> ${JSON.stringify([{ ecosystem: e }])}::jsonb`), sql` or `) : null;
     filters.push(ecos
-      ? sql`(lower(${items.language}) in (${langs}) or ${items.packageEcosystem} in (${ecos}))`
+      ? sql`(lower(${items.language}) in (${langs}) or ${items.packageEcosystem} in (${ecos}) or ${optionFits})`
       : sql`lower(${items.language}) in (${langs})`);
   }
   const live = [eq(items.archived, false), ...filters];
@@ -124,7 +184,7 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
   const [qv] = await embedder.embed([normalizeQuery(query) || pq.raw]);
   const vec = `[${qv.join(",")}]`;
   const similarity = sql<number>`coalesce(1 - (${items.embedding} <=> ${vec}::vector), 0)`;
-  const anyTerm = pq.terms.length ? sql.join(pq.terms.map(termQuery), sql` || `) : null;
+  const anyTerm = pq.alts.length ? sql.join(pq.alts.map(termQuery), sql` || `) : null;
   const tsv = sql.raw("items.search_tsv");
   const keyList = pq.exactKeys.length ? sql.join(pq.exactKeys.map((k) => sql`${k}`), sql`, `) : null;
   const exactExpr = keyList
@@ -141,8 +201,10 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
   const ids = [...new Set([...exactRows, ...lexRows, ...semRows].map((r) => r.id))];
   if (ids.length === 0) return none();
 
-  // Per term: 2 = in name/description/topics (weights A,B), 1 = README only, 0 = absent.
-  const termHits = pq.terms.map((t) => sql<number>`((ts_filter(${tsv}, '{a,b}') @@ ${termQuery(t)})::int + (${tsv} @@ ${termQuery(t)})::int)`);
+  // Per term: 2 = in name, topics or description (head), 1 = README only, 0 = absent.
+  const termHits = pq.alts.map((forms) => sql<number>`((ts_filter(${tsv}, ${HEAD}) @@ (${termQuery(forms)}))::int + (${tsv} @@ (${termQuery(forms)}))::int)`);
+  // Name or topics only (A,B): what a one-word lookup may offer as "related".
+  const tagged = pq.singleWord && pq.alts.length ? sql<boolean>`ts_filter(${tsv}, '{a,b}') @@ (${termQuery(pq.alts[0])})` : sql<boolean>`false`;
   const rows = await db.select({
     item: items,
     semantic: similarity,
@@ -150,7 +212,8 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     hits: termHits.length ? sql<number[]>`array[${sql.join(termHits, sql`, `)}]` : sql<number[]>`array[]::int[]`,
     exact: exactExpr,
     // The whole query as a phrase in name/description/topics ("markdown parser" in marked's description).
-    phrase: pq.terms.length > 1 ? sql<boolean>`ts_filter(${tsv}, '{a,b}') @@ (phraseto_tsquery('english', ${pq.terms.join(" ")}) || phraseto_tsquery('simple', ${pq.terms.join(" ")}))` : sql<boolean>`false`,
+    phrase: pq.terms.length > 1 ? sql<boolean>`ts_filter(${tsv}, ${HEAD}) @@ (phraseto_tsquery('english', ${pq.terms.join(" ")}) || phraseto_tsquery('simple', ${pq.terms.join(" ")}))` : sql<boolean>`false`,
+    tagged,
   }).from(items).where(inArray(items.id, ids));
 
   const maxRank = Math.max(1e-9, ...rows.map((r) => Number(r.rank)));
@@ -158,40 +221,67 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
   const scored = rows.map((r) => {
     const semantic = Math.max(0, Number(r.semantic));
     const hits = (r.hits ?? []).map(Number);
-    const coverage = hits.length ? hits.reduce((a, h) => a + (h === 2 ? 1 : h === 1 ? 0.5 : 0), 0) / hits.length : 0;
-    const headAll = hits.length > 0 && hits.every((h) => h === 2);
+    // README-only hits count 0.4 of a head hit (name, topics, description).
+    const coverage = hits.length ? hits.reduce((a, h) => a + (h === 2 ? 1 : h === 1 ? 0.4 : 0), 0) / hits.length : 0;
+    const headHits = hits.filter((h) => h === 2).length;
+    const headAll = hits.length > 0 && headHits === hits.length;
     const lexical = 0.75 * coverage + 0.25 * (Number(r.rank) / maxRank);
     const exact = r.exact === true;
     const nameHit = pq.terms.some((t) => t === r.item.name.toLowerCase() || t === r.item.packageName?.toLowerCase());
     const lang = r.item.language?.toLowerCase();
-    const ecoFits = !!r.item.packageEcosystem && pq.ecosystems.has(r.item.packageEcosystem);
+    const ecoFits = (!!r.item.packageEcosystem && pq.ecosystems.has(r.item.packageEcosystem)) || (r.item.installOptions ?? []).some((o) => pq.ecosystems.has(o.ecosystem));
     const langMismatch = pq.languages.size > 0 && !ecoFits && !(lang && pq.languages.has(lang));
     const phrase = r.phrase === true;
     let relevance = 0.55 * lexical + 0.45 * semantic + (nameHit ? 0.2 : 0) + (phrase ? 0.15 : 0);
     if (langMismatch) relevance *= 0.6;
     relevance = Math.min(1, relevance);
     const match: MatchKind = exact ? "exact" : headAll && (phrase || hits.length <= 2 || nameHit) ? "strong" : "partial";
-    // A one-word query is usually a name: a README mention alone is not a match. A partial match in
-    // the wrong language (Go queue for a Node query) is noise, not a fallback.
-    // A one-word query is usually a name: a README mention alone is not a match. A named language
-    // filters (mismatches never pass). An identifier (express-rate-limit) is a name lookup: without an
-    // exact match it must appear as a phrase in a name, description or topics; two of its three words
-    // in a topic list (bull's "rate-limiter") is not it.
+    /*
+     * Relevance floor. Exact name matches always pass. Otherwise:
+     *   - one plain word (requests, fastapi): a name lookup. Only exact matches are results; items
+     *     tagged with the word (name, topics) come back separately as `related`.
+     *   - an identifier (express-rate-limit): the whole identifier as a phrase in the head.
+     *   - a problem query: the content words (qualifiers like "library" or "faster" dropped, synonyms
+     *     allowed) must be found, at least one in the head, with weighted coverage of 0.7 for one or two
+     *     content words and 0.6 for three or more (head 1, README-only 0.4); or the content words as a
+     *     phrase in the head; or, with a real embedder, semantic similarity at the floor.
+     *   - a language named in the query filters; a mismatch never passes.
+     */
+    const needed = hits.length <= 2 ? 0.7 : 0.6;
+    const lexicalPass = headHits >= 1 && coverage >= needed;
     const isMatch = exact || (
-      (coverage >= MIN_COVERAGE || semantic >= floor) &&
-      !(hits.length === 1 && !headAll && semantic < floor) &&
+      !pq.singleWord &&
       !langMismatch &&
-      !(pq.identifier && hits.length > 1 && !phrase)
+      (pq.identifier ? phrase || (hits.length === 1 && headAll) : lexicalPass || phrase || semantic >= floor)
     );
+    const isRelated = !exact && pq.singleWord && r.tagged === true && !langMismatch;
     const inputs = { semantic: relevance, weightedScore: r.item.weightedScore, health: r.item.healthScore, stars: r.item.stars, installs: r.item.installs, archived: r.item.archived, deprecated: r.item.deprecated };
     // Exact matches are pinned above everything (tier -1); among them, flagged ones still sort last.
     const tier = exact ? -1 + rankTier(inputs) * 0.5 : rankTier(inputs);
-    return { r, semantic, lexical, match, isMatch, score: blendedRank(inputs), tier };
-  }).filter((x) => x.isMatch && (x.match === "exact" || !x.r.item.archived));
+    return { r, semantic, lexical, match, isMatch, isRelated, score: blendedRank(inputs), tier };
+  });
+  const matched = scored.filter((x) => x.isMatch && (x.match === "exact" || !x.r.item.archived));
+  const relatedRows = scored.filter((x) => x.isRelated && !x.r.item.archived).sort(compareRank).slice(0, 3);
 
-  if (scored.length === 0) return none();
-  const ranked = scored.sort(compareRank).slice(0, limit);
+  if (matched.length === 0) {
+    if (!relatedRows.length) return none();
+    return { results: [], notIndexed: true, related: await decorate(db, relatedRows, pq) };
+  }
+  const ranked = matched.sort(compareRank).slice(0, limit);
+  return { results: await decorate(db, ranked, pq), notIndexed: false };
+}
 
+type Scored = { r: { item: Item }; semantic: number; lexical: number; match: MatchKind; score: number };
+
+/** The install to show for this query: a named language picks its registry's option (polars: PyPI for Python). */
+export function chooseInstall(i: Pick<Item, "installPackage" | "installOptions" | "installKind" | "packageEcosystem">, ecosystems: Set<string>): { ecosystem: string; name: string } | null {
+  if (i.installKind && i.installKind !== "package") return null;
+  const byQuery = (i.installOptions ?? []).find((o) => ecosystems.has(o.ecosystem));
+  if (byQuery) return byQuery;
+  return i.installPackage && i.packageEcosystem ? { ecosystem: i.packageEcosystem, name: i.installPackage } : null;
+}
+
+async function decorate(db: Db, ranked: Scored[], pq: ParsedQuery): Promise<SearchResult[]> {
   const top = ranked.map((x) => x.r.item.id);
   const [reasonRows, compatRows] = await Promise.all([
     db.select({ itemId: votes.itemId, reason: votes.reason, n: sql<number>`count(*)::int` })
@@ -213,18 +303,18 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     a[c.status] = c.n; m[c.agent] = a; compat.set(c.itemId, m);
   }
 
-  const results = ranked.map(({ r, semantic, lexical, match, score }) => ({
+  return ranked.map(({ r, semantic, lexical, match, score }) => ({
     item: pick(r.item),
     score,
     semantic: round(semantic, 4),
     lexical: round(lexical, 4),
     match,
+    install: chooseInstall(r.item, pq.ecosystems),
     why: explain(r.item, match, reasons.get(r.item.id) ?? {}, compat.get(r.item.id) ?? {}),
     downvoteReasons: reasons.get(r.item.id) ?? {},
     compat: compat.get(r.item.id) ?? {},
     trust: trustScore(r.item),
   }));
-  return { results, notIndexed: false };
 }
 
 const MATCH_LABEL: Record<MatchKind, string> = { exact: "Exact name match", strong: "Matches every term", partial: "Partial match" };
@@ -242,8 +332,9 @@ export function explain(i: Item, match: MatchKind, reasons: Record<string, numbe
   if (typeof i.advisoriesOpen === "number" && i.advisoriesOpen > 0) parts.push(`${i.advisoriesOpen} open security ${i.advisoriesOpen === 1 ? "advisory" : "advisories"} on the latest ${i.packageName ?? "release"}`);
   if (!i.archived && i.pushedAt) parts.push(`last push ${ago(i.pushedAt, now)}`);
   if (i.lastReleaseAt) parts.push(`last release ${ago(i.lastReleaseAt, now)}`);
-  if (i.installPackage && i.packageEcosystem) parts.push(`${i.packageEcosystem}: ${i.installPackage}`);
-  else if (i.publishedPackages?.length) parts.push(`publishes ${i.publishedPackages.length} package${i.publishedPackages.length === 1 ? "" : "s"}, none of them the one obvious install`);
+  if (i.installKind === "app") parts.push("an application: install it from its docs");
+  else if (i.installPackage && i.packageEcosystem) parts.push(`${i.packageEcosystem}: ${i.installPackage}`);
+  else if (i.publishedPackages?.length) parts.push(i.publishedPackages.length === 1 ? "publishes 1 package, not the one to install: see its docs" : `publishes ${i.publishedPackages.length} packages, none of them the one obvious install`);
   if (i.advisoriesOpen === 0) parts.push("no open advisories");
   const net = i.upvotes - i.downvotes;
   if (net >= 5) parts.push(`+${net} community votes`);
@@ -259,9 +350,9 @@ export function explain(i: Item, match: MatchKind, reasons: Record<string, numbe
 
 function pick(i: Item): SearchResult["item"] {
   const { id, kind, slug, owner, name, url, description, language, stars, installs, healthScore, upvotes, downvotes, weightedScore, license, pushedAt,
-    githubId, lastReleaseAt, closedIssues, archived, deprecated, deprecationMessage, advisoriesOpen, openIssues, openPullRequests, packageEcosystem, packageName, installPackage, publishedPackages, signalsCheckedAt } = i;
+    githubId, lastReleaseAt, closedIssues, archived, deprecated, deprecationMessage, advisoriesOpen, openIssues, openPullRequests, packageEcosystem, packageName, installPackage, installOptions, installKind, releasesLastYear, publishedPackages, signalsCheckedAt } = i;
   return { id, kind, slug, owner, name, url, description, language, stars, installs, healthScore, upvotes, downvotes, weightedScore, license, pushedAt,
-    githubId, lastReleaseAt, closedIssues, archived, deprecated, deprecationMessage, advisoriesOpen, openIssues, openPullRequests, packageEcosystem, packageName, installPackage, publishedPackages, signalsCheckedAt };
+    githubId, lastReleaseAt, closedIssues, archived, deprecated, deprecationMessage, advisoriesOpen, openIssues, openPullRequests, packageEcosystem, packageName, installPackage, installOptions, installKind, releasesLastYear, publishedPackages, signalsCheckedAt };
 }
 function truncate(s: string, n: number) { return s.length > n ? `${s.slice(0, n - 1)}…` : s; }
 function round(n: number, d: number) { const f = 10 ** d; return Math.round(n * f) / f; }
