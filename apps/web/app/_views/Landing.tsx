@@ -5,8 +5,8 @@ import { db } from "@/lib/db";
 import { Masthead } from "@/components/Masthead";
 import { Footer } from "@/components/Footer";
 import { LandingSearch } from "@/components/SearchForms";
-import { InstallCmd } from "@/components/InstallCmd";
-import { Strip, ScoreNum } from "@/components/marks";
+import { ReppitInstall } from "@/components/ReppitInstall";
+import { Strip, ScoreNum, Measured } from "@/components/marks";
 import { compact } from "@/components/trust";
 import { trustScore, signalCells } from "@/components/score";
 import { REASONS, REASON_LABEL, REASON_GLOSS, MCP_INSTALL, itemHref } from "@/components/labels";
@@ -35,6 +35,7 @@ export async function Landing() {
   const pick = scored.find((x) => x.t.cells.some((c) => c.state === "slipping" || c.state === "failing")) ?? scored[0];
   const example = pick?.r;
   const exampleScore = pick?.t.score ?? null;
+  const exampleTs = pick?.t;
 
   return (
     <>
@@ -91,7 +92,8 @@ export async function Landing() {
                 <div className="evidence">
                   <Strip cells={signalCells(example)} />
                   <Link href={itemHref(example.slug)} className="ev-link">{example.slug}</Link> &middot;{" "}
-                  <b className="ev-n"><ScoreNum score={exampleScore} /></b>{exampleScore !== null && "/100"}
+                  <b className="ev-n"><ScoreNum score={exampleScore} reason={exampleTs?.reason} /></b>{exampleScore !== null && "/100"}
+                  {exampleTs && <> &middot; <Measured measured={exampleTs.measured} applicable={exampleTs.applicable} className="" /></>}
                 </div>
               )}
             </div>
@@ -141,7 +143,7 @@ export async function Landing() {
             <div>
               <h2 className="h3">Or from inside your agent</h2>
               <p>Your agent checks before it installs, instead of after you find out.</p>
-              <InstallCmd command={MCP_INSTALL} />
+              <ReppitInstall command={MCP_INSTALL} />
             </div>
           </div>
         </div>

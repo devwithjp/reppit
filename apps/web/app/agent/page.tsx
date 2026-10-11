@@ -6,10 +6,11 @@ import { db } from "@/lib/db";
 import { getViewer } from "@/lib/viewer";
 import { embedder } from "@/lib/services";
 import { Masthead } from "@/components/Masthead";
-import { InstallCmd } from "@/components/InstallCmd";
+import { ReppitInstall } from "@/components/ReppitInstall";
+import { nullReason } from "@/components/marks";
 import { band } from "@/components/trust";
 import { trustScore, signalCells, type SignalCell } from "@/components/score";
-import { REASON_LABEL, MCP_INSTALL, CLI_EXAMPLE, installCommand } from "@/components/labels";
+import { REASON_LABEL, MCP_INSTALL, CLI_EXAMPLE, REPPIT_PUBLISHED, installCommand } from "@/components/labels";
 import { rowColumns, loadExtras, indexCounts, type RowItem } from "../_data/items";
 
 export const metadata: Metadata = { title: "In your agent" };
@@ -48,13 +49,25 @@ export default async function AgentPage() {
       <div className="term-shell">
         <h1 className="term-h1">In your agent</h1>
         <p className="term-lede">Most people will meet reppit as a few lines of context their agent read before it installed
-          something. Add the MCP server once:</p>
-        <div className="term-install"><InstallCmd command={MCP_INSTALL} /></div>
-        <p className="term-lede">No MCP? The same search from any shell:</p>
-        <div className="term-install"><InstallCmd command={CLI_EXAMPLE} /></div>
-        <p className="term-lede">Tools it adds: <code>search_repos</code>, <code>get_repo</code>, <code>vote</code>,{" "}
-          <code>report_compat</code>, <code>install_skill</code>. Below is what <code>search_repos</code> returns for
-          one query, from today&rsquo;s index.</p>
+          something. {REPPIT_PUBLISHED ? "Add the MCP server once:" : ""}</p>
+        <div className="term-install"><ReppitInstall command={MCP_INSTALL} /></div>
+        {REPPIT_PUBLISHED && (
+          <>
+            <p className="term-lede">No MCP? The same search from any shell:</p>
+            <div className="term-install"><ReppitInstall command={CLI_EXAMPLE} /></div>
+          </>
+        )}
+
+        <h2 className="term-h2">What each tool can do</h2>
+        <ul className="tools">
+          <li><code>search_repos</code><span>Reads only. Searches the index by problem and returns scores, reasons and agent reports.</span></li>
+          <li><code>get_repo</code><span>Reads only. Returns one entry&rsquo;s signals, votes and agent reports.</span></li>
+          <li><code>vote</code><span>Acts as you, with your personal token. The server tells the agent to use it only when you ask.</span></li>
+          <li><code>report_compat</code><span>Acts as you, with your personal token. The server tells the agent to file a report only after you confirm how a run went.</span></li>
+          <li><code>install_skill</code><span>Returns an install command. It never runs it.</span></li>
+        </ul>
+        <p className="term-lede">Without a personal token the server can only read. You create and revoke the token on your account page.</p>
+        <p className="term-lede">Below is what <code>search_repos</code> returns for one query, from today&rsquo;s index.</p>
 
         <div className="tbar" aria-hidden="true"><i className="on" /><i /><i /> ~/work/invoice-parser &nbsp;&mdash;&nbsp; claude</div>
         <pre className="term" aria-label={`Search results for ${QUERY}`}>
@@ -66,13 +79,14 @@ export default async function AgentPage() {
 {results.map((r) => {
   const row = byId.get(r.item.id);
   if (!row) return null;
-  const score = trustScore(row).score;
+  const ts = trustScore(row);
+  const score = ts.score;
   const cells = signalCells(row);
   const reasons = Object.entries(extras.reasons.get(row.id) ?? {});
   const compat = Object.entries(extras.compat.get(row.id) ?? {});
   const facts = cells.filter((s) => s.key === "push" || s.key === "release" || s.key === "advisories" || s.state === "failing");
   return (
-    <span key={row.id}>{"\n     "}<span className="c-b">{row.slug.padEnd(pad)}</span><span className={score === null ? "c-faint" : C[band(score)]}>{score === null ? "trust n/a" : `trust ${String(score).padStart(2)}`}</span>  <TermStrip cells={cells} />{"\n"}
+    <span key={row.id}>{"\n     "}<span className="c-b">{row.slug.padEnd(pad)}</span><span className={score === null ? "c-faint" : C[band(score)]}>{score === null ? `trust: ${nullReason(ts.reason)}` : `trust ${String(score).padStart(2)}`}</span>  <TermStrip cells={cells} />  <span className="c-faint">{ts.measured} of {ts.applicable} measured</span>{"\n"}
 {"     "}<span className="c-dim">{"│"}</span> {facts.map((s, i) => <span key={s.key}>{i > 0 && " · "}<span className={CC[s.state] === "c-steel" ? undefined : CC[s.state]}>{s.label}</span></span>)}{"\n"}
 {"     "}<span className="c-dim">{"│"}</span> {row.upvotes + row.downvotes === 0
       ? <span className="c-faint">no votes yet</span>

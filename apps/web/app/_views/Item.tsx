@@ -7,12 +7,13 @@ import { getViewer } from "@/lib/viewer";
 import { Masthead } from "@/components/Masthead";
 import { Footer } from "@/components/Footer";
 import { InstallCmd } from "@/components/InstallCmd";
+import { ReppitInstall } from "@/components/ReppitInstall";
 import { VoteComposer } from "@/components/VoteComposer";
 import { CompatForm } from "@/components/CompatForm";
 import { AgentChip, agentState } from "@/components/marks";
 import { flags, ago, compact, band } from "@/components/trust";
 import { trustScore, VOTE_ADJUST_MAX, type SignalCell } from "@/components/score";
-import { ScoreNum } from "@/components/marks";
+import { ScoreNum, nullReason } from "@/components/marks";
 import { REASONS, REASON_LABEL, CORE_AGENTS, KIND_LABEL, MCP_INSTALL, installCommand, splitSlug, itemHref, parentRepo } from "@/components/labels";
 import { rowColumns, indexCounts } from "../_data/items";
 
@@ -170,7 +171,7 @@ export async function ItemView({ slug }: { slug: string }) {
             {cold ? (
               <section className="sec" style={{ marginBottom: 22 }} aria-label="Trust score">
                 <div className="cold">
-                  <div className={`big${t.score === null ? " is-nd" : ""}`}><ScoreNum score={t.score} /><s>Trust{t.score === null ? "" : ", of 100"}</s></div>
+                  <div className={`big${t.score === null ? " is-nd" : ""}`}><ScoreNum score={t.score} reason={t.reason} /><s>Trust{t.score === null ? "" : ", of 100"} &middot; {t.measured} of {t.applicable} measured</s></div>
                   <div className="txt">
                     <h2>Nobody has voted. Here is what the repo is doing.</h2>
                     <p>{t.score === null
@@ -186,7 +187,7 @@ export async function ItemView({ slug }: { slug: string }) {
               <section className="sec">
                 <h2>Trust score <em>computed from the repo, votes adjust it</em></h2>
                 <div className="score-hero">
-                  <div className={`big${t.score === null ? " is-nd" : ""}`}><ScoreNum score={t.score} /><s>{t.score === null ? "trust" : "of 100"}</s></div>
+                  <div className={`big${t.score === null ? " is-nd" : ""}`}><ScoreNum score={t.score} reason={t.reason} /><s>{t.score === null ? "trust" : "of 100"} &middot; {t.measured} of {t.applicable} measured</s></div>
                   <div className="txt"><b>{verdict(t.cells)}</b>{" "}
                     {unknownNote && <>{unknownNote} </>}
                     {t.base !== null && <>The measurements give {t.base}; votes move it {t.voteAdjust >= 0 ? "+" : "\u2212"}{Math.abs(t.voteAdjust)}. </>}
@@ -220,7 +221,7 @@ export async function ItemView({ slug }: { slug: string }) {
                   <th scope="row">Trust score</th>
                   <td className="val">{t.score === null ? `${t.measured} of ${t.applicable} measured`
                     : `${t.base} from ${t.measured} of ${t.applicable} measured signals${t.voteAdjust !== 0 ? `, votes ${t.voteAdjust > 0 ? "+" : "\u2212"}${Math.abs(t.voteAdjust)}` : ""}${item.archived || item.deprecated ? ", capped at 25" : ""}`}</td>
-                  <td className="pts">{t.score === null ? "not enough data" : `${t.score}/100`}</td>
+                  <td className="pts">{t.score === null ? nullReason(t.reason) : `${t.score}/100`}</td>
                 </tr></tfoot>
               </table>
               {item.deprecationMessage && <p className="meta" style={{ marginTop: 9 }}>Registry says: &ldquo;{item.deprecationMessage}&rdquo;</p>}
@@ -334,7 +335,7 @@ export async function ItemView({ slug }: { slug: string }) {
             <div className="panel" style={{ marginTop: 18 }}>
               <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>Ask from your agent</span></div>
               <div className="panel-b">
-                <InstallCmd command={MCP_INSTALL} compact />
+                <ReppitInstall command={MCP_INSTALL} compact />
                 <p className="meta" style={{ margin: "10px 0 0" }}>Your agent gets these measurements whether or not anybody has voted.{" "}
                   <Link className="inline-link" href="/agent">See what it returns</Link></p>
               </div>
@@ -345,11 +346,12 @@ export async function ItemView({ slug }: { slug: string }) {
                 <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>{cold ? "Measured, not voted" : "Considered instead"}</span></div>
                 <table className="kv kv-rel"><tbody>
                   {neighbours.map((n) => {
-                    const s = trustScore(n).score;
+                    const nt = trustScore(n);
+                    const s = nt.score;
                     return (
                       <tr key={n.id}>
                         <th><Link className="mono kv-link" href={itemHref(n.slug)}>{n.slug}</Link></th>
-                        <td className={s === null ? "v-nd" : `v-${band(s)}`}><ScoreNum score={s} short /></td>
+                        <td className={s === null ? "v-nd" : `v-${band(s)}`}><ScoreNum score={s} reason={nt.reason} short /></td>
                       </tr>
                     );
                   })}

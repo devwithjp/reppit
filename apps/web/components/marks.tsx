@@ -15,13 +15,27 @@ export function Strip({ cells, className }: { cells: SignalCell[]; className?: s
   );
 }
 
-/** The score, or the words "not enough data". Never a zero standing in for unknown. */
-export function ScoreNum({ score, short = false }: { score: number | null; short?: boolean }) {
-  return score === null
-    ? short
-      ? <span className="nd" data-testid="trust-score" title="not enough data">n/a<span className="sr-only">: not enough data</span></span>
-      : <span className="nd" data-testid="trust-score">not enough data</span>
-    : <span data-testid="trust-score">{score}</span>;
+/**
+ * Why a score is null, in words. Core's reasons ("not enough data", "too little measured", and any it adds
+ * later) are shown as they are; a cap reason ("archived", "deprecated") never reaches here because a
+ * capped item still has a number.
+ */
+export function nullReason(reason: string | undefined): string {
+  return reason && reason !== "archived" && reason !== "deprecated" ? reason : "not enough data";
+}
+
+/** The score, or its null reason in words. Never a zero standing in for unknown. */
+export function ScoreNum({ score, reason, short = false }: { score: number | null; reason?: string; short?: boolean }) {
+  if (score !== null) return <span data-testid="trust-score">{score}</span>;
+  const words = nullReason(reason);
+  return short
+    ? <span className="nd" data-testid="trust-score" title={words}>n/a<span className="sr-only">: {words}</span></span>
+    : <span className="nd" data-testid="trust-score">{words}</span>;
+}
+
+/** What the number rests on: "3 of 6 measured". */
+export function Measured({ measured, applicable, className = "meas" }: { measured: number; applicable: number; className?: string }) {
+  return <span className={className} data-testid="measured">{measured} of {applicable} measured</span>;
 }
 
 /** Key above the list: taught once, not repeated per row. */

@@ -81,9 +81,9 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
           </div>
         </div>
 
-        <StripKey />
+        {rows.length > 0 && <StripKey />}
 
-        {reasons.length > 0 && (
+        {rows.length > 0 && reasons.length > 0 && (
           <div className="legend">
             <span className="lbl">Reasons given, last 30 days</span>
             {reasons.map((r) => <span key={r.reason} className="tag"><span className="n">{r.n}</span> {REASON_LABEL[r.reason] ?? r.reason}</span>)}
@@ -92,10 +92,13 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
 
         {rows.length === 0 ? (
           <div className="nothing">
-            <h3>{page > 1 ? "Nothing on this page." : kind === "mcp" ? "No MCP servers indexed yet." : `No ${noun} indexed yet.`}</h3>
+            <h3>{page > 1 ? "Nothing on this page." : kind === "mcp" ? "No MCP servers are indexed yet." : `No ${noun} indexed yet.`}</h3>
             <p>{page > 1
               ? <>The list ends earlier than that. <Link className="inline-link" href={href(sort, kind)}>Back to the first page</Link>.</>
-              : <>When one is submitted it shows up here, measured from its own record. <Link className="inline-link" href="/submit">Submit one</Link>.</>}</p>
+              : kind === "mcp"
+                ? <>None have been added to the index so far, so there is nothing to rank here. This tab shows up in the feed once there are some.{" "}
+                    <Link className="inline-link" href={href(sort, "")}>Back to the feed</Link>.</>
+                : <>When one is submitted it shows up here, measured from its own record. <Link className="inline-link" href="/submit">Submit one</Link>.</>}</p>
           </div>
         ) : (
           <div className="list">

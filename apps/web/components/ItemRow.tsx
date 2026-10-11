@@ -3,16 +3,19 @@ import type { RowItem, RowExtras } from "@/app/_data/items";
 import { flags, ago } from "./trust";
 import { trustScore, signalCells, type SignalCell } from "./score";
 import { itemHref, splitSlug, installCommand, cleanWhy } from "./labels";
-import { Strip, ScoreNum, ReasonLine, AgentLine, NoOpinions } from "./marks";
+import { Strip, ScoreNum, Measured, ReasonLine, AgentLine, NoOpinions } from "./marks";
 import { RailVote } from "./RailVote";
 import { InstallCmd } from "./InstallCmd";
 
 /** The trust block on the right of a row: TRUST label, score, strip, last push. */
-export function TrustBlock({ score, cells, pushedAt }: { score: number | null; cells: SignalCell[]; pushedAt: Date | null }) {
+export function TrustBlock({ score, reason, measured, applicable, cells, pushedAt }: {
+  score: number | null; reason?: string; measured: number; applicable: number; cells: SignalCell[]; pushedAt: Date | null;
+}) {
   return (
     <div className="trust">
       <div className="hd">Trust</div>
-      <div className={`n${score === null ? " is-nd" : ""}`}><ScoreNum score={score} />{score !== null && <s>/100</s>}</div>
+      <div className={`n${score === null ? " is-nd" : ""}`}><ScoreNum score={score} reason={reason} />{score !== null && <s>/100</s>}</div>
+      <Measured measured={measured} applicable={applicable} />
       <Strip cells={cells} />
       <div className="cap">{pushedAt ? `pushed ${ago(pushedAt)}` : "push date unknown"}</div>
     </div>
@@ -39,7 +42,8 @@ export function ItemRow({
 }: {
   item: RowItem; extras: RowExtras; signedIn: boolean; rank?: number; why?: string; variant?: "feed" | "search";
 }) {
-  const score = trustScore(item).score;
+  const ts = trustScore(item);
+  const score = ts.score;
   const cells = signalCells(item);
   const fl = flags(item);
   const { owner, name } = splitSlug(item.slug);
@@ -76,7 +80,7 @@ export function ItemRow({
         <NoOpinions votes={hasVotes} reports={hasReports} />
         {variant === "search" && <InstallCmd command={installCommand(item)} compact />}
       </div>
-      <TrustBlock score={score} cells={cells} pushedAt={item.pushedAt} />
+      <TrustBlock score={score} reason={ts.reason} measured={ts.measured} applicable={ts.applicable} cells={cells} pushedAt={item.pushedAt} />
     </article>
   );
 }

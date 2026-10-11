@@ -35,6 +35,14 @@ export const AGENT_LABEL: Record<string, string> = {
 
 export const KIND_LABEL: Record<string, string> = { repo: "repos", skill: "skills", mcp: "MCP servers" };
 
+/**
+ * The reppit CLI and MCP server are not on npm yet. Until NEXT_PUBLIC_REPPIT_PUBLISHED=1 is set at build
+ * time, no page shows a reppit install command: `npx -y` on an unclaimed name fails today and is a
+ * squatting risk tomorrow. Third-party library install lines are unaffected. Render through <ReppitInstall>.
+ */
+export const REPPIT_PUBLISHED = process.env.NEXT_PUBLIC_REPPIT_PUBLISHED === "1";
+export const UNPUBLISHED_NOTE = "The reppit CLI and MCP server are published on launch day.";
+
 /** Add the MCP server to an agent. Single source so it can change with the package name. */
 export const MCP_INSTALL = "claude mcp add reppit -- npx -y reppit-mcp";
 /** The CLI, for agents without MCP. */

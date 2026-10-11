@@ -678,3 +678,11 @@ a.btn{text-decoration:none}
 }
 .tail > *{min-width:0}
 @media(max-width:700px){.tail{grid-template-columns:minmax(0,1fr)}}
+.trust .meas{font-family:var(--mono);font-size:10px;color:var(--ink-3);letter-spacing:.02em;white-space:nowrap}
+.unpublished{font-family:var(--mono);font-size:12px;color:var(--ink-2);border:1px dashed var(--rule-hard);padding:8px 10px;margin:0}
+.term-page .unpublished{color:var(--t-fg);border-color:#3A352D}
+.tools{list-style:none;margin:0 0 16px;padding:0;max-width:72ch;border-top:1px solid #2A2621}
+.tools li{display:flex;gap:12px;padding:7px 0;border-bottom:1px solid #2A2621;font-size:13px;color:var(--t-fg)}
+.tools code{flex:0 0 120px;color:var(--t-white);font-family:var(--mono);font-size:12.5px}
+@media(max-width:520px){.tools li{flex-direction:column;gap:2px}.tools code{flex:none}}
+.term-h2{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--t-white);margin:22px 0 8px}
