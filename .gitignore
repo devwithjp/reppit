@@ -7,3 +7,4 @@ dist
 .pglite
 coverage
 .gstack/
+__pycache__/
