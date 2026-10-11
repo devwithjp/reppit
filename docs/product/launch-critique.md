@@ -1,5 +1,92 @@
 # reppit launch critique
 
+## Second pass, 2026-10-12
+
+I ran the same queries as the first pass, the same way: Chrome through Playwright, at desktop width and at 400px, against the production build on localhost:3100 (755 entries). I added a set of name lookups and five new queries. Sign-in is still not available on this machine, so I judged only what a signed-out user can use. I checked each change the team said it made against the running site, and read the source only to confirm one suspicion. The first pass is kept unchanged below.
+
+### Verdict
+
+**Probably yes for search, still no for the MCP server.** The product now does part of what it says. Search finds the obvious library first for most of my queries, the install line is usually the real `npm install` / `pip install`, archived repos visibly score 25, and when something isn't indexed it says so instead of making up matches. I'd use the site as a second opinion when my agent picks a dependency. The trust number itself still tells me very little: 82% of the scores I saw were exactly 85 or exactly 79. And the agent integration, which the site calls the main way people will use it, still cannot be installed.
+
+### What the team said changed, checked
+
+| Claim | What I saw | Status |
+|---|---|---|
+| Trust scores for 610 of 720 repos | 101 of 107 result rows across 11 searches had a number; 6 said "not enough data". That's consistent with the claim. | **True** |
+| No-package repos marked "not applicable", page says "2 of 4 measured" | anything-llm: "Deprecated / Advisories: publishes no package, not applicable", "79 from 2 of 4 measured signals". The search row shows only "79/100", with no hint of how thin it is. | **True on the item page, hidden in search** |
+| Archived or deprecated capped at 25 | localstack: 25/100, "capped at 25", ARCHIVED and 1 ADVISORY badges. The homepage line about it was rewritten to match. | **True** |
+| Full-text blended in, exact names first, relevance floor, "Not in the index yet" | `ollama`, `llama.cpp`, `pdfplumber`, `react` are all #1. Keyboard mash, `zod`, `clap`, `envalid` and two problem queries get "Not in the index yet". One leak: `express-rate-limit` returns only OptimalBits/bull. `/api/health` still reports `"embedding":"local"`, so the full-text match is carrying the ranking. | **Mostly true** |
+| Overclaiming copy rewritten, MCP tab hidden, phone nav reworked | "Measured, not voted" replaces "works on day one". /submit and /trust now mention "not enough data". The MCP tab is gone from the header and footer, but `/?kind=mcp` still renders an empty "Browse MCP servers" page. Phones now get a three-tab nav (Browse / Trust score / In your agent) with no horizontal scroll. | **True** |
+| Package detection covers npm, PyPI, crates.io, Go | drizzle-orm, ws, react, docling, localstack, ollama (Go) all resolve. But in monorepos it often picks the wrong package (see below). | **True, with a correctness bug** |
+
+### Search, before and after
+
+Same queries as the first pass. "Hit" means something I'd actually choose is in the top three.
+
+| Query | First pass top result | Now top result | Hit now? | Note |
+|---|---|---|---|---|
+| parse pdf tables in python | opendataloader-pdf (Java) | docling, 85 | Yes, #1 | pdfplumber #2 (now indexed), MinerU #3. All Python, all `pip install`. A clear fix. |
+| typescript orm for postgres | drizzle-orm | prisma/orm, 85 | Yes, #1 | Drizzle #2, TypeORM #3. **But Prisma's install line is `npm install @prisma/orm-toolchain`**, a Prisma 8 release candidate for tooling, not `prisma` / `@prisma/client`. |
+| rate limit an express api | scalar | redisson/redisson | No | Redisson (Java), go-zero (Go), firecrawl-mcp, bull. Still nothing about rate limiting. |
+| run an llm locally | pathwaycom/llm-app | pathwaycom/llm-app | No | anything-llm, then OpenHands (`npm install @openhands/agent-canvas`, which is wrong for a Python agent app). ollama and llama.cpp are still not in the top five for the most obvious question in the set. |
+| validate env vars in node | developer-roadmap | validator.js (only result) | No | Fewer results, but still the wrong tool, and no "not indexed" message. |
+| websocket server for node | ws | ws, 87 | Yes, #1 | Then yaak and hoppscotch: API clients, not servers. |
+| background jobs with redis in node | river (Go) | bullmq, 85 | Yes, #1 | xstate at #2 is wrong; bull at #3 is the legacy predecessor. |
+| cli argument parsing in rust | tree-sitter | Not in the index yet | No (honest) | Correct answer given the index. clap is not indexed. |
+| http client for python async | aiohttp | aiohttp, 85 | Yes, #1 | httpie at #2 with 53/100, "1 open security advisory, last push 2 years ago". The score is doing its job here. |
+| date library javascript | electron | date-fns, 87 | Yes, #1 | dayjs #2. A clear fix. |
+| react form validation | react-hook-form | react-hook-form, 85 | Yes, #1 | Unchanged and good. |
+| markdown parser | parsedown (PHP) | marked, 85 | Yes, #1 | parsedown #2 is honestly "not enough data". opendataloader-pdf at #3 is noise. |
+
+**Hit rate on these 12: 8 of 12 in the top three, the same as before. #1 correct went from 4 of 12 to 8 of 12. On the brief's eight queries: 4 of 8 in the top three, the same; #1 correct went from 2 of 8 to 4 of 8.** The misses have not moved: rate limiting, local LLMs, env validation, Rust CLI parsing. The difference is that the hits are now first and the junk has mostly gone, and one miss out of four is now an honest "not in the index".
+
+Name lookups: `ollama`, `llama.cpp`, `pdfplumber`, `react` are all #1 (before: 0 of 7 at #1). `zod`, `clap`, `envalid` and the keyboard mash say "Not in the index yet". `express-rate-limit` wrongly returns bull.
+
+Five new queries I'd really type:
+
+| Query | Top three | Hit? | Note |
+|---|---|---|---|
+| send transactional email from node | react-email, nodemailer, novu | Yes (nodemailer #2) | Reasonable. |
+| dataframe library faster than pandas | Not in the index yet | No (honest) | No polars. |
+| state management for react | react, zustand, react-hook-form | Yes (zustand #2) | Returning React itself for "state management for react" is the weak version of an exact-name match. TanStack Query's install line is `@tanstack/query-core`, not `@tanstack/react-query`. |
+| end to end browser testing | SeleniumBase, playwright, browser-use | Yes (playwright #2) | Playwright scores 87 against SeleniumBase's 85 and still ranks second. |
+| schema validation typescript | valibot, joi, pydantic | Yes, #1 | pydantic (Python) at #3 for a TypeScript query. zod is not indexed, and for this query that's the gap people will notice. |
+
+New queries: 4 of 5 in the top three, 1 of 5 correct at #1.
+
+### The four questions
+
+**1. Would I come back next week?** Yes, for the website, as a quick sanity check on what my agent picked. The archived cap, the advisory flags (httpie 53, ollama "9 advisories") and the honest "Not in the index yet" are each worth a visit. No, for adding it to my agent. `npm view reppit-mcp` still returns 404, so the command on every page fails. And the install lines are wrong often enough (Prisma, TanStack Query, react-pdf, OpenHands) that I would not let an agent act on them without checking.
+
+**2. Does "2 of 4 measured" help, or is it noise dressed as a number?** It's noise dressed as a number, and so is most of the scale. Releases and issue load are unknown for every entry I opened, so the most a healthy repo can score is 85 with a package and 79 without. Of 107 scores in my searches, 72 were exactly 85 and 16 exactly 79. The number encodes "publishes a package or not" plus "not archived". "79 from 2 of 4 measured" means "pushed recently and not archived", which GitHub shows already, rescaled to look like a grade. It's also unfair in a way that will mislead: a package-less repo can never lose points on advisories, so anything-llm (79) outranks ollama (72) on trust because ollama's advisories could be measured. And on the other side, redux-form, untouched for two years, scores 60. That's a pass-looking number for a dead library, because last push is only 25 of the 100 points.
+
+What I'd want instead:
+- **Search rows:** below 3 measured signals, show the facts ("pushed 4 days ago · not archived · no package") with no number. If the number stays, put "2 of 4 measured" on the row, not only on the item page.
+- **Stale repos:** cap anything not pushed in over a year, the same way archived is capped, so dead libraries stop scoring 60.
+- **The ceiling:** measure releases and issue load (GitHub API, token budget). Until then, scores between 79 and 87 shouldn't be treated as a ranking.
+
+**3. The biggest reason a developer like me would still leave:** the install lines are wrong when it matters most. The product's pitch is "check before your agent installs", and for Prisma it would install a release-candidate tooling package. For TanStack Query it gives the framework-agnostic core rather than the React package, for react-pdf only the type definitions, and for OpenHands an unrelated UI package. The registry back-link check proves the package belongs to the repo, not that it's the one to install. In a monorepo every package links back. One wrong install via MCP, and I'd uninstall reppit. Close second: the index still misses obvious libraries (zod, clap, polars, express-rate-limit, envalid). With 755 entries, roughly a third of my real queries end in "not in the index" or a miss.
+
+### Updated must-fix list, ranked
+
+Items struck through are resolved on this build.
+
+1. **Pick the right package in monorepos, or show none.** Prefer the package whose name matches the repo or project name (`prisma`, `@tanstack/react-query`, `@react-pdf/renderer`). Skip `-types`, `-core`, `-toolchain`, `-cli` and pre-release-only packages. Ignore packages that are clearly side tools (OpenHands' UI package). When in doubt, link to the repo's install docs instead of printing a command. This is now the main way the product can hurt someone. *Medium.*
+2. **Publish `reppit-mcp` and `reppit` to npm, or take the commands off the site.** Still 404 on both. This is unchanged from the first pass, and it's still a squatting hole behind `npx -y`. Say on /agent what `vote` and `install_skill` can do without my approval. *Small to medium.*
+3. **Make the trust number carry information.** Measure releases and issue load so healthy repos stop hitting the 85 ceiling. Hide the number, or show "2 of 4 measured" on the search row, when only push and archived are known. Cap repos not pushed in over a year. Fix the ranking bias where an unmeasurable repo outranks a measured one. *Medium.*
+4. **Seed the index with the obvious answers.** zod, clap, polars, httpx, express-rate-limit, envalid, and the top packages by downloads on npm, PyPI and crates. The honest "not in the index" is good, but it now shows up for a third of real questions. *Medium.*
+5. **Tighten ranking for problem queries.** Treat the language named in the query as a filter: pydantic and redisson should not rank for TypeScript or Express queries. Don't let a bare framework name ("react") win "state management for react". Make sure the relevance floor also catches name lookups like `express-rate-limit` → bull. And switch the embedder off `local`: health still reports it. *Medium.*
+6. ~~**Run the signal enrichment so most entries get a number.**~~ Done: 101 of 107 rows have one, though see item 3 on what the number is worth.
+7. ~~**Archived or deprecated override "not enough data".**~~ Done: localstack shows 25, capped, with the reason. Small follow-up: an archived package still shows `pip install localstack` with no warning on the command itself.
+8. ~~**Never tell anyone to `git clone` a library.**~~ Mostly done: libraries now get registry commands. Repos without a package still show `git clone`, which is acceptable for apps like anything-llm, but an MCP client should get "no package; see repo" instead of a clone command.
+9. ~~**Make every claim on the site true.**~~ Done for the lines I flagged. The /agent transcript now shows real scores and real install commands. Leftover: `/?kind=mcp` still renders an empty page when reached directly.
+10. ~~**Mobile nav.**~~ Done.
+11. ~~**Data errors** (date-fns "NO LICENCE", skills inheriting 296k parent stars).~~ Done: date-fns now shows MIT, the superpowers skill page no longer shows a star count, and superpowers skills no longer show up in the redis-jobs or local-LLM results.
+
+---
+
+## First pass, 2026-10-11
+
 Written 2026-10-11 against the local production build at http://localhost:3100 (755 entries, 12 with any votes). I used it as an outsider: a TypeScript and Python developer whose agent picks dependencies several times a week. I drove it in Chrome through Playwright, at desktop width and at 400px. I could not sign in on this machine, so everything I say about signed-in flows comes from what the pages show. I read the source only afterwards, to check three suspicions; those checks are marked.
 
 ## Verdict in three sentences
