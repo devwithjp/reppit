@@ -1,40 +1,144 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { randomBytes, createHash } from "node:crypto";
-import { eq, and, isNull } from "drizzle-orm";
-import { apiKeys } from "@gitit/db";
+import { eq, and, isNull, desc } from "drizzle-orm";
+import { apiKeys, votes, items, agentCompatReports } from "@gitit/db";
 import { db } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { getViewer } from "@/lib/viewer";
+import { signOut } from "@/app/auth/actions";
+import { Masthead } from "@/components/Masthead";
+import { Footer } from "@/components/Footer";
+import { ago } from "@/components/trust";
+import { REASON_LABEL, AGENT_LABEL, itemHref } from "@/components/labels";
+import { InstallCmd } from "@/components/InstallCmd";
+
+export const metadata: Metadata = { title: "Account" };
 export const dynamic = "force-dynamic";
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ created?: string }> }) {
-  const { created } = await searchParams;
-  const session = await auth(); if (!session?.user?.id) redirect("/");
-  const d = await db();
-  const keys = await d.select().from(apiKeys).where(and(eq(apiKeys.userId, session.user.id), isNull(apiKeys.revokedAt)));
+const FLASH = "reppit_new_token";
+const sha = (t: string) => createHash("sha256").update(t).digest("hex");
 
-  async function create(fd: FormData) {
-    "use server";
-    const s = await auth(); if (!s?.user?.id) redirect("/");
-    const key = `gitit_${randomBytes(24).toString("base64url")}`;
-    await (await db()).insert(apiKeys).values({ userId: s.user.id, keyHash: createHash("sha256").update(key).digest("hex"), label: String(fd.get("label") ?? "default").slice(0, 60) });
-    redirect(`/account?created=${encodeURIComponent(key)}`);
-  }
-  async function revoke(fd: FormData) {
-    "use server";
-    const s = await auth(); if (!s?.user?.id) redirect("/");
-    await (await db()).update(apiKeys).set({ revokedAt: new Date() }).where(and(eq(apiKeys.id, String(fd.get("id"))), eq(apiKeys.userId, s.user.id)));
-    redirect("/account");
-  }
+/** One personal token per person. The plain value exists only in this response; we store its sha256. */
+async function createToken() {
+  "use server";
+  const v = await getViewer(); if (!v) redirect("/login?next=%2Faccount");
+  const d = await db();
+  const [existing] = await d.select({ id: apiKeys.id }).from(apiKeys).where(and(eq(apiKeys.userId, v.id), isNull(apiKeys.revokedAt))).limit(1);
+  if (existing) redirect("/account#token");
+  const token = `reppit_${randomBytes(24).toString("base64url")}`;
+  await d.insert(apiKeys).values({ userId: v.id, keyHash: sha(token), label: "personal token" });
+  // Shown once: a 60-second httpOnly cookie scoped to this page, never the URL (history, logs, referrers).
+  (await cookies()).set(FLASH, token, { httpOnly: true, sameSite: "strict", secure: process.env.NODE_ENV === "production", path: "/account", maxAge: 60 });
+  redirect("/account#token");
+}
+
+async function revokeToken(fd: FormData) {
+  "use server";
+  (await cookies()).delete({ name: FLASH, path: "/account" });
+  const v = await getViewer(); if (!v) redirect("/login?next=%2Faccount");
+  await (await db()).update(apiKeys).set({ revokedAt: new Date() }).where(and(eq(apiKeys.id, String(fd.get("id"))), eq(apiKeys.userId, v.id)));
+  redirect("/account#token");
+}
+
+export default async function AccountPage() {
+  const viewer = await getViewer();
+  if (!viewer) redirect("/login?next=%2Faccount");
+  const d = await db();
+  const [keys, myVotes, myReports] = await Promise.all([
+    d.select({ id: apiKeys.id, createdAt: apiKeys.createdAt, keyHash: apiKeys.keyHash }).from(apiKeys).where(and(eq(apiKeys.userId, viewer.id), isNull(apiKeys.revokedAt))).orderBy(desc(apiKeys.createdAt)).limit(1),
+    d.select({ slug: items.slug, direction: votes.direction, reason: votes.reason, createdAt: votes.createdAt })
+      .from(votes).innerJoin(items, eq(items.id, votes.itemId)).where(eq(votes.userId, viewer.id)).orderBy(desc(votes.createdAt)).limit(25),
+    d.select({ slug: items.slug, agent: agentCompatReports.agent, status: agentCompatReports.status, createdAt: agentCompatReports.createdAt })
+      .from(agentCompatReports).innerJoin(items, eq(items.id, agentCompatReports.itemId)).where(eq(agentCompatReports.userId, viewer.id)).orderBy(desc(agentCompatReports.createdAt)).limit(25),
+  ]);
+
+  const token = keys[0] ?? null;
+  const flash = (await cookies()).get(FLASH)?.value;
+  const created = flash && token && token.keyHash === sha(flash) ? flash : null;
 
   return (
-    <div className="card" style={{ maxWidth: 640 }}>
-      <h1 style={{ marginTop: 0 }}>API keys</h1>
-      <p className="muted">Used by the MCP server and CLI for voting and compatibility reports, and for the free tier of 1,000 searches a month. Set <code>GITIT_API_KEY</code> in your agent&apos;s environment.</p>
-      {created && <div className="note">Copy this key now, it is not shown again:<pre>{created}</pre></div>}
-      <form action={create} className="inline"><input name="label" placeholder="label (e.g. laptop claude code)" /><button className="primary">Create key</button></form>
-      <table style={{ width: "100%", marginTop: 12, fontSize: 14 }}><tbody>
-        {keys.map((k) => <tr key={k.id}><td>{k.label}</td><td className="muted">{k.tier} · {k.monthlyLimit}/mo</td><td className="muted">{k.createdAt.toISOString().slice(0, 10)}</td><td style={{ textAlign: "right" }}><form action={revoke}><input type="hidden" name="id" value={k.id} /><button>Revoke</button></form></td></tr>)}
-      </tbody></table>
-    </div>
+    <>
+      <Masthead viewer={viewer} next="/account" />
+      <main className="wrap" id="main">
+        <div className="head"><div className="head-row">
+          <div className="l">
+            <h1><span className="ow">@</span>{viewer.login}</h1>
+            <p className="sub">{myVotes.length === 0 && myReports.length === 0
+              ? "No votes or agent reports from you yet."
+              : `${myVotes.length} vote${myVotes.length === 1 ? "" : "s"} and ${myReports.length} agent report${myReports.length === 1 ? "" : "s"} so far.`}</p>
+          </div>
+          <div className="r" style={{ textAlign: "right" }}>
+            <form action={signOut}><button className="btn" type="submit">Sign out</button></form>
+          </div>
+        </div></div>
+
+        <div className="cols">
+          <div>
+            <section className="sec">
+              <h2>Your votes <em>newest first</em></h2>
+              {myVotes.length === 0 ? (
+                <p className="meta">None yet. <Link className="inline-link" href="/?sort=hot">Browse the directory</Link> and vote on something you have used.</p>
+              ) : (
+                <table className="sig boxed"><tbody>
+                  {myVotes.map((v) => (
+                    <tr key={v.slug}>
+                      <th scope="row"><Link className="mono kv-link" href={itemHref(v.slug)}>{v.slug}</Link></th>
+                      <td className="val">{v.direction === "up"
+                        ? <span className="tag pos"><span className="n">&#9650;</span> works as described</span>
+                        : <span className="tag"><span className="n">&#9660;</span> {REASON_LABEL[v.reason ?? ""] ?? "downvote"}</span>}</td>
+                      <td className="pts meta">{ago(v.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody></table>
+              )}
+            </section>
+            <section className="sec">
+              <h2>Your agent reports</h2>
+              {myReports.length === 0 ? <p className="meta">None yet. They are the most useful thing you can add.</p> : (
+                <table className="sig boxed"><tbody>
+                  {myReports.map((r) => (
+                    <tr key={`${r.slug}-${r.agent}`}>
+                      <th scope="row"><Link className="mono kv-link" href={itemHref(r.slug)}>{r.slug}</Link></th>
+                      <td className="val">{AGENT_LABEL[r.agent] ?? r.agent}: {r.status === "works" ? "works" : "broken"}</td>
+                      <td className="pts meta">{ago(r.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody></table>
+              )}
+            </section>
+          </div>
+
+          <aside>
+            <div className="panel" id="token">
+              <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>Personal token</span></div>
+              <div className="panel-b">
+                <p className="meta" style={{ margin: "0 0 10px" }}>Lets the reppit CLI and MCP server vote and file agent reports as you.</p>
+                {created && (
+                  <div style={{ margin: "0 0 12px" }}>
+                    <p className="auth-msg ok" role="status" style={{ marginTop: 0, marginBottom: 6 }}>Copy it now. It is not shown again.</p>
+                    <InstallCmd command={created} compact prompt="" label="Copy token" />
+                  </div>
+                )}
+                {token ? (
+                  <div className="token-row">
+                    <span className="meta">Created {ago(token.createdAt)} &middot; {token.createdAt.toISOString().slice(0, 10)}</span>
+                    <form action={revokeToken}><input type="hidden" name="id" value={token.id} />
+                      <button className="btn btn-sm" type="submit">Revoke</button></form>
+                  </div>
+                ) : (
+                  <form action={createToken}>
+                    <button className="btn btn-sm" type="submit">Create a token</button>
+                  </form>
+                )}
+                {token && <p className="meta" style={{ margin: "10px 0 0" }}>Lost it? Revoke this one and create another.</p>}
+              </div>
+            </div>
+          </aside>
+        </div>
+      </main>
+      <Footer />
+    </>
   );
 }

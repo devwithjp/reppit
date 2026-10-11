@@ -1,49 +1,98 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { eq, and } from "drizzle-orm";
 import { items } from "@gitit/db";
 import { GitHubClient, ingestRepo, ingestSkillsFromRepo, parseRepoRef, itemEmbeddingText } from "@gitit/core";
 import { db } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { getViewer } from "@/lib/viewer";
 import { embedder } from "@/lib/services";
+import { Masthead } from "@/components/Masthead";
+import { Footer } from "@/components/Footer";
+import { itemHref } from "@/components/labels";
 
+export const metadata: Metadata = { title: "Submit a repo" };
 export const dynamic = "force-dynamic";
 
-export default async function SubmitPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
-  const session = await auth();
+const fail = (msg: string, repo = "") => redirect(`/submit?error=${encodeURIComponent(msg)}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`);
 
-  async function submit(fd: FormData) {
-    "use server";
-    const s = await auth(); if (!s?.user?.id) redirect("/submit?error=Sign+in+first");
-    const ref = parseRepoRef(String(fd.get("repo") ?? "")); if (!ref) redirect("/submit?error=Enter+owner%2Fname+or+a+GitHub+URL");
-    const asSkills = fd.get("skills") === "on";
-    const d = await db(); const gh = new GitHubClient(); const e = embedder();
+async function submit(fd: FormData) {
+  "use server";
+  const viewer = await getViewer();
+  if (!viewer) redirect(`/login?next=${encodeURIComponent("/submit")}`);
+  const raw = String(fd.get("repo") ?? "").trim();
+  const ref = parseRepoRef(raw);
+  if (!ref) fail("That is not a GitHub repo. Use owner/name or a github.com URL.", raw);
+  const asSkills = fd.get("skills") === "on";
+  const d = await db();
+  const slug = `${ref!.owner}/${ref!.name}`;
+
+  let target: string | null = null;
+  let error: string | null = null;
+  try {
+    const gh = new GitHubClient();
     if (asSkills) {
-      const rows = await ingestSkillsFromRepo(gh, ref.owner, ref.name);
-      if (!rows.length) redirect("/submit?error=No+skills%2F*%2FSKILL.md+found");
-      const vecs = await e.embed(rows.map(itemEmbeddingText));
-      await d.insert(items).values(rows.map((r, i) => ({ ...r, embedding: vecs[i], embeddedAt: new Date(), submittedBy: s.user.id }))).onConflictDoNothing();
-      redirect(`/?kind=skill&sort=new`);
+      const rows = await ingestSkillsFromRepo(gh, ref!.owner, ref!.name);
+      if (!rows.length) error = "No skills/*/SKILL.md folders found in that repo.";
+      else {
+        const vecs = await embedder().embed(rows.map(itemEmbeddingText));
+        await d.insert(items).values(rows.map((r, i) => ({ ...r, embedding: vecs[i], embeddedAt: new Date(), submittedBy: viewer!.id }))).onConflictDoNothing();
+        target = "/?kind=skill&sort=new";
+      }
+    } else {
+      const [existing] = await d.select({ slug: items.slug }).from(items).where(and(eq(items.slug, slug), eq(items.kind, "repo")));
+      if (existing) target = itemHref(existing.slug);
+      else {
+        const row = await ingestRepo(gh, ref!.owner, ref!.name);
+        if (!row) error = "GitHub says that repo does not exist, or it is private.";
+        else {
+          const [vec] = await embedder().embed([itemEmbeddingText(row)]);
+          await d.insert(items).values({ ...row, embedding: vec, embeddedAt: new Date(), submittedBy: viewer!.id });
+          target = itemHref(slug);
+        }
+      }
     }
-    const slug = `${ref.owner}/${ref.name}`;
-    const [existing] = await d.select({ slug: items.slug }).from(items).where(and(eq(items.slug, slug), eq(items.kind, "repo")));
-    if (existing) redirect(`/r/${slug}`);
-    const row = await ingestRepo(gh, ref.owner, ref.name); if (!row) redirect("/submit?error=Repo+not+found");
-    const [vec] = await e.embed([itemEmbeddingText(row)]);
-    await d.insert(items).values({ ...row, embedding: vec, embeddedAt: new Date(), submittedBy: s.user.id });
-    redirect(`/r/${slug}`);
+  } catch (e) {
+    console.error("[submit] failed:", (e as Error).message);
+    error = "GitHub did not answer, or rate-limited us. Nothing was saved. Try again in a few minutes.";
   }
+  if (error || !target) fail(error ?? "Nothing was saved.", raw);
+  redirect(target!);
+}
 
+export default async function SubmitPage({ searchParams }: { searchParams: Promise<{ error?: string; repo?: string }> }) {
+  const { error, repo } = await searchParams;
+  const viewer = await getViewer();
   return (
-    <div className="card" style={{ maxWidth: 560 }}>
-      <h1 style={{ marginTop: 0 }}>Submit a repo or skill pack</h1>
-      {!session?.user && <p className="note">Sign in to submit.</p>}
-      {error && <p style={{ color: "var(--down)" }}>{error}</p>}
-      <form action={submit}>
-        <label>GitHub repo<input name="repo" placeholder="owner/name or https://github.com/owner/name" required /></label>
-        <label style={{ display: "block", marginTop: 10 }}><input type="checkbox" name="skills" style={{ width: "auto", marginRight: 6 }} />Index its <code>skills/*/SKILL.md</code> folders as agent skills</label>
-        <button className="primary" style={{ marginTop: 12 }} disabled={!session?.user}>Submit</button>
-      </form>
-    </div>
+    <>
+      <Masthead viewer={viewer} next="/submit" />
+      <main className="wrap" id="main">
+        <div className="auth wide">
+          <h1>Submit a repo</h1>
+          <p className="auth-lede">Give it a GitHub repo. It gets a trust score as soon as it is indexed, from its own record,
+            before anybody votes. If it is already here you go straight to its page.</p>
+          {!viewer && (
+            <p className="auth-msg bad" role="status">You need to be signed in to submit.{" "}
+              <Link className="inline-link" href="/login?next=%2Fsubmit">Sign in</Link></p>
+          )}
+          <div className="panel"><div className="panel-b">
+            <form action={submit} className="auth-form">
+              <label className="fld"><span className="lbl">GitHub repo</span>
+                <input name="repo" defaultValue={repo} placeholder="owner/name or https://github.com/owner/name" required
+                  autoComplete="off" spellCheck={false} data-testid="submit-repo-input" aria-describedby={error ? "submit-error" : undefined} />
+              </label>
+              <label className="check">
+                <input type="checkbox" name="skills" />
+                <span>Index its <code>skills/*/SKILL.md</code> folders as agent skills instead</span>
+              </label>
+              <button type="submit" className="btn btn-primary" disabled={!viewer} data-testid="submit-repo-button">Submit</button>
+              <p className="auth-msg bad" id="submit-error" role="alert" data-testid="submit-error" hidden={!error}>{error}</p>
+            </form>
+          </div></div>
+          <p className="meta" style={{ marginTop: 12 }}>Fetching from GitHub takes a few seconds. Nothing is ranked by who submitted it.</p>
+        </div>
+      </main>
+      <Footer />
+    </>
   );
 }

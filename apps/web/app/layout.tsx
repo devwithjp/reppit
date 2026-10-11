@@ -1,34 +1,36 @@
 import "./globals.css";
-import Link from "next/link";
-import { auth, signIn, signOut } from "@/lib/auth";
+import type { Metadata, Viewport } from "next";
+import { JetBrains_Mono, IBM_Plex_Sans } from "next/font/google";
+import { themeScript } from "@/components/ThemeToggle";
 
-export const metadata = { title: "gitit — community-ranked repos and agent skills", description: "Reddit for repos and agent skills. Describe your problem, get the top repos, install from your agent." };
+const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
+const sans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-sans", display: "swap" });
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
-  const hasGitHub = !!(process.env.GITHUB_ID && process.env.GITHUB_SECRET);
+export const metadata: Metadata = {
+  title: { default: "reppit — stars say it was popular, reppit says it still works", template: "%s · reppit" },
+  description: "Community-ranked repos and agent skills. Every downvote carries a reason, every vote fades with age, and your coding agent can ask before it picks your next dependency.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
+    { media: "(prefers-color-scheme: dark)", color: "#191714" },
+  ],
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en"><body>
-      <header className="site"><div className="in">
-        <Link href="/" className="brand">gitit</Link>
-        <nav><Link href="/?sort=hot">Hot</Link><Link href="/?sort=top">Top</Link><Link href="/?sort=new">New</Link><Link href="/?kind=skill">Skills</Link><Link href="/submit">Submit</Link></nav>
-        <span className="spacer" />
-        {session?.user ? (
-          <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
-            <span className="muted" style={{ marginRight: 8 }}>@{session.user.login}</span>
-            <Link href="/account" className="btn" style={{ marginRight: 8 }}>API keys</Link>
-            <button>Sign out</button>
-          </form>
-        ) : hasGitHub ? (
-          <form action={async () => { "use server"; await signIn("github"); }}><button className="primary">Sign in with GitHub</button></form>
-        ) : (
-          <form action={async (fd: FormData) => { "use server"; await signIn("credentials", { login: String(fd.get("login") ?? ""), redirectTo: "/" }); }} className="inline" style={{ margin: 0 }}>
-            <input name="login" placeholder="dev username" style={{ width: 140 }} required />
-            <button className="primary">Dev sign in</button>
-          </form>
-        )}
-      </div></header>
-      <main>{children}</main>
-    </body></html>
+    <html lang="en" className={`${mono.variable} ${sans.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body>
+        <a className="skip" href="#main">Skip to content</a>
+        {children}
+      </body>
+    </html>
   );
 }
