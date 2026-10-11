@@ -22,18 +22,24 @@
  * Licence is not scored: it says whether you may use a project, not whether it is maintained. It
  * stays a flag on the row (see the UI). Stars are not an input anywhere in this file.
  *
- * Score:
- *   - Unknown signals score half their points (neutral).
- *   - Not applicable: a repo confirmed to publish no package (package_ecosystem = 'none') has no
- *     deprecation or advisories to measure. Those cells leave the denominator; the score is computed
- *     over the applicable signals and rescaled to 100. A failed or unattempted check stays unknown.
- *   - Archived or deprecated is decisive: the score is capped at 25 (votes included) and `reason`
- *     names it, even when other signals are unknown. Nobody needs four more measurements to know an
- *     archived project is unmaintained.
- *   - Otherwise, fewer than half of the applicable signals measured: no number,
- *     `{ score: null, reason: "not enough data" }`. `measured` and `applicable` say how many.
+ * Score (on the fixed six-signal scale, max 100 points):
+ *   - Measured cells earn their points. Unknown cells earn half (neutral).
+ *   - Not applicable cells (a repo confirmed to publish no package: deprecation, advisories) also earn
+ *     half, the same as unknown. Neither the earned total nor the maximum changes, so N/A can never
+ *     lift a score above an otherwise-equal packaged repo: a package with a clean record (15) beats
+ *     N/A (7.5), one advisory (6) loses to it by 1.5 only on that cell, and the packaged repo still
+ *     earns 15 for "not deprecated" against N/A's 7.5. Net: packaged-with-one-advisory 21 vs N/A 15
+ *     on those two cells. Removing N/A from both totals (rescaling to 100) was the earlier rule; it let
+ *     a no-package app (79) outrank a packaged library with an advisory (72), so it is gone.
+ *   - A number needs at least 3 measured signals (N/A and unknown do not count). Below that:
+ *     `{ score: null, reason: "too little measured" }`, with the cells still listed as facts.
+ *   - Archived or deprecated is decisive: capped at 25 (votes included), `reason` names it, and it
+ *     shows even with fewer than 3 measured.
+ *   - Stale: no push in 365+ days caps the score at 50, in 730+ days at 35 (votes included),
+ *     `reason: "stale"`. A dead library stops reading like a pass.
  *   - Votes adjust by at most ±12: round(12 * tanh(weightedScore / 6)), where weightedScore is the
- *     time-decayed, reputation-weighted vote sum from ranking.ts.
+ *     time-decayed, reputation-weighted vote sum from ranking.ts. Caps apply after votes.
+ *   - `measured` and `applicable` are always returned ("3 of 4 measured").
  */
 import { weightedScore as computeWeightedScore, type VoteRow } from "./ranking";
 
@@ -72,10 +78,10 @@ export interface TrustItem {
 }
 
 export interface TrustScore {
-  /** 0..100, or null when fewer than half of the applicable signals are measured. */
+  /** 0..100, or null when fewer than 3 signals are measured (and the item is not archived/deprecated). */
   score: number | null;
   /** Why the score is null ("not enough data") or capped ("archived" / "deprecated"). */
-  reason?: "not enough data" | "archived" | "deprecated";
+  reason?: "too little measured" | "archived" | "deprecated" | "stale";
   /** Signals-only score before the vote adjustment; null with score. */
   base: number | null;
   voteAdjust: number;
@@ -98,10 +104,13 @@ export const SIGNAL_ORDER: { key: SignalKey; short: string }[] = [
 ];
 export const VOTE_ADJUST_MAX = 12;
 export const FLAGGED_CAP = 25;
+/** A number needs at least this many measured signals. */
+export const MIN_MEASURED = 3;
+/** Stale caps: [days since last push, maximum score]. */
+export const STALE_CAPS: [number, number][] = [[730, 35], [365, 50]];
 /**
- * @deprecated The rule is now "fewer than half of the applicable signals measured → no number"
- * (TrustScore.measured / .applicable). With all six applicable that is "more than 3 unknown".
- * Kept for UI copy until it moves to measured/applicable.
+ * @deprecated The rule is now "fewer than MIN_MEASURED measured → no number". With all six
+ * applicable that is "more than 3 unknown". Kept for UI copy until it moves to MIN_MEASURED.
  */
 export const MAX_UNKNOWN = 3;
 
@@ -122,7 +131,7 @@ export function ago(d: Date, now: Date = new Date()): string {
 function cell(key: SignalKey, state: SignalState, label: string, points?: number): SignalCell {
   const max = TRUST_POINTS[key];
   const short = SIGNAL_ORDER.find((s) => s.key === key)!.short;
-  return { key, short, state, label, max, points: state === "unknown" ? max / 2 : state === "not_applicable" ? 0 : Math.round(points ?? 0) };
+  return { key, short, state, label, max, points: state === "unknown" || state === "not_applicable" ? max / 2 : Math.round(points ?? 0) };
 }
 
 /** The six cells in fixed strip order. */
@@ -181,22 +190,24 @@ export function voteAdjust(weightedScore: number): number {
  */
 export function trustScore(item: TrustItem, votes?: VoteRow[] | number, now: Date = new Date()): TrustScore {
   const cells = signalCells(item, now);
-  const applicableCells = cells.filter((c) => c.state !== "not_applicable");
-  const unknownCount = applicableCells.filter((c) => c.state === "unknown").length;
-  const applicable = applicableCells.length;
+  const applicable = cells.filter((c) => c.state !== "not_applicable").length;
+  const unknownCount = cells.filter((c) => c.state === "unknown").length;
   const measured = applicable - unknownCount;
   const ws = Array.isArray(votes) ? computeWeightedScore(votes, now) : typeof votes === "number" ? votes : item.weightedScore ?? 0;
   const adj = voteAdjust(ws);
-  // Points over the applicable signals only, rescaled to 100. Unknowns carry their neutral half.
-  const maxPoints = applicableCells.reduce((a, c) => a + c.max, 0);
-  const raw = maxPoints > 0 ? Math.round((100 * applicableCells.reduce((a, c) => a + c.points, 0)) / maxPoints) : 0;
+  // Fixed six-signal scale: TRUST_POINTS sum to 100, N/A and unknown cells carry their neutral half.
+  const raw = Math.round(cells.reduce((a, c) => a + c.points, 0));
   const counts = { voteAdjust: adj, unknownCount, measured, applicable, cells };
   const flagged = item.archived ? "archived" : item.deprecated === true ? "deprecated" : null;
   if (flagged) {
-    // Known fatal signal beats unknowns. Votes cannot lift it past the cap.
     const base = Math.min(raw, FLAGGED_CAP);
     return { score: Math.max(0, Math.min(FLAGGED_CAP, base + adj)), reason: flagged, base, ...counts };
   }
-  if (measured * 2 < applicable) return { score: null, reason: "not enough data", base: null, ...counts };
-  return { score: Math.max(0, Math.min(100, raw + adj)), base: raw, ...counts };
+  if (measured < MIN_MEASURED) return { score: null, reason: "too little measured", base: null, ...counts };
+  const pushed = toDate(item.pushedAt);
+  const days = pushed ? (now.getTime() - pushed.getTime()) / DAY : null;
+  const cap = days === null ? null : STALE_CAPS.find(([d]) => days >= d)?.[1] ?? null;
+  const score = Math.max(0, Math.min(100, raw + adj));
+  if (cap !== null && score > cap) return { score: cap, reason: "stale", base: Math.min(raw, cap), ...counts };
+  return { score, base: raw, ...counts };
 }

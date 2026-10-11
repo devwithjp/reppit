@@ -20,10 +20,14 @@ describe("helpers", () => {
 
 describe("installCommand", () => {
   const base = { id: "1", kind: "repo" as const, slug: "drizzle-team/drizzle-orm", url: "https://github.com/drizzle-team/drizzle-orm", description: null, language: "TypeScript", stars: 0, installs: 0, healthScore: 1, upvotes: 0, downvotes: 0, license: null };
-  it("uses the verified package, never git clone", () => {
-    expect(installCommand({ ...base, packageEcosystem: "npm", packageName: "drizzle-orm" })).toBe("npm install drizzle-orm");
-    expect(installCommand({ ...base, packageEcosystem: "PyPI", packageName: "docling" })).toBe("pip install docling");
-    expect(installCommand({ ...base, packageEcosystem: "crates.io", packageName: "clap" })).toBe("cargo add clap");
+  it("uses only the primary install package, never git clone", () => {
+    expect(installCommand({ ...base, packageEcosystem: "npm", packageName: "drizzle-orm", installPackage: "drizzle-orm" })).toBe("npm install drizzle-orm");
+    expect(installCommand({ ...base, packageEcosystem: "PyPI", packageName: "docling", installPackage: "docling" })).toBe("pip install docling");
+    expect(installCommand({ ...base, packageEcosystem: "crates.io", packageName: "clap", installPackage: "clap" })).toBe("cargo add clap");
+    expect(installCommand({ ...base, packageEcosystem: "Go", packageName: "gorm.io/gorm", installPackage: "gorm.io/gorm" })).toBe("go get gorm.io/gorm");
+    // A verified side package (monorepo) is never offered as the install.
+    expect(installCommand({ ...base, slug: "TanStack/query", url: "https://github.com/TanStack/query", packageEcosystem: "npm", packageName: "@tanstack/query-core", installPackage: null }))
+      .toBe("# no single package to install verified; see the install docs at https://github.com/TanStack/query#readme");
     expect(installCommand(base)).not.toMatch(/git clone|npm install/);
   });
   it("says not indexed instead of listing weak matches", () => {

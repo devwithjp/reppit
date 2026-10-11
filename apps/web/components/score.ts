@@ -4,6 +4,6 @@
  * Server components only: @gitit/core pulls in the database layer and must not reach a client bundle.
  */
 export {
-  trustScore, signalCells, SIGNAL_ORDER, VOTE_ADJUST_MAX, FLAGGED_CAP, MAX_UNKNOWN, TRUST_POINTS,
+  trustScore, signalCells, SIGNAL_ORDER, VOTE_ADJUST_MAX, FLAGGED_CAP, MAX_UNKNOWN, MIN_MEASURED, STALE_CAPS, TRUST_POINTS,
   type SignalCell, type SignalState as CellState, type TrustScore,
 } from "@gitit/core";

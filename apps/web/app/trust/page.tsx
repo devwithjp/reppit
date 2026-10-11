@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getViewer } from "@/lib/viewer";
 import { Masthead } from "@/components/Masthead";
 import { Footer } from "@/components/Footer";
-import { VOTE_ADJUST_MAX, FLAGGED_CAP, MAX_UNKNOWN, TRUST_POINTS } from "@/components/score";
+import { VOTE_ADJUST_MAX, FLAGGED_CAP, MIN_MEASURED, STALE_CAPS, TRUST_POINTS } from "@/components/score";
 
 export const metadata: Metadata = { title: "How the trust score works" };
 export const dynamic = "force-dynamic";
@@ -50,9 +50,12 @@ export default async function TrustPage() {
             <section className="sec prose">
               <h2>How they add up</h2>
               <p>Each signal earns points up to its maximum, and the points add up to 100. A signal we could not measure
-                counts as half its points: neither a pass nor a zero. When more than {MAX_UNKNOWN} of the six are unknown, there is no
-                number at all. The page says &ldquo;not enough data&rdquo; rather than guess.</p>
-              <p>An archived or deprecated project is capped at {FLAGGED_CAP}, whatever else it measures. Nobody is maintaining it.</p>
+                counts as half its points: neither a pass nor a zero. A repo that publishes no package cannot be deprecated on
+                a registry or carry package advisories, so those two read &ldquo;not applicable&rdquo; and also count as half, so
+                lacking a package never raises a score. With fewer than {MIN_MEASURED} signals actually measured there is no number at
+                all. The page says &ldquo;too little measured&rdquo; rather than guess, and every score says how many signals it rests on.</p>
+              <p>An archived or deprecated project is capped at {FLAGGED_CAP}, whatever else it measures. Nobody is maintaining it.
+                A project with no push in a year is capped at {STALE_CAPS.find(([d]) => d === 365)?.[1]}, and after two years at {STALE_CAPS.find(([d]) => d === 730)?.[1]}.</p>
               <p>Votes then move the score by at most &plusmn;{VOTE_ADJUST_MAX}. Each vote is weighted by the voter&rsquo;s account
                 and loses half its weight every six months, so old praise stops counting. Every downvote has to name one of
                 five reasons: unmaintained, insecure, broken on an agent, misleading, low quality.</p>

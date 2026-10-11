@@ -14,7 +14,7 @@ import { AgentChip, agentState } from "@/components/marks";
 import { flags, ago, compact, band } from "@/components/trust";
 import { trustScore, VOTE_ADJUST_MAX, type SignalCell } from "@/components/score";
 import { ScoreNum, nullReason } from "@/components/marks";
-import { REASONS, REASON_LABEL, CORE_AGENTS, KIND_LABEL, MCP_INSTALL, installCommand, splitSlug, itemHref, parentRepo } from "@/components/labels";
+import { REASONS, REASON_LABEL, CORE_AGENTS, KIND_LABEL, MCP_INSTALL, installCommand, installNote, splitSlug, itemHref, parentRepo } from "@/components/labels";
 import { rowColumns, indexCounts } from "../_data/items";
 
 const HALF_LIFE_DAYS = 180;
@@ -139,7 +139,7 @@ export async function ItemView({ slug }: { slug: string }) {
             </div>
             <div style={{ marginTop: 12, maxWidth: 460 }}>
               <InstallCmd command={installCommand(item)}
-                note={item.kind === "repo" && !item.packageName ? "No published package was found that points back at this repo, so this clones the source." : item.packageName ? `${item.packageEcosystem} package ${item.packageName}, verified to point back at this repo.` : undefined} />
+                note={installNote(item)} />
             </div>
           </div>
           <div className="r">

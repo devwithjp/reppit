@@ -65,7 +65,7 @@ export interface SearchResult {
     id: string; kind: "repo" | "skill" | "mcp"; slug: string; url: string; description: string | null; language: string | null;
     stars: number; installs: number; healthScore: number; upvotes: number; downvotes: number; license: string | null;
     archived?: boolean; deprecated?: boolean | null; advisoriesOpen?: number | null;
-    packageEcosystem?: string | null; packageName?: string | null;
+    packageEcosystem?: string | null; packageName?: string | null; installPackage?: string | null;
   };
   score: number; semantic: number; why: string; match?: "exact" | "strong" | "partial";
   downvoteReasons: Record<string, number>;
@@ -86,19 +86,20 @@ export function formatTrust(t: Trust | undefined): string {
 }
 
 /**
- * The install command for a result. Only a package verified against its registry gets a package
- * manager command; anything else gets a pointer to the repo, never a `git clone` of a library.
+ * The install command for a result. Only the repo's primary package (`installPackage`, verified and
+ * named like the repo or its root manifest) gets a package-manager command. A monorepo whose verified
+ * packages are side packages (@tanstack/query-core, @prisma/orm-toolchain) gets the repo's install
+ * docs instead: a wrong install run by an agent is worse than none. Never `git clone`.
  */
 export function installCommand(r: SearchResult["item"]): string {
   if (r.kind === "skill") return `npx skills add ${r.slug}`;
   if (r.kind === "mcp") return `# add to your MCP config: see ${r.url}`;
-  const name = r.packageName;
+  const name = r.installPackage;
   if (name && r.packageEcosystem === "npm") return `npm install ${name}`;
   if (name && r.packageEcosystem === "PyPI") return `pip install ${name}`;
   if (name && r.packageEcosystem === "crates.io") return `cargo add ${name}`;
   if (name && r.packageEcosystem === "Go") return `go get ${name}`;
-  if ((r.language ?? "").toLowerCase() === "go") return `go get github.com/${r.slug}`;
-  return `# no published package verified for ${r.slug}; see ${r.url}`;
+  return `# no single package to install verified; see the install docs at ${r.url}#readme`;
 }
 
 export function formatResults(results: SearchResult[], notIndexed = false): string {

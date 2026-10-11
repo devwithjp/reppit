@@ -48,15 +48,37 @@ export const MCP_INSTALL = "claude mcp add reppit -- npx -y reppit-mcp";
 /** The CLI, for agents without MCP. */
 export const CLI_EXAMPLE = 'npx reppit find "parse pdf tables in python"';
 
+type InstallRow = {
+  kind: string; slug: string; url: string;
+  installPackage?: string | null; packageEcosystem?: string | null;
+  publishedPackages?: { ecosystem: string; name: string }[] | null;
+};
+
 /**
- * What to paste to get the thing. Only what we can know from the row: a package name is used only
- * when ingestion verified it points back at this repo. Otherwise, clone the source.
+ * What to paste to get the thing. A package install is offered only for the repo's primary
+ * package (installPackage): one whose name matches the repo or its root manifest. A monorepo's
+ * side packages are verified as belonging to the repo, but they are not "the thing to install",
+ * so they never appear here. Without a primary package, clone the source.
  */
-export function installCommand(i: { kind: string; slug: string; url: string; packageName?: string | null; packageEcosystem?: string | null }): string {
+export function installCommand(i: InstallRow): string {
   if (i.kind === "skill") return `npx skills add ${i.slug}`;
-  if (i.packageName && i.packageEcosystem === "npm") return `npm install ${i.packageName}`;
-  if (i.packageName && i.packageEcosystem === "PyPI") return `pip install ${i.packageName}`;
+  const pkg = i.installPackage;
+  if (pkg) {
+    const eco = i.publishedPackages?.find((p) => p.name === pkg)?.ecosystem ?? i.packageEcosystem;
+    if (eco === "npm") return `npm install ${pkg}`;
+    if (eco === "PyPI") return `pip install ${pkg}`;
+    if (eco === "crates.io") return `cargo add ${pkg}`;
+    if (eco === "Go") return `go get ${pkg}`;
+  }
   return `git clone ${i.url}.git`;
+}
+
+/** One plain sentence explaining the install line, so a clone is never mistaken for a package. */
+export function installNote(i: InstallRow): string | undefined {
+  if (i.kind !== "repo") return undefined;
+  if (i.installPackage) return `Verified ${i.packageEcosystem ?? ""} package ${i.installPackage}: its registry entry points back at this repo.`.replace("  ", " ");
+  if (i.publishedPackages?.length) return `This repo publishes ${i.publishedPackages.length} packages and none is verified as the one to install, so this clones the source. Check its install docs.`;
+  return "No published package points back at this repo, so this clones the source.";
 }
 
 /**

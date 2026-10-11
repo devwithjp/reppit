@@ -134,6 +134,11 @@
     "nameWithOwner": "ggml-org/llama.cpp",
     "checkedAt": "2026-10-11T12:00:13.563Z"
   },
+  "graphql-hive/graphql-yoga": {
+    "githubId": 110819939,
+    "nameWithOwner": "graphql-hive/graphql-yoga",
+    "checkedAt": "2026-10-11T13:56:51.407Z"
+  },
   "graphql/graphql-js": {
     "githubId": 38307428,
     "nameWithOwner": "graphql/graphql-js",

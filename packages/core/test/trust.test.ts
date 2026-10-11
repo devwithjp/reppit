@@ -47,11 +47,10 @@ describe("trustScore", () => {
   it("reports measured and applicable counts", () => {
     expect(trustScore(healthy, 0, now)).toMatchObject({ measured: 6, applicable: 6, unknownCount: 0 });
   });
-  it("returns no number when fewer than half the applicable signals are measured", () => {
-    const four = trustScore({ ...healthy, lastReleaseAt: null, deprecated: null, advisoriesOpen: null, openIssues: null }, 0, now);
-    expect(four).toMatchObject({ score: null, reason: "not enough data", base: null, unknownCount: 4, measured: 2, applicable: 6 });
-    expect(four.cells).toHaveLength(6);
-    // Exactly half measured (3 of 6) is enough for a number.
+  it("needs at least 3 measured signals for a number", () => {
+    const two = trustScore({ ...healthy, lastReleaseAt: null, deprecated: null, advisoriesOpen: null, openIssues: null }, 0, now);
+    expect(two).toMatchObject({ score: null, reason: "too little measured", base: null, unknownCount: 4, measured: 2, applicable: 6 });
+    expect(two.cells).toHaveLength(6);
     const three = trustScore({ ...healthy, deprecated: null, advisoriesOpen: null, openIssues: null }, 0, now);
     expect(three).toMatchObject({ measured: 3, applicable: 6 });
     expect(three.score).not.toBeNull();
@@ -83,7 +82,7 @@ describe("trustScore", () => {
     expect(voteAdjust(1e9)).toBe(12);
     expect(voteAdjust(-1e9)).toBe(-12);
     expect(voteAdjust(0)).toBe(0);
-    const mid = { ...healthy, pushedAt: daysAgo(500), lastReleaseAt: daysAgo(500) };
+    const mid = { ...healthy, pushedAt: daysAgo(200), lastReleaseAt: daysAgo(500) };
     const base = trustScore(mid, 0, now).score!;
     expect(trustScore(mid, 1000, now).score! - base).toBe(12);
     expect(trustScore(mid, -1000, now).score! - base).toBe(-12);
@@ -100,23 +99,44 @@ describe("not applicable: confirmed to publish no package", () => {
   it("marks deprecation and advisories not_applicable with the label, in fixed order", () => {
     const cells = signalCells(app, now);
     expect(cells.map((c) => c.key)).toEqual(SIGNAL_ORDER.map((s) => s.key));
-    for (const k of ["deprecated", "advisories"]) expect(cells.find((c) => c.key === k)).toMatchObject({ state: "not_applicable", label: "publishes no package", points: 0 });
+    for (const k of ["deprecated", "advisories"]) expect(cells.find((c) => c.key === k)).toMatchObject({ state: "not_applicable", label: "publishes no package", points: 7.5 });
   });
-  it("scores over the applicable signals, rescaled to 100", () => {
-    // push 25/25 + release 7.5/15 (unknown) + archived 15/15 + issues 7.5/15 (unknown) = 55/70.
-    const t = trustScore(app, 0, now);
-    expect(t).toMatchObject({ applicable: 4, measured: 2, unknownCount: 2, score: Math.round((100 * 55) / 70) });
-    // The same repo with an unconfirmed check: 4 of 6 unknown, no number.
-    expect(trustScore({ ...app, packageEcosystem: null }, 0, now)).toMatchObject({ score: null, measured: 2, applicable: 6 });
+  it("push and archived alone are too little for a number, but the facts stay", () => {
+    expect(trustScore(app, 0, now)).toMatchObject({ score: null, reason: "too little measured", measured: 2, applicable: 4 });
   });
-  it("a fully measured no-package repo can reach 100", () => {
-    expect(trustScore({ ...app, lastReleaseAt: daysAgo(10), openIssues: 10, closedIssues: 990 }, 0, now)).toMatchObject({ score: 100, applicable: 4, measured: 4 });
+  it("is scored on the six-signal scale with N/A at the neutral half: 3 measured, no package", () => {
+    // push 25 + release 15 + archived 15 + deprecated 7.5 (N/A) + advisories 7.5 (N/A) + issues 7.5 (unknown) = 77.5
+    const t = trustScore({ ...app, lastReleaseAt: daysAgo(10) }, 0, now);
+    expect(t).toMatchObject({ score: 78, measured: 3, applicable: 4 });
   });
-  it("still needs half the applicable signals", () => {
-    expect(trustScore({ ...app, pushedAt: null }, 0, now)).toMatchObject({ score: null, reason: "not enough data", measured: 1, applicable: 4 });
+  it("a no-package repo never outranks an otherwise-equal packaged one through N/A", () => {
+    const base = { pushedAt: daysAgo(3), lastReleaseAt: daysAgo(20), archived: false, openIssues: null, closedIssues: null };
+    const anythingLlm = trustScore({ ...base, packageEcosystem: "none" }, 0, now).score!;
+    const ollamaOneAdvisory = trustScore({ ...base, packageEcosystem: "Go", packageName: "github.com/ollama/ollama", deprecated: false, advisoriesOpen: 1 }, 0, now).score!;
+    const ollamaClean = trustScore({ ...base, packageEcosystem: "Go", packageName: "x", deprecated: false, advisoriesOpen: 0 }, 0, now).score!;
+    const ollamaMany = trustScore({ ...base, packageEcosystem: "Go", packageName: "x", deprecated: false, advisoriesOpen: 9 }, 0, now).score!;
+    expect(ollamaOneAdvisory).toBeGreaterThan(anythingLlm);
+    expect(ollamaClean).toBeGreaterThan(anythingLlm);
+    expect(ollamaMany).toBeGreaterThanOrEqual(anythingLlm);
   });
-  it("archived still decides, over applicable signals", () => {
+  it("archived still decides, and shows below 3 measured", () => {
     expect(trustScore({ ...app, archived: true }, 0, now)).toMatchObject({ reason: "archived", applicable: 4 });
     expect(trustScore({ ...app, archived: true }, 0, now).score!).toBeLessThanOrEqual(25);
+  });
+});
+
+describe("stale caps", () => {
+  const lib: TrustItem = { lastReleaseAt: null, archived: false, deprecated: false, advisoriesOpen: 0, packageEcosystem: "npm", packageName: "redux-form", openIssues: null, closedIssues: null };
+  it("caps at 50 after a year and 35 after two, votes included", () => {
+    expect(trustScore({ ...lib, pushedAt: daysAgo(100) }, 0, now).reason).toBeUndefined();
+    expect(trustScore({ ...lib, pushedAt: daysAgo(400) }, 0, now)).toMatchObject({ reason: "stale" });
+    expect(trustScore({ ...lib, pushedAt: daysAgo(400) }, 0, now).score!).toBeLessThanOrEqual(50);
+    // redux-form: two years untouched no longer reads 60.
+    expect(trustScore({ ...lib, pushedAt: daysAgo(740) }, 1000, now)).toMatchObject({ score: 35, reason: "stale" });
+  });
+  it("does not cap when the push date is unknown or the score is already lower", () => {
+    const low = trustScore({ ...lib, pushedAt: daysAgo(400), advisoriesOpen: 5 }, -1000, now);
+    expect(low.score!).toBeLessThan(50);
+    expect(low.reason).toBeUndefined();
   });
 });

@@ -13,6 +13,9 @@ const rows = [
   { slug: "drizzle-team/drizzle-orm", name: "drizzle-orm", packageName: "drizzle-orm", description: "Headless TypeScript ORM for Postgres, MySQL and SQLite", topics: ["orm", "postgres", "typescript"], language: "TypeScript", stars: 30000 },
   { slug: "go-gorm/gorm", name: "gorm", description: "The fantastic ORM library for Golang, supports Postgres", topics: ["orm", "go"], language: "Go", stars: 37000 },
   { slug: "localstack/localstack", name: "localstack", description: "A fully functional local AWS cloud stack", topics: ["aws"], language: "Python", stars: 60000, archived: true },
+  { slug: "OptimalBits/bull", name: "bull", description: "Premium Queue package for handling distributed jobs and messages in NodeJS.", topics: ["job-queue", "rate-limiter", "nodejs"], language: "JavaScript", stars: 15000 },
+  { slug: "encode/httpx-like", name: "pyhttp", description: "An async HTTP client", topics: ["http-client", "async"], language: null, packageEcosystem: "PyPI", packageName: "pyhttp", stars: 100 },
+  { slug: "seanmonstar/reqwest", name: "reqwest", description: "An easy and powerful async HTTP client", topics: ["http-client"], language: "Rust", stars: 10000 },
   { slug: "jsdoc/notes", name: "notes", description: "Personal notes", topics: [], language: null, stars: 10, readme: "this readme mentions orm once" },
 ];
 
@@ -41,12 +44,22 @@ describe("hybrid search", () => {
       expect(r).toEqual({ results: [], notIndexed: true });
     }
   });
-  it("finds by full-text terms and penalises a language mismatch", async () => {
+  it("treats a language named in the query as a filter", async () => {
     const { results: r, notIndexed } = await search(db, e, "typescript orm for postgres");
     expect(r[0].item.slug).toBe("drizzle-team/drizzle-orm");
     expect(notIndexed).toBe(false);
-    const slugs = r.map((x) => x.item.slug);
-    expect(slugs.indexOf("go-gorm/gorm")).toBeGreaterThan(0);
+    expect(r.map((x) => x.item.slug)).not.toContain("go-gorm/gorm");
+    expect((await search(db, e, "orm for postgres in go")).results.map((x) => x.item.slug)).toEqual(["go-gorm/gorm"]);
+  });
+  it("admits the language's registry packages even when the repo language is unknown", async () => {
+    const py = (await search(db, e, "async http client in python")).results.map((x) => x.item.slug);
+    expect(py).toEqual(["encode/httpx-like"]);
+    expect((await search(db, e, "async http client in rust")).results.map((x) => x.item.slug)).toEqual(["seanmonstar/reqwest"]);
+  });
+  it("an identifier query is a name lookup: two of its words in a topic list are not a match", async () => {
+    // bull's topic "rate-limiter" covers "rate" and "limit" of express-rate-limit.
+    expect(await search(db, e, "express-rate-limit")).toEqual({ results: [], notIndexed: true });
+    expect((await search(db, e, "rate limiter for node jobs")).results.map((x) => x.item.slug)).toContain("OptimalBits/bull");
   });
   it("labels a README-only hit partial, never strong", async () => {
     const { results: r } = await search(db, e, "orm", { limit: 10 });
@@ -79,7 +92,7 @@ describe("query parsing and wording", () => {
   });
   it("explanations carry decision facts, not stars or 'good match'", () => {
     const w = explain({ archived: false, deprecated: false, advisoriesOpen: 0, pushedAt: new Date(Date.now() - 3 * 86_400_000), lastReleaseAt: null,
-      packageName: "ws", packageEcosystem: "npm", upvotes: 0, downvotes: 0, stars: 22000, installs: 0, deprecationMessage: null } as never, "strong", {}, {});
+      packageName: "ws", installPackage: "ws", packageEcosystem: "npm", upvotes: 0, downvotes: 0, stars: 22000, installs: 0, deprecationMessage: null } as never, "strong", {}, {});
     expect(w).toMatch(/^Matches every term: last push 3 days ago, npm: ws, no open advisories\.$/);
     expect(w).not.toMatch(/stars|good match/i);
   });

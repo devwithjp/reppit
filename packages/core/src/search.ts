@@ -15,7 +15,7 @@ export type MatchKind = "exact" | "strong" | "partial";
 
 export interface SearchResult {
   item: Pick<Item, "id" | "kind" | "slug" | "owner" | "name" | "url" | "description" | "language" | "stars" | "installs" | "healthScore" | "upvotes" | "downvotes" | "weightedScore" | "license" | "pushedAt"
-    | "githubId" | "lastReleaseAt" | "closedIssues" | "archived" | "deprecated" | "deprecationMessage" | "advisoriesOpen" | "openIssues" | "openPullRequests" | "packageEcosystem" | "packageName" | "signalsCheckedAt">;
+    | "githubId" | "lastReleaseAt" | "closedIssues" | "archived" | "deprecated" | "deprecationMessage" | "advisoriesOpen" | "openIssues" | "openPullRequests" | "packageEcosystem" | "packageName" | "installPackage" | "publishedPackages" | "signalsCheckedAt">;
   score: number;
   /** Vector similarity in [0, 1] (0 when the item has no embedding). */
   semantic: number;
@@ -61,7 +61,18 @@ export function semanticFloor(embedderName: string, env: Record<string, string |
   return embedderName.startsWith("local") ? Number.POSITIVE_INFINITY : 0.45;
 }
 
-export interface ParsedQuery { raw: string; exactKeys: string[]; terms: string[]; languages: Set<string> }
+/** Registry ecosystem for each language family, so "in python" also admits PyPI packages. */
+const LANGUAGE_ECOSYSTEMS: Record<string, string> = { python: "PyPI", rust: "crates.io", go: "Go", typescript: "npm", javascript: "npm" };
+
+export interface ParsedQuery {
+  raw: string; exactKeys: string[]; terms: string[];
+  /** Repo languages named in the query (lower-case). Non-empty = results are restricted to them. */
+  languages: Set<string>;
+  /** Registry ecosystems for those languages. */
+  ecosystems: Set<string>;
+  /** A single identifier-like token (express-rate-limit, socket.io, @scope/pkg): a name lookup. */
+  identifier: boolean;
+}
 
 export function parseQuery(query: string): ParsedQuery {
   const raw = query.trim().toLowerCase().replace(/\s+/g, " ");
@@ -74,7 +85,9 @@ export function parseQuery(query: string): ParsedQuery {
   const all = [...new Set(tokenize(raw))];
   const languages = new Set(all.flatMap((t) => LANGUAGE_WORDS[t] ?? []));
   const topical = all.filter((t) => !LANGUAGE_WORDS[t]);
-  return { raw, exactKeys: [...keys].filter((k) => k.length >= 2 && k.length <= 120), terms: (topical.length ? topical : all).slice(0, 8), languages };
+  const ecosystems = new Set([...languages].map((l) => LANGUAGE_ECOSYSTEMS[l]).filter((x): x is string => !!x));
+  const identifier = !raw.includes(" ") && /[-_.@/]/.test(raw);
+  return { raw, exactKeys: [...keys].filter((k) => k.length >= 2 && k.length <= 120), terms: (topical.length ? topical : all).slice(0, 8), languages, ecosystems, identifier };
 }
 
 /** One query term against both configs the document uses (simple for names, english for prose). */
@@ -96,6 +109,16 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
   const filters = [];
   if (opts.language) filters.push(sql`lower(${items.language}) = ${opts.language.toLowerCase()}`);
   if (opts.kind) filters.push(eq(items.kind, opts.kind));
+  const exactFilters = [...filters];
+  // A language named in the query is a filter, not a hint: "cli argument parsing in rust" returns
+  // Rust repos and crates only. Exact name lookups are not filtered.
+  if (pq.languages.size) {
+    const langs = sql.join([...pq.languages].map((l) => sql`${l}`), sql`, `);
+    const ecos = pq.ecosystems.size ? sql.join([...pq.ecosystems].map((e) => sql`${e}`), sql`, `) : null;
+    filters.push(ecos
+      ? sql`(lower(${items.language}) in (${langs}) or ${items.packageEcosystem} in (${ecos}))`
+      : sql`lower(${items.language}) in (${langs})`);
+  }
   const live = [eq(items.archived, false), ...filters];
 
   const [qv] = await embedder.embed([normalizeQuery(query) || pq.raw]);
@@ -113,7 +136,7 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     anyTerm
       ? db.select({ id: items.id }).from(items).where(and(sql`${tsv} @@ (${anyTerm})`, ...live)).orderBy(desc(sql`ts_rank(${tsv}, ${anyTerm})`)).limit(n)
       : Promise.resolve([] as { id: string }[]),
-    keyList ? db.select({ id: items.id }).from(items).where(and(exactExpr, ...filters)).limit(10) : Promise.resolve([] as { id: string }[]),
+    keyList ? db.select({ id: items.id }).from(items).where(and(exactExpr, ...exactFilters)).limit(10) : Promise.resolve([] as { id: string }[]),
   ]);
   const ids = [...new Set([...exactRows, ...lexRows, ...semRows].map((r) => r.id))];
   if (ids.length === 0) return none();
@@ -141,7 +164,8 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     const exact = r.exact === true;
     const nameHit = pq.terms.some((t) => t === r.item.name.toLowerCase() || t === r.item.packageName?.toLowerCase());
     const lang = r.item.language?.toLowerCase();
-    const langMismatch = pq.languages.size > 0 && !!lang && !pq.languages.has(lang);
+    const ecoFits = !!r.item.packageEcosystem && pq.ecosystems.has(r.item.packageEcosystem);
+    const langMismatch = pq.languages.size > 0 && !ecoFits && !(lang && pq.languages.has(lang));
     const phrase = r.phrase === true;
     let relevance = 0.55 * lexical + 0.45 * semantic + (nameHit ? 0.2 : 0) + (phrase ? 0.15 : 0);
     if (langMismatch) relevance *= 0.6;
@@ -149,10 +173,15 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     const match: MatchKind = exact ? "exact" : headAll && (phrase || hits.length <= 2 || nameHit) ? "strong" : "partial";
     // A one-word query is usually a name: a README mention alone is not a match. A partial match in
     // the wrong language (Go queue for a Node query) is noise, not a fallback.
+    // A one-word query is usually a name: a README mention alone is not a match. A named language
+    // filters (mismatches never pass). An identifier (express-rate-limit) is a name lookup: without an
+    // exact match it must appear as a phrase in a name, description or topics; two of its three words
+    // in a topic list (bull's "rate-limiter") is not it.
     const isMatch = exact || (
       (coverage >= MIN_COVERAGE || semantic >= floor) &&
       !(hits.length === 1 && !headAll && semantic < floor) &&
-      !(langMismatch && match === "partial")
+      !langMismatch &&
+      !(pq.identifier && hits.length > 1 && !phrase)
     );
     const inputs = { semantic: relevance, weightedScore: r.item.weightedScore, health: r.item.healthScore, stars: r.item.stars, installs: r.item.installs, archived: r.item.archived, deprecated: r.item.deprecated };
     // Exact matches are pinned above everything (tier -1); among them, flagged ones still sort last.
@@ -213,7 +242,8 @@ export function explain(i: Item, match: MatchKind, reasons: Record<string, numbe
   if (typeof i.advisoriesOpen === "number" && i.advisoriesOpen > 0) parts.push(`${i.advisoriesOpen} open security ${i.advisoriesOpen === 1 ? "advisory" : "advisories"} on the latest ${i.packageName ?? "release"}`);
   if (!i.archived && i.pushedAt) parts.push(`last push ${ago(i.pushedAt, now)}`);
   if (i.lastReleaseAt) parts.push(`last release ${ago(i.lastReleaseAt, now)}`);
-  if (i.packageName && i.packageEcosystem) parts.push(`${i.packageEcosystem}: ${i.packageName}`);
+  if (i.installPackage && i.packageEcosystem) parts.push(`${i.packageEcosystem}: ${i.installPackage}`);
+  else if (i.publishedPackages?.length) parts.push(`publishes ${i.publishedPackages.length} package${i.publishedPackages.length === 1 ? "" : "s"}, none of them the one obvious install`);
   if (i.advisoriesOpen === 0) parts.push("no open advisories");
   const net = i.upvotes - i.downvotes;
   if (net >= 5) parts.push(`+${net} community votes`);
@@ -229,9 +259,9 @@ export function explain(i: Item, match: MatchKind, reasons: Record<string, numbe
 
 function pick(i: Item): SearchResult["item"] {
   const { id, kind, slug, owner, name, url, description, language, stars, installs, healthScore, upvotes, downvotes, weightedScore, license, pushedAt,
-    githubId, lastReleaseAt, closedIssues, archived, deprecated, deprecationMessage, advisoriesOpen, openIssues, openPullRequests, packageEcosystem, packageName, signalsCheckedAt } = i;
+    githubId, lastReleaseAt, closedIssues, archived, deprecated, deprecationMessage, advisoriesOpen, openIssues, openPullRequests, packageEcosystem, packageName, installPackage, publishedPackages, signalsCheckedAt } = i;
   return { id, kind, slug, owner, name, url, description, language, stars, installs, healthScore, upvotes, downvotes, weightedScore, license, pushedAt,
-    githubId, lastReleaseAt, closedIssues, archived, deprecated, deprecationMessage, advisoriesOpen, openIssues, openPullRequests, packageEcosystem, packageName, signalsCheckedAt };
+    githubId, lastReleaseAt, closedIssues, archived, deprecated, deprecationMessage, advisoriesOpen, openIssues, openPullRequests, packageEcosystem, packageName, installPackage, publishedPackages, signalsCheckedAt };
 }
 function truncate(s: string, n: number) { return s.length > n ? `${s.slice(0, n - 1)}…` : s; }
 function round(n: number, d: number) { const f = 10 ** d; return Math.round(n * f) / f; }

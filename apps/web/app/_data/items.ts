@@ -8,7 +8,7 @@ export const rowColumns = {
   language: items.language, license: items.license, stars: items.stars, openIssues: items.openIssues,
   pushedAt: items.pushedAt, lastReleaseAt: items.lastReleaseAt, archived: items.archived,
   deprecated: items.deprecated, deprecationMessage: items.deprecationMessage, advisoriesOpen: items.advisoriesOpen,
-  closedIssues: items.closedIssues, packageName: items.packageName, packageEcosystem: items.packageEcosystem,
+  closedIssues: items.closedIssues, packageName: items.packageName, packageEcosystem: items.packageEcosystem, installPackage: items.installPackage, publishedPackages: items.publishedPackages,
   healthScore: items.healthScore, upvotes: items.upvotes, downvotes: items.downvotes,
   weightedScore: items.weightedScore, createdAt: items.createdAt,
 };
@@ -17,7 +17,7 @@ export type RowItem = {
   id: string; kind: string; slug: string; url: string; description: string | null; language: string | null;
   license: string | null; stars: number; openIssues: number | null; closedIssues: number | null; pushedAt: Date | null; lastReleaseAt: Date | null;
   archived: boolean; deprecated: boolean | null; deprecationMessage: string | null; advisoriesOpen: number | null;
-  packageName: string | null; packageEcosystem: string | null; healthScore: number; upvotes: number; downvotes: number; weightedScore: number;
+  packageName: string | null; packageEcosystem: string | null; installPackage: string | null; publishedPackages: { ecosystem: string; name: string }[] | null; healthScore: number; upvotes: number; downvotes: number; weightedScore: number;
 };
 
 export type Compat = Record<string, { works: number; broken: number }>;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cleanWhy, parentRepo, safeNext, installCommand } from "./labels";
+import { cleanWhy, parentRepo, safeNext, installCommand, installNote } from "./labels";
 
 describe("cleanWhy", () => {
   it("drops the match label", () => {
@@ -25,8 +25,14 @@ describe("helpers", () => {
     expect(safeNext("//evil.example.com")).toBe("/");
     expect(safeNext("/r/a/b")).toBe("/r/a/b");
   });
-  it("installs a verified package, else clones", () => {
-    expect(installCommand({ kind: "repo", slug: "a/b", url: "https://github.com/a/b", packageName: "b", packageEcosystem: "npm" })).toBe("npm install b");
+  it("installs only the verified primary package, else clones", () => {
+    expect(installCommand({ kind: "repo", slug: "a/b", url: "https://github.com/a/b", installPackage: "b", packageEcosystem: "npm" })).toBe("npm install b");
+    expect(installCommand({ kind: "repo", slug: "a/b", url: "https://github.com/a/b", installPackage: "b", publishedPackages: [{ ecosystem: "PyPI", name: "b" }] })).toBe("pip install b");
+    expect(installCommand({ kind: "repo", slug: "a/b", url: "https://github.com/a/b", installPackage: "b", packageEcosystem: "crates.io" })).toBe("cargo add b");
+    // A monorepo's side package is verified as the repo's, but it is never offered as the install.
+    const mono = { kind: "repo", slug: "prisma/orm", url: "https://github.com/prisma/orm", installPackage: null, publishedPackages: [{ ecosystem: "npm", name: "@prisma/orm-toolchain" }] };
+    expect(installCommand(mono)).toBe("git clone https://github.com/prisma/orm.git");
+    expect(installNote(mono)).toMatch(/none is verified as the one to install/);
     expect(installCommand({ kind: "repo", slug: "a/b", url: "https://github.com/a/b" })).toBe("git clone https://github.com/a/b.git");
   });
 });

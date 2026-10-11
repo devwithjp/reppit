@@ -3,7 +3,7 @@ import {
   packageNameFromPackageJson, packageNameFromPyproject, githubSlugFromUrl, checkNpm, checkPypi, osvOpenAdvisories,
   countDistinctAdvisories, checkPackageSignals, type FetchLike,
   packageNameFromSetupCfg, packageNameFromSetupPy, packageNameFromCargoToml, checkCrates, osvOpenAdvisoriesBatch, resolvePackage,
-  fetchManifestsRaw, goModInfo, goProxyEscape, checkGo, confirmNoPackage,
+  fetchManifestsRaw, goModInfo, goProxyEscape, checkGo, confirmNoPackage, resolvePackages, combinePackageSignals,
 } from "../src/signals";
 
 /** Route table fake. Bodies below follow shapes recorded from the live APIs on 2026-10-11. */
@@ -109,7 +109,7 @@ describe("checkPackageSignals", () => {
   const now = new Date("2026-10-11T00:00:00Z");
   it("repo with no package: everything unknown, but the check is recorded", async () => {
     const s = await checkPackageSignals(["torvalds/linux"], { packageJson: null, pyproject: null }, fake({}), now);
-    expect(s).toEqual({ packageEcosystem: null, packageName: null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now });
+    expect(s).toEqual({ packageEcosystem: null, packageName: null, installPackage: null, publishedPackages: null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now });
   });
   it("deprecated npm package with an advisory", async () => {
     const f = fake({
@@ -317,5 +317,92 @@ describe("self-declared repository links", () => {
   it("still trusts a name the repo's own manifest gives, whatever the language", async () => {
     const f = fake({ "https://registry.npmjs.org/tool/latest": { name: "tool", version: "1.0.0", repository: "acme/tool" } });
     expect(await resolvePackage(["acme/tool"], { packageJson: '{"name":"tool"}' }, f, { language: "Go" })).toMatchObject({ name: "tool" });
+  });
+});
+
+describe("install package: only the repo's primary package", () => {
+  const npm = (name: string, repo: string, extra: object = {}) => ({ name, version: "1.0.0", repository: { url: `git+https://github.com/${repo}.git` }, ...extra });
+  const search = (repo: string, names: string[]) => ({ objects: names.map((n) => ({ package: { name: n, links: { repository: `https://github.com/${repo}` } } })) });
+  const privateRoot = { packageJson: '{"name":"root","private":true}' };
+
+  it("prisma/orm: a tooling side package is published, not installable", async () => {
+    const f = fake({
+      "https://registry.npmjs.org/orm/latest": npm("orm", "dresende/node-orm2"),
+      "https://registry.npmjs.org/-/v1/search?text=orm&size=10": search("prisma/orm", ["@prisma/orm-toolchain"]),
+      "https://registry.npmjs.org/@prisma%2form-toolchain/latest": npm("@prisma/orm-toolchain", "prisma/orm", { version: "8.0.0-rc.1" }),
+    });
+    const r = await resolvePackages(["prisma/orm"], privateRoot, f, { language: "TypeScript" });
+    expect(r.packages.map((p) => p.name)).toEqual(["@prisma/orm-toolchain"]);
+    expect(r.install).toBeNull();
+  });
+  it("TanStack/query: core and react packages link back, neither is the install", async () => {
+    const f = fake({
+      "https://registry.npmjs.org/-/v1/search?text=query&size=10": search("TanStack/query", ["@tanstack/query-core", "@tanstack/react-query"]),
+      "https://registry.npmjs.org/@tanstack%2fquery-core/latest": npm("@tanstack/query-core", "TanStack/query"),
+      "https://registry.npmjs.org/@tanstack%2freact-query/latest": npm("@tanstack/react-query", "TanStack/query"),
+    });
+    const r = await resolvePackages(["TanStack/query"], privateRoot, f, { language: "TypeScript" });
+    expect(r.packages.map((p) => p.name)).toEqual(["@tanstack/query-core", "@tanstack/react-query"]);
+    expect(r.install).toBeNull();
+  });
+  it("diegomura/react-pdf: the same-named npm package belongs to someone else; types are not the install", async () => {
+    const f = fake({
+      "https://registry.npmjs.org/react-pdf/latest": npm("react-pdf", "wojtekmaj/react-pdf"),
+      "https://registry.npmjs.org/-/v1/search?text=react-pdf&size=10": search("diegomura/react-pdf", ["@react-pdf/types"]),
+      "https://registry.npmjs.org/@react-pdf%2ftypes/latest": npm("@react-pdf/types", "diegomura/react-pdf"),
+    });
+    const r = await resolvePackages(["diegomura/react-pdf"], privateRoot, f, { language: "TypeScript" });
+    expect(r.packages.map((p) => p.name)).toEqual(["@react-pdf/types"]);
+    expect(r.install).toBeNull();
+  });
+  it("OpenHands: a UI package found by search is never the install; the root pyproject's package is", async () => {
+    const urls = { project_urls: { Repository: "https://github.com/OpenHands/OpenHands" } };
+    const base = {
+      "https://registry.npmjs.org/-/v1/search?text=openhands&size=10": search("OpenHands/OpenHands", ["@openhands/agent-canvas"]),
+      "https://registry.npmjs.org/@openhands%2fagent-canvas/latest": npm("@openhands/agent-canvas", "OpenHands/OpenHands"),
+      "https://registry.npmjs.org/@openhands%2fagent-canvas": { versions: { "1.0.0": {}, "1.1.0": {}, "1.2.0": {} } },
+    };
+    const noPy = await resolvePackages(["OpenHands/OpenHands"], privateRoot, fake(base), { language: "Python" });
+    expect(noPy.packages.map((p) => p.name)).toEqual(["@openhands/agent-canvas"]);
+    expect(noPy.install).toBeNull();
+    // As on GitHub today: the root package.json itself publishes the UI package. Still not the install for a Python repo.
+    const rootUi = await resolvePackages(["OpenHands/OpenHands"], { packageJson: '{"name":"@openhands/agent-canvas"}' }, fake(base), { language: "Python" });
+    expect(rootUi.packages.map((p) => p.name)).toEqual(["@openhands/agent-canvas"]);
+    expect(rootUi.install).toBeNull();
+    const withPy = await resolvePackages(["OpenHands/OpenHands"], { ...privateRoot, pyproject: '[project]\nname = "openhands-ai"' },
+      fake({ ...base, "https://pypi.org/pypi/openhands-ai/json": { info: { name: "openhands-ai", version: "1.0", ...urls } } }), { language: "Python" });
+    expect(withPy.install?.name).toBe("openhands-ai");
+  });
+  it("installs when the name is the repo's, @owner/repo, or the root manifest's own", async () => {
+    const ws = await resolvePackages(["websockets/ws"], { packageJson: '{"name":"ws"}' }, fake({ "https://registry.npmjs.org/ws/latest": npm("ws", "websockets/ws") }));
+    expect(ws.install?.name).toBe("ws");
+    const scoped = await resolvePackages(["acme/thing"], privateRoot, fake({ "https://registry.npmjs.org/@acme%2fthing/latest": npm("@acme/thing", "acme/thing") }));
+    expect(scoped.install?.name).toBe("@acme/thing");
+    const rootName = await resolvePackages(["vercel/next.js"], { packageJson: '{"name":"next"}' }, fake({ "https://registry.npmjs.org/next/latest": npm("next", "vercel/next.js") }));
+    expect(rootName.install?.name).toBe("next");
+    // Repo name beats the root manifest's name (docling, not docling-slim).
+    const urls = { project_urls: { Repository: "https://github.com/docling-project/docling" } };
+    const docling = await resolvePackages(["docling-project/docling"], { pyproject: '[project]\nname = "docling-slim"' }, fake({
+      "https://pypi.org/pypi/docling/json": { info: { name: "docling", version: "2", ...urls } },
+      "https://pypi.org/pypi/docling-slim/json": { info: { name: "docling-slim", version: "2", ...urls } },
+    }));
+    expect(docling.install?.name).toBe("docling");
+    expect(docling.packages.map((p) => p.name)).toEqual(["docling", "docling-slim"]);
+  });
+});
+
+describe("signals across every published package", () => {
+  const now = new Date("2026-10-12T00:00:00Z");
+  const pkg = (name: string, deprecated = false) => ({ ecosystem: "npm" as const, name, version: "1.0.0", deprecated, deprecationMessage: deprecated ? "gone" : null });
+  it("sums advisories over all packages, and is unknown if any count is unknown", () => {
+    const r = { packages: [pkg("@x/core"), pkg("@x/react")], install: null };
+    expect(combinePackageSignals(r, [1, 2], now)).toMatchObject({ advisoriesOpen: 3, installPackage: null, packageName: "@x/core", publishedPackages: [{ ecosystem: "npm", name: "@x/core" }, { ecosystem: "npm", name: "@x/react" }] });
+    expect(combinePackageSignals(r, [1, null], now).advisoriesOpen).toBeNull();
+  });
+  it("deprecation follows the install package, else needs every package deprecated", () => {
+    expect(combinePackageSignals({ packages: [pkg("a", true), pkg("b")], install: null }, [0, 0], now).deprecated).toBe(false);
+    expect(combinePackageSignals({ packages: [pkg("a", true), pkg("b", true)], install: null }, [0, 0], now).deprecated).toBe(true);
+    const main = pkg("main", true);
+    expect(combinePackageSignals({ packages: [main, pkg("side")], install: main }, [0, 0], now)).toMatchObject({ deprecated: true, installPackage: "main" });
   });
 });

@@ -146,6 +146,7 @@ export async function refreshHealth(db: Db, itemId: string, now: Date = new Date
 export async function applySignals(db: Db, itemId: string, s: {
   packageEcosystem: string | null; packageName: string | null; deprecated: boolean | null; deprecationMessage: string | null;
   advisoriesOpen: number | null; signalsCheckedAt: Date; registryLicense?: string | null;
+  installPackage?: string | null; publishedPackages?: { ecosystem: string; name: string }[] | null;
 } | null, now: Date = new Date()) {
   if (!s) return false;
   const { registryLicense, ...cols } = s;

@@ -40,9 +40,9 @@ import path from "node:path";
 import { and, eq, or, desc, inArray, sql } from "drizzle-orm";
 import { getDb, items, itemAliases, type Db } from "@gitit/db";
 import {
-  fetchManifestsRaw, resolvePackage, osvOpenAdvisoriesBatch, applySignals, noPackageSignals, trustScore,
+  fetchManifestsRaw, resolvePackages, combinePackageSignals, osvOpenAdvisoriesBatch, applySignals, noPackageSignals, trustScore,
   fetchReadmeRaw, embedderFromEnv, itemEmbeddingText, confirmNoPackage,
-  type FetchLike, type ResolvedPackage,
+  type FetchLike, type ResolvedPackage, type ResolvedPackages,
 } from "@gitit/core";
 
 config();
@@ -126,7 +126,7 @@ async function main() {
   const embedder = embedderFromEnv();
   console.log(`visiting ${todo.length} repos: ${todo.filter((r) => r.signalsDue).length} due a signals check, ${todo.filter((r) => r.needsReadme).length} missing a README · embedder ${embedder.name}${dryRun ? " · DRY RUN" : ""}`);
 
-  const tally = { noPackage: 0, readmes: 0, readmeMissing: 0, checked: 0, failed: 0, packages: 0, npm: 0, PyPI: 0, "crates.io": 0, Go: 0, deprecated: 0, withAdvisories: 0, advisoriesUnknown: 0 };
+  const tally = { noPackage: 0, readmes: 0, readmeMissing: 0, checked: 0, failed: 0, packages: 0, npm: 0, PyPI: 0, "crates.io": 0, Go: 0, installable: 0, deprecated: 0, withAdvisories: 0, advisoriesUnknown: 0 };
   const osvCache = new Map();
   const t0 = Date.now();
 
@@ -135,7 +135,7 @@ async function main() {
     const aliasRows = await db.select({ itemId: itemAliases.itemId, slug: itemAliases.slug }).from(itemAliases).where(inArray(itemAliases.itemId, chunk.map((r) => r.id)));
 
     // 1-3: manifests and registry, CONCURRENCY repos at a time (pacing is per host, below this).
-    const resolved: { row: Row; hit: ResolvedPackage | null; complete: boolean }[] = [];
+    const resolved: { row: Row; res: ResolvedPackages; complete: boolean }[] = [];
     const readmes: { row: Row; readme: string }[] = [];
     for (let j = 0; j < chunk.length; j += CONCURRENCY) {
       await Promise.all(chunk.slice(j, j + CONCURRENCY).map(async (row) => {
@@ -151,8 +151,8 @@ async function main() {
         if (!row.signalsDue) return;
         try {
           const manifests = await fetchManifestsRaw(owner, name, paced, { strict: true });
-          const hit = await resolvePackage(slugs, manifests, paced, { language: row.language });
-          resolved.push({ row, hit, complete: hit ? false : await confirmNoPackage(slug, manifests, paced) });
+          const res = await resolvePackages(slugs, manifests, paced, { language: row.language });
+          resolved.push({ row, res, complete: res.packages.length ? false : await confirmNoPackage(slug, manifests, paced) });
         } catch (e) {
           tally.failed++;
           console.warn(`  ${row.slug}: left for a later run (${(e as Error).message.slice(0, 80)})`);
@@ -160,20 +160,22 @@ async function main() {
       }));
     }
 
-    // 4: one OSV call for every package in the chunk.
-    const withVersion = resolved.filter((r) => r.hit?.version);
-    const adv = await osvOpenAdvisoriesBatch(withVersion.map((r) => ({ ecosystem: r.hit!.ecosystem, name: r.hit!.name, version: r.hit!.version! })), paced, osvCache);
-    const advBy = new Map(withVersion.map((r, k) => [r.row.id, adv[k]]));
+    // 4: one OSV call for every package in the chunk (all packages of every repo).
+    const flat = resolved.flatMap((r) => r.res.packages.filter((p) => p.version).map((p) => ({ id: r.row.id, p })));
+    const adv = await osvOpenAdvisoriesBatch(flat.map(({ p }) => ({ ecosystem: p.ecosystem, name: p.name, version: p.version! })), paced, osvCache);
+    const advOf = (id: string, p: ResolvedPackage) => { const k = flat.findIndex((x) => x.id === id && x.p === p); return k >= 0 ? adv[k] : null; };
 
     const now = new Date();
-    for (const { row, hit, complete } of resolved) {
-      const s = hit
-        ? { packageEcosystem: hit.ecosystem, packageName: hit.name, deprecated: hit.deprecated, deprecationMessage: hit.deprecationMessage, advisoriesOpen: advBy.get(row.id) ?? null, signalsCheckedAt: now, registryLicense: hit.license ?? null }
+    for (const { row, res, complete } of resolved) {
+      const s = res.packages.length
+        ? combinePackageSignals(res, res.packages.map((p) => advOf(row.id, p)), now)
         : noPackageSignals(now, complete);
-      if (!hit && complete) tally.noPackage++;
-      if (hit) {
-        tally.packages++; tally[hit.ecosystem]++;
-        if (hit.deprecated) tally.deprecated++;
+      if (!res.packages.length && complete) tally.noPackage++;
+      if (res.packages.length) {
+        const lead = res.install ?? res.packages[0];
+        tally.packages++; tally[lead.ecosystem]++;
+        if (res.install) tally.installable++;
+        if (s.deprecated) tally.deprecated++;
         if (s.advisoriesOpen === null) tally.advisoriesUnknown++; else if (s.advisoriesOpen > 0) tally.withAdvisories++;
       }
       if (!dryRun) await applySignals(db, row.id, s, now);
@@ -199,7 +201,7 @@ async function main() {
   console.log(`\nafter:  ${after.repos} repos · ${after.scored} scored · ${after.notEnough} "not enough data"`);
   console.log(`moved to a real score: ${before.notEnough - after.notEnough}`);
   console.log(`READMEs filled and re-embedded: ${tally.readmes} · no README file found: ${tally.readmeMissing}`);
-  console.log(`confirmed no package ${tally.noPackage}`);
+  console.log(`confirmed no package ${tally.noPackage} · repos with a primary package to install ${tally.installable}`);
   console.log(`packages verified ${tally.packages} (npm ${tally.npm}, PyPI ${tally.PyPI}, crates.io ${tally["crates.io"]}, Go ${tally.Go}) · deprecated ${tally.deprecated} · with open advisories ${tally.withAdvisories} · advisories unknown ${tally.advisoriesUnknown} · failed ${tally.failed} · retries ${counts.retries} · ${((Date.now() - t0) / 1000).toFixed(0)}s`);
   process.exit(0);
 }

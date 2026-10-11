@@ -65,6 +65,14 @@ export const items = pgTable("items", {
   // The package this repo publishes, verified to point back at this repo. Null = none found.
   packageEcosystem: text("package_ecosystem"), // OSV ecosystem name ("npm" | "PyPI" | "crates.io" | "Go"), "none" = confirmed no package, null = unknown
   packageName: text("package_name"),
+  // The one package to install, only when it is demonstrably the repo's primary package: its name
+  // equals the repo name or @owner/repo, or it is the root manifest's own published name. Null in
+  // monorepos where the verified packages are side packages (@prisma/orm-toolchain,
+  // @tanstack/query-core): the install line then points at the repo's docs. Ecosystem: package_ecosystem.
+  installPackage: text("install_package"),
+  // Every verified package this repo publishes, [{ ecosystem, name }]. Advisories and deprecation are
+  // read across all of them. Null = not checked.
+  publishedPackages: jsonb("published_packages").$type<{ ecosystem: string; name: string }[]>(),
   // true = registry marks the latest release deprecated (npm `deprecated`, PyPI yanked / Inactive).
   deprecated: boolean("deprecated"),
   deprecationMessage: text("deprecation_message"),

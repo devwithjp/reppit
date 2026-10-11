@@ -32,6 +32,10 @@ export interface PackageSignals {
   signalsCheckedAt: Date;
   /** Licence the verified package declares (SPDX-looking only). Used when GitHub detected none. */
   registryLicense?: string | null;
+  /** The package to install (primary only), or null. */
+  installPackage?: string | null;
+  /** Every verified package; null = not checked, [] = none. */
+  publishedPackages?: { ecosystem: string; name: string }[] | null;
 }
 
 /** `name` from a package.json, or null when absent, unparsable, or `private: true`. */
@@ -346,63 +350,128 @@ const ECOSYSTEM_LANGUAGES: Record<Exclude<Ecosystem, "Go">, string[]> = {
 const fitsLanguage = (eco: Ecosystem, language?: string | null) =>
   eco === "Go" || !language || ECOSYSTEM_LANGUAGES[eco].includes(language.toLowerCase());
 
+export interface ResolvedPackages {
+  /** Every verified package this repo publishes (registry links back), primary first. */
+  packages: ResolvedPackage[];
+  /** The package to install, or null when none is demonstrably the repo's primary one. */
+  install: ResolvedPackage | null;
+}
+
+const norm = (n: string) => n.toLowerCase().replace(/[-_.]+/g, "-");
+
 /**
- * The repo's own published package. Every candidate must be confirmed by its registry entry linking
- * back to one of `slugs`, so a name collision never counts. Candidates, in order:
+ * The packages a repo publishes, and separately the one to install. Every candidate must be
+ * confirmed by its registry entry linking back to one of `slugs`, so a name collision never counts.
+ * Candidates:
  *   0. a Go module from the root go.mod, published on proxy.golang.org, whose Origin is this repo;
- *   1. the repo's own name, in each ecosystem the repo has a root manifest for (so docling resolves
- *      to `docling`, not the `docling-slim` its pyproject names, and localstack to `localstack`);
+ *   1. the repo's own name, in each ecosystem the repo has a root manifest for;
  *   2. names from root manifests: package.json, pyproject.toml, setup.cfg, setup.py, Cargo.toml;
  *   3. package.json in monorepo folders named like the repo (drizzle-orm/, packages/react/);
- *   4. npm search for the repo name, filtered by repository link (when a package.json exists).
+ *   4. only when nothing primary was found: npm search for the repo name, filtered by repository
+ *      link (up to 5), so signals still see a monorepo's packages.
  * Steps 1 and 4 are not grounded in the repo's own files, and a registry's repository field is
  * self-declared (npm "rails" is an unrelated 2022 beta claiming rails/rails). So when the ecosystem
  * does not fit the repo's primary language, those candidates must also be established: at least 3
  * non-prerelease versions (typescript, electron, uv pass; the rails squat does not).
- * Null = no verified package. Throws when a registry call fails, so callers can tell "none" from
- * "could not check".
+ *
+ * Install: a package that links back only proves it belongs to the repo, and in a monorepo every
+ * package links back (@prisma/orm-toolchain, @tanstack/query-core, @react-pdf/types,
+ * @openhands/agent-canvas). So `install` is set only for a primary package: its name equals the repo
+ * name, or `@<owner>/<repo>`, or it is the root manifest's own published name (root package.json when
+ * not private, root pyproject/setup.cfg/setup.py, root Cargo.toml [package], root go.mod) in an
+ * ecosystem that fits the repo's language. Preference in that order. Otherwise null, and the install
+ * line points at the repo's docs.
+ * Throws when a registry call fails, so callers can tell "none" from "could not check".
  */
-export async function resolvePackage(slugs: string[], m: RepoManifests, f: FetchLike = fetch, opts: { language?: string | null } = {}): Promise<ResolvedPackage | null> {
-  const repoName = (slugs[0] ?? "").split("/")[1]?.toLowerCase() ?? "";
+export async function resolvePackages(slugs: string[], m: RepoManifests, f: FetchLike = fetch, opts: { language?: string | null } = {}): Promise<ResolvedPackages> {
+  const [owner = "", repoRaw = ""] = (slugs[0] ?? "").replace(/~[0-9a-f]{8}$/, "").split("/");
+  const repoName = repoRaw.toLowerCase();
   const hasNpm = !!m.packageJson || (m.subPackageJsons ?? []).some(Boolean);
   const hasPy = !!(m.pyproject || m.setupCfg || m.setupPy);
   const hasCargo = !!m.cargoToml;
-  if (m.goMod) { const go = await checkGo(m.goMod, slugs, f); if (go) return go; }
+  const rootNames = {
+    npm: packageNameFromPackageJson(m.packageJson),
+    py: [packageNameFromPyproject(m.pyproject), packageNameFromSetupCfg(m.setupCfg), packageNameFromSetupPy(m.setupPy)].filter((x): x is string => !!x),
+    cargo: packageNameFromCargoToml(m.cargoToml),
+  };
+  const grounded = new Set([rootNames.npm, ...(m.subPackageJsons ?? []).map(packageNameFromPackageJson), ...rootNames.py, rootNames.cargo]
+    .filter((x): x is string => !!x).map(norm));
+
+  /** 0 = repo name, 1 = @owner/repo, 2 = root manifest's own name, null = not primary. */
+  const primaryRank = (p: ResolvedPackage): number | null => {
+    const n = norm(p.name);
+    if (p.ecosystem === "Go") return 2; // only ever from the root go.mod
+    if (n === norm(repoName)) return 0;
+    if (p.ecosystem === "npm" && n === norm(`@${owner}/${repoName}`)) return 1;
+    // The root manifest's own name counts only in an ecosystem that fits the repo's language: a Python
+    // agent app whose root package.json publishes a UI (@openhands/agent-canvas) is not installed with npm.
+    const root = p.ecosystem === "npm" ? [rootNames.npm] : p.ecosystem === "PyPI" ? rootNames.py : [rootNames.cargo];
+    return root.some((r) => r && norm(r) === n) && fitsLanguage(p.ecosystem, opts.language) ? 2 : null;
+  };
+
+  const found: ResolvedPackage[] = [];
   const tried = new Set<string>();
   const attempt = async (eco: Ecosystem, name: string | null): Promise<ResolvedPackage | null> => {
     if (!name) return null;
-    const key = `${eco}:${eco === "npm" ? name : name.toLowerCase().replace(/[-_.]+/g, "-")}`;
+    const key = `${eco}:${norm(name)}`;
     if (tried.has(key)) return null;
     tried.add(key);
     if (eco === "npm" && !/^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/i.test(name)) return null; // not a valid npm name
     return eco === "npm" ? checkNpm(name, slugs, f) : eco === "PyPI" ? checkPypi(name, slugs, f) : eco === "crates.io" ? checkCrates(name, slugs, f) : null;
   };
-  const steps: [Ecosystem, string | null][] = [];
-  /** Ungrounded candidates (repo name, npm search) in an ecosystem that does not fit the language must be established. */
-  const grounded = new Set([
-    packageNameFromPackageJson(m.packageJson), ...(m.subPackageJsons ?? []).map(packageNameFromPackageJson),
-    packageNameFromPyproject(m.pyproject), packageNameFromSetupCfg(m.setupCfg), packageNameFromSetupPy(m.setupPy), packageNameFromCargoToml(m.cargoToml),
-  ].filter((x): x is string => !!x).map((x) => x.toLowerCase().replace(/[-_.]+/g, "-")));
+  const keep = (hit: ResolvedPackage | null) => { if (hit && !found.some((x) => x.ecosystem === hit.ecosystem && norm(x.name) === norm(hit.name))) found.push(hit); };
   const ungrounded = async (eco: Ecosystem, name: string) => {
     const hit = await attempt(eco, name);
-    if (!hit || fitsLanguage(eco, opts.language) || grounded.has(hit.name.toLowerCase().replace(/[-_.]+/g, "-"))) return hit;
+    if (!hit || fitsLanguage(eco, opts.language) || grounded.has(norm(hit.name))) return hit;
     const stable = hit.stableReleases ?? (eco === "npm" ? await npmStableReleases(hit.name, f) : 0);
     return stable >= ESTABLISHED_MIN_RELEASES ? hit : null;
   };
+
+  if (m.goMod) keep(await checkGo(m.goMod, slugs, f));
   if (repoName) {
-    if (hasNpm) { const hit = await ungrounded("npm", repoName); if (hit) return hit; }
-    if (hasPy) { const hit = await ungrounded("PyPI", repoName); if (hit) return hit; }
-    if (hasCargo) { const hit = await ungrounded("crates.io", repoName); if (hit) return hit; }
+    if (hasNpm) { keep(await ungrounded("npm", repoName)); keep(await ungrounded("npm", `@${owner.toLowerCase()}/${repoName}`)); }
+    if (hasPy) keep(await ungrounded("PyPI", repoName));
+    if (hasCargo) keep(await ungrounded("crates.io", repoName));
   }
-  steps.push(["npm", packageNameFromPackageJson(m.packageJson)]);
-  for (const py of [packageNameFromPyproject(m.pyproject), packageNameFromSetupCfg(m.setupCfg), packageNameFromSetupPy(m.setupPy)]) steps.push(["PyPI", py]);
-  steps.push(["crates.io", packageNameFromCargoToml(m.cargoToml)]);
-  for (const sub of m.subPackageJsons ?? []) steps.push(["npm", packageNameFromPackageJson(sub)]);
-  for (const [eco, name] of steps) { const hit = await attempt(eco, name); if (hit) return hit; }
-  if (hasNpm && repoName) {
-    for (const name of await npmSearchByRepo(repoName, slugs, f)) { const hit = await ungrounded("npm", name); if (hit) return hit; }
+  keep(await attempt("npm", rootNames.npm));
+  for (const py of rootNames.py) keep(await attempt("PyPI", py));
+  keep(await attempt("crates.io", rootNames.cargo));
+  for (const sub of m.subPackageJsons ?? []) keep(await attempt("npm", packageNameFromPackageJson(sub)));
+  if (hasNpm && repoName && !found.some((p) => primaryRank(p) !== null)) {
+    for (const name of (await npmSearchByRepo(repoName, slugs, f)).slice(0, 5)) keep(await ungrounded("npm", name));
   }
-  return null;
+
+  const ranked = found.map((p) => ({ p, r: primaryRank(p) }));
+  const primary = ranked.filter((x) => x.r !== null).sort((a, b) => a.r! - b.r!)[0]?.p ?? null;
+  const packages = primary ? [primary, ...found.filter((p) => p !== primary)] : found;
+  return { packages, install: primary };
+}
+
+/** The install package, else the first verified one. Kept for callers that need a single package. */
+export async function resolvePackage(slugs: string[], m: RepoManifests, f: FetchLike = fetch, opts: { language?: string | null } = {}): Promise<ResolvedPackage | null> {
+  const r = await resolvePackages(slugs, m, f, opts);
+  return r.install ?? r.packages[0] ?? null;
+}
+
+/**
+ * Signals from everything a repo publishes. `advisories[i]` is the OSV count for `packages[i]`
+ * (null = unknown). Advisories: the sum over all verified packages, since an advisory in any package
+ * the repo ships is real; null if any package's count is unknown. Deprecated: the install package's
+ * flag when there is one; otherwise true only when every verified package is deprecated (a dead side
+ * package does not make the project dead).
+ */
+export function combinePackageSignals(r: ResolvedPackages, advisories: (number | null)[], now: Date): PackageSignals {
+  const lead = r.install ?? r.packages[0];
+  const sum = advisories.length === r.packages.length && advisories.every((n) => typeof n === "number") ? advisories.reduce<number>((a, n) => a + (n as number), 0) : null;
+  const deprecated = r.install ? r.install.deprecated : r.packages.every((p) => p.deprecated);
+  const message = r.install ? r.install.deprecationMessage : deprecated ? lead.deprecationMessage : null;
+  return {
+    packageEcosystem: lead.ecosystem, packageName: lead.name,
+    installPackage: r.install?.name ?? null,
+    publishedPackages: r.packages.map((p) => ({ ecosystem: p.ecosystem, name: p.name })),
+    deprecated, deprecationMessage: message, advisoriesOpen: sum, signalsCheckedAt: now,
+    registryLicense: (r.install ?? lead).license ?? null,
+  };
 }
 
 /**
@@ -412,10 +481,10 @@ export async function resolvePackage(slugs: string[], m: RepoManifests, f: Fetch
  */
 export async function checkPackageSignals(slugs: string[], manifests: RepoManifests, f: FetchLike = fetch, now = new Date(), opts: { language?: string | null } = {}): Promise<PackageSignals | null> {
   try {
-    const hit = await resolvePackage(slugs, manifests, f, opts);
-    if (!hit) return noPackageSignals(now, await confirmNoPackage(slugs[0] ?? "", manifests, f));
-    const advisoriesOpen = hit.version ? await osvOpenAdvisories({ ecosystem: hit.ecosystem, name: hit.name }, hit.version, f) : null;
-    return { packageEcosystem: hit.ecosystem, packageName: hit.name, deprecated: hit.deprecated, deprecationMessage: hit.deprecationMessage, advisoriesOpen, signalsCheckedAt: now, registryLicense: hit.license ?? null };
+    const r = await resolvePackages(slugs, manifests, f, opts);
+    if (!r.packages.length) return noPackageSignals(now, await confirmNoPackage(slugs[0] ?? "", manifests, f));
+    const adv = await osvOpenAdvisoriesBatch(r.packages.map((p) => ({ ecosystem: p.ecosystem, name: p.name, version: p.version ?? "" })), f);
+    return combinePackageSignals(r, r.packages.map((p, i) => (p.version ? adv[i] : null)), now);
   } catch {
     return null;
   }
@@ -446,7 +515,7 @@ export async function confirmNoPackage(slug: string, manifests: RepoManifests, f
  * applicable in the trust score. Unconfirmed leaves them unknown.
  */
 export const noPackageSignals = (now: Date, confirmed = false): PackageSignals =>
-  ({ packageEcosystem: confirmed ? NO_PACKAGE : null, packageName: null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now });
+  ({ packageEcosystem: confirmed ? NO_PACKAGE : null, packageName: null, installPackage: null, publishedPackages: confirmed ? [] : null, deprecated: null, deprecationMessage: null, advisoriesOpen: null, signalsCheckedAt: now });
 
 export const MANIFEST_FILES: Record<Exclude<keyof RepoManifests, "subPackageJsons" | "complete">, string> = {
   packageJson: "package.json", pyproject: "pyproject.toml", setupCfg: "setup.cfg", setupPy: "setup.py", cargoToml: "Cargo.toml", goMod: "go.mod",
