@@ -327,7 +327,7 @@ export interface RepoManifests {
   goMod?: string | null;
   /** package.json files from monorepo folders named like the repo (`<name>/`, `packages/<name>/`). */
   subPackageJsons?: (string | null)[];
-  /** The root directory is a Go `main` package (main.go at the root): the module is an app. */
+  /** The module builds a program: a `main` package at the root (main.go or <name>.go) or cmd/<name>/main.go. */
   goRootIsMain?: boolean;
   /**
    * True only when every manifest file (root, and monorepo folders when the root is private) was
@@ -475,8 +475,11 @@ export async function resolvePackages(slugs: string[], m: RepoManifests, f: Fetc
   // Primary packages, best rank first; one per registry.
   const primaries = found.map((p) => ({ p, r: primaryRank(p) })).filter((x) => x.r !== null).sort((a, b) => a.r! - b.r!).map((x) => x.p);
   const perRegistry = primaries.filter((p, i) => primaries.findIndex((q) => q.ecosystem === p.ecosystem) === i);
+  // When the primary package in the repo language's own registry is an app (dbmate's Go module), the
+  // repo is an app: a wrapper in another registry (dbmate on npm) is not offered as its install.
+  const nativeApp = perRegistry.some((p) => p.kind === "app" && opts.language && fitsLanguage(p.ecosystem, opts.language) && (p.ecosystem !== "Go" || opts.language.toLowerCase() === "go"));
   // Installable options exclude apps; the repo language's registry goes first.
-  const libs = perRegistry.filter((p) => p.kind !== "app");
+  const libs = nativeApp ? [] : perRegistry.filter((p) => p.kind !== "app");
   const options = [...libs.filter((p) => fitsLanguage(p.ecosystem, opts.language) && opts.language), ...libs.filter((p) => !(fitsLanguage(p.ecosystem, opts.language) && opts.language))];
   const install = options[0] ?? null;
   const installKind: InstallKind | null = install ? "package" : perRegistry.length ? "app" : found.length ? "docs" : null;
@@ -489,6 +492,49 @@ export async function resolvePackages(slugs: string[], m: RepoManifests, f: Fetc
 export async function resolvePackage(slugs: string[], m: RepoManifests, f: FetchLike = fetch, opts: { language?: string | null } = {}): Promise<ResolvedPackage | null> {
   const r = await resolvePackages(slugs, m, f, opts);
   return r.install ?? r.packages[0] ?? null;
+}
+
+/**
+ * Whether a README's install section says "this is an application": its first install command is a
+ * system or binary install (brew, curl/wget pipes, PowerShell downloads, scoop/winget/choco, apt/snap,
+ * docker), or it points at downloading a binary/release before any command. A first command that adds
+ * a dependency (npm/yarn/pnpm install, pip install, cargo add, go get, poetry/uv add) means a library.
+ * Null when there is no recognisable install section.
+ */
+export function readmeSuggestsApp(readme: string | null | undefined): boolean | null {
+  if (!readme) return null;
+  const lines = readme.split(/\r?\n/);
+  const start = lines.findIndex((l, i) => /^#{1,4}\s.*\b(install|installation|getting started|quick ?start|setup)\b/i.test(l) || (/\b(install|installation)\b/i.test(l) && /^[=-]{3,}\s*$/.test(lines[i + 1] ?? "")));
+  if (start < 0) return null;
+  const level = (lines[start].match(/^#+/)?.[0].length) ?? 2;
+  const section: string[] = [];
+  for (let i = start + 1; i < lines.length && section.length < 80; i++) {
+    const h = lines[i].match(/^(#+)\s/);
+    if (h && h[1].length <= level) break;
+    section.push(lines[i]);
+  }
+  const APP = /^(sudo\s+)?(brew|curl|wget|iwr|irm|scoop|winget|choco|snap|flatpak|apt(-get)?|dnf|yum|pacman|yay|docker|podman)\b/i;
+  const LIB = /^(npm|yarn|pnpm|bun)\s+(i|install|add)\b(?!.*\s(-g|--global)\b)|^(pip3?|python3? -m pip)\s+install\b|^cargo\s+add\b|^go\s+get\b|^(poetry|uv|pdm|rye)\s+add\b|^dotnet\s+add\b|^composer\s+require\b|^gem\s+install\b|^bundle\s+add\b/i;
+  let inCode = false;
+  for (const raw of section) {
+    const line = raw.trim();
+    if (line.startsWith("```")) { inCode = !inCode; continue; }
+    const cmd = line.replace(/^\$\s*/, "").replace(/^>\s*/, "");
+    if (inCode || raw.startsWith("    ") || /^\$\s/.test(line)) {
+      if (!cmd || cmd.startsWith("#")) continue;
+      if (APP.test(cmd)) return true;
+      if (LIB.test(cmd)) return false;
+      continue;
+    }
+    if (/\b(download|grab)\b.{0,60}\b(binar(y|ies)|release|executable)/i.test(line)) return true;
+  }
+  return null;
+}
+
+/** Turn a resolved "package" into an "app" when the README's install section says so. */
+export function withReadmeKind(r: ResolvedPackages, readme: string | null | undefined): ResolvedPackages {
+  if (r.installKind !== "package" || readmeSuggestsApp(readme) !== true) return r;
+  return { ...r, install: null, options: [], installKind: "app" };
 }
 
 const DEPS_DEV_SYSTEM: Record<Ecosystem, string> = { npm: "npm", PyPI: "pypi", "crates.io": "cargo", Go: "go" };
@@ -552,9 +598,9 @@ export function combinePackageSignals(r: ResolvedPackages, advisories: (number |
  * internally). Returns null when a registry call failed outright, so callers leave existing values
  * untouched rather than overwrite them with unknowns.
  */
-export async function checkPackageSignals(slugs: string[], manifests: RepoManifests, f: FetchLike = fetch, now = new Date(), opts: { language?: string | null } = {}): Promise<PackageSignals | null> {
+export async function checkPackageSignals(slugs: string[], manifests: RepoManifests, f: FetchLike = fetch, now = new Date(), opts: { language?: string | null; readme?: string | null } = {}): Promise<PackageSignals | null> {
   try {
-    const r = await resolvePackages(slugs, manifests, f, opts);
+    const r = withReadmeKind(await resolvePackages(slugs, manifests, f, opts), opts.readme);
     if (!r.packages.length) return noPackageSignals(now, await confirmNoPackage(slugs[0] ?? "", manifests, f));
     const adv = await osvOpenAdvisoriesBatch(r.packages.map((p) => ({ ecosystem: p.ecosystem, name: p.name, version: p.version ?? "" })), f);
     const releases = r.install ? await registryReleases(r.install.ecosystem, r.install.name, f, now).catch(() => null) : null;
@@ -622,8 +668,10 @@ export async function fetchManifestsRaw(owner: string, name: string, f: FetchLik
     out.subPackageJsons = await Promise.all([`${name}/package.json`, `packages/${name}/package.json`].map(get));
   }
   if (out.goMod) {
-    const mainGo = await get("main.go");
-    out.goRootIsMain = !!mainGo && /^package\s+main\b/m.test(mainGo);
+    // An app: a main package at the root (main.go, or <name>.go as in yq) or cmd/<name>/main.go.
+    const base = name.toLowerCase().replace(/\.go$/, "");
+    const mains = await Promise.all(["main.go", `${base}.go`, `cmd/${base}/main.go`].map(get));
+    out.goRootIsMain = mains.some((t) => !!t && /^package\s+main\b/m.test(t));
   }
   out.complete = complete;
   return out;

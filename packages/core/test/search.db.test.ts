@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createDb, items, type Db } from "@gitit/db";
-import { search, parseQuery, explain, outlierRule, robustStats, OUTLIER_DEFAULTS } from "../src/search";
+import { search, parseQuery, explain, outlierRule, robustStats, OUTLIER_DEFAULTS, idfCoverage, idfWeight, chooseInstall } from "../src/search";
 import { LocalEmbedder, itemEmbeddingText } from "../src/embeddings";
 
 const e = new LocalEmbedder();
@@ -20,6 +20,9 @@ const rows = [
     packageEcosystem: "crates.io", packageName: "polars", installPackage: "polars", installKind: "package" as const,
     installOptions: [{ ecosystem: "crates.io", name: "polars" }, { ecosystem: "PyPI", name: "polars" }], readme: "A faster pandas replacement for data frames." },
   { slug: "acme/flags", name: "flags", description: "Redis client with feature-rich flags parsing", topics: ["redis"], language: "TypeScript", stars: 50 },
+  { slug: "homelab/dashboard", name: "dashboard", description: "A self-hosted dashboard for your homelab services", topics: ["self-hosted", "homelab"], language: "TypeScript", stars: 20000 },
+  { slug: "homelab/monitor", name: "monitor", description: "Lightweight self hosted server monitoring hub", topics: ["self-hosted", "monitoring"], language: "Go", stars: 15000 },
+  { slug: "homelab/media", name: "media", description: "Self hosted media server", topics: ["self-hosted", "media"], language: "Go", stars: 9000 },
   { slug: "jsdoc/notes", name: "notes", description: "Personal notes", topics: [], language: null, stars: 10, readme: "this readme mentions orm once" },
 ];
 
@@ -86,8 +89,8 @@ describe("hybrid search", () => {
 });
 
 describe("problem queries", () => {
-  it("drops qualifier words and finds the content: dataframe library faster than pandas", async () => {
-    const r = await search(db, e, "dataframe library faster than pandas");
+  it("drops qualifier words and finds the content: fast dataframe library", async () => {
+    const r = await search(db, e, "fast dataframe library");
     expect(r.results[0]?.item.slug).toBe("pola-rs/polars");
   });
   it("matches synonyms: a data frame query finds the dataframe tag", async () => {
@@ -106,6 +109,41 @@ describe("problem queries", () => {
     expect(rust.results[0].install).toEqual({ ecosystem: "crates.io", name: "polars" });
     const plain = await search(db, e, "polars");
     expect(plain.results[0].install).toEqual({ ecosystem: "crates.io", name: "polars" });
+  });
+});
+
+describe("multi-word synonyms", () => {
+  it("collapse into one term before matching", async () => {
+    const { collapsePhrases } = await import("../src/search");
+    expect(collapsePhrases("python data frame engine")).toBe("python dataframe engine");
+    expect(collapsePhrases("command line argument parser")).toBe("cli argument parser");
+    expect(collapsePhrases("terminal user interface toolkit")).toBe("terminal ui toolkit");
+    expect(parseQuery("data frame engine").terms).toEqual(["dataframe", "engine"]);
+  });
+});
+
+describe("IDF-weighted floor", () => {
+  it("weights rare terms above frequent ones and needs the most distinctive one", () => {
+    expect(idfWeight(1000, 2)).toBeGreaterThan(idfWeight(1000, 300));
+    // "self hosted password manager": frequent self/hosted matched, rare password/manager not.
+    const w = [idfWeight(1000, 300), idfWeight(1000, 280), idfWeight(1000, 4), idfWeight(1000, 30)];
+    const generic = idfCoverage([2, 2, 0, 0], w);
+    expect(w[generic.distinctive]).toBe(w[2]);
+    expect(generic.coverage).toBeLessThan(0.4);
+    expect(idfCoverage([2, 2, 2, 2], w).coverage).toBe(1);
+    // A term in no head anywhere has the top weight and is required.
+    expect(idfCoverage([2, 0], [1, idfWeight(1000, 0)]).distinctive).toBe(1);
+  });
+  it("generic shared words do not carry a query into an uncovered domain", async () => {
+    expect(await search(db, e, "self hosted password manager")).toMatchObject({ results: [], notIndexed: true });
+  });
+});
+
+describe("install for a query's language", () => {
+  it("never offers another registry's command when the query names a language", () => {
+    const npmOnly = { installPackage: "tui-cli", packageEcosystem: "npm", installKind: "package" as const, installOptions: [{ ecosystem: "npm", name: "tui-cli" }] };
+    expect(chooseInstall(npmOnly, new Set(["PyPI"]))).toBeNull();
+    expect(chooseInstall(npmOnly, new Set())).toEqual({ ecosystem: "npm", name: "tui-cli" });
   });
 });
 

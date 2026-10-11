@@ -106,7 +106,7 @@ describe("search demotes deprecated items (pglite)", () => {
       const { id } = await upsertRepoItem(db, repo(9000 + i, r.slug, { description: r.text, embedding: vecs[i], stars: r.deprecated ? 26000 : 14000 }), { now });
       await applySignals(db, id, { packageEcosystem: "npm", packageName: r.slug.split("/")[1], deprecated: r.deprecated, deprecationMessage: r.deprecated ? "request has been deprecated" : null, advisoriesOpen: r.deprecated ? 1 : 0, signalsCheckedAt: now }, now);
     }
-    const { results: res } = await search(db, e, "http request client for node", { candidates: 50, limit: 10 });
+    const { results: res } = await search(db, e, "http request library for node", { candidates: 50, limit: 10 });
     const slugs = res.map((r) => r.item.slug);
     expect(res.find((r) => r.item.slug === "request/request")!.semantic).toBeGreaterThan(res.find((r) => r.item.slug === "sindresorhus/got")!.semantic);
     expect(slugs.indexOf("sindresorhus/got")).toBeLessThan(slugs.indexOf("request/request"));

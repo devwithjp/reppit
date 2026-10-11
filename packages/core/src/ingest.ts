@@ -33,7 +33,7 @@ export async function storeRepos(db: Db, embedder: Embedder, repos: PreparedRepo
     if (opts.checkSignals && r.manifests) {
       const manifests = typeof r.manifests === "function" ? await r.manifests() : r.manifests;
       const slugs = [res.slug, r.requestedSlug, res.previousSlug].filter((s): s is string => !!s);
-      const s = await checkPackageSignals(slugs, manifests, opts.fetch, opts.now, { language: r.row.language });
+      const s = await checkPackageSignals(slugs, manifests, opts.fetch, opts.now, { language: r.row.language, readme: r.row.readme });
       if (await applySignals(db, res.id, s, opts.now)) counts.signalsChecked++; else counts.signalsFailed++;
     }
   }

@@ -72,6 +72,55 @@ const LANGUAGE_WORDS: Record<string, string[]> = {
  * with SEARCH_OUTLIER_K and SEARCH_OUTLIER_MARGIN.
  */
 export const BASELINE_SIZE = 300;
+
+/**
+ * IDF-weighted relevance floor. A query term's weight is its inverse document frequency over the
+ * index's heads (name, topics, description): ln((N + 1) / (df + 1)) + 0.1. Generic words ("self",
+ * "hosted", "list", "tool") are frequent, so they weigh little without any hand list. A problem query
+ * passes on words only if its most distinctive term matches in the head and the IDF-weighted coverage
+ * (head 1, README-only 0.4) reaches IDF_COVERAGE_MIN. Tuned on the eval fixtures and negatives;
+ * override with SEARCH_IDF_COVERAGE.
+ */
+export const IDF_COVERAGE_MIN = 0.6;
+export const idfCoverageMin = (env: Record<string, string | undefined> = process.env) => {
+  const v = Number(env.SEARCH_IDF_COVERAGE);
+  return env.SEARCH_IDF_COVERAGE && Number.isFinite(v) ? v : IDF_COVERAGE_MIN;
+};
+export const idfWeight = (n: number, df: number) => Math.log((n + 1) / (df + 1)) + 0.1;
+
+/**
+ * IDF-weighted coverage and the index of the most distinctive term. hits: 2 head, 1 README only,
+ * 0 absent. A term found in no head anywhere gets the highest weight and becomes the distinctive
+ * term: nothing indexed is about it, which is the strongest sign the domain is not covered
+ * ("self hosted password manager" when no password manager is indexed).
+ */
+export function idfCoverage(hits: number[], weights: number[]): { coverage: number; distinctive: number } {
+  if (!hits.length) return { coverage: 0, distinctive: -1 };
+  const total = weights.reduce((a, w) => a + w, 0) || 1;
+  const got = hits.reduce((a, h, i) => a + weights[i] * (h === 2 ? 1 : h === 1 ? 0.4 : 0), 0);
+  const distinctive = weights.reduce((best, w, i) => (w > weights[best] ? i : best), 0);
+  return { coverage: got / total, distinctive };
+}
+
+/** Head document frequency per term form-set, cached per database for 10 minutes. */
+const dfCache = new WeakMap<object, { n: number; at: number; df: Map<string, number> }>();
+async function termWeights(db: Db, alts: string[][]): Promise<number[]> {
+  if (!alts.length) return [];
+  const now = Date.now();
+  let c = dfCache.get(db);
+  if (!c || now - c.at > 10 * 60_000) { c = { n: -1, at: now, df: new Map() }; dfCache.set(db, c); }
+  const keyOf = (forms: string[]) => forms.join("|");
+  const missing = alts.filter((f) => !c!.df.has(keyOf(f)));
+  if (missing.length || c.n < 0) {
+    const tsv = sql.raw("items.search_tsv");
+    const cols = missing.map((forms, i) => sql`count(*) filter (where ts_filter(${tsv}, ${HEAD}) @@ (${termQuery(forms)}))::int as ${sql.raw(`d${i}`)}`);
+    const r = await db.execute(sql`select count(*)::int as n${cols.length ? sql`, ${sql.join(cols, sql`, `)}` : sql``} from ${items}`);
+    const row = ((Array.isArray(r) ? r : (r as { rows: Record<string, number>[] }).rows) as Record<string, number>[])[0];
+    c.n = Number(row.n);
+    missing.forEach((forms, i) => c!.df.set(keyOf(forms), Number(row[`d${i}`])));
+  }
+  return alts.map((forms) => idfWeight(c!.n, c!.df.get(keyOf(forms)) ?? 0));
+}
 // k = 6, one step safer than the sweep's best (5): at 4 a junk query already leaks, and with only seven
 // negative queries a one-step margin is too thin. Confident junk costs more trust than one eval miss.
 export const OUTLIER_DEFAULTS = { k: 6, margin: 0.03 };
@@ -156,9 +205,21 @@ export const SYNONYM_GROUPS: string[][] = [
   ["fsm", "finite state machine"],
   ["async", "asynchronous"],
   ["resize", "resizing", "resizer"],
+  ["ui", "uis", "user interface", "user interfaces", "tui", "gui"],
 ];
 const SYNONYMS = new Map<string, string[]>();
 for (const g of SYNONYM_GROUPS) for (const w of g) SYNONYMS.set(w, g);
+/** Multi-word forms, longest first, mapped to their group's single-word head ("data frame" → "dataframe"). */
+const PHRASES = SYNONYM_GROUPS.flatMap((g) => {
+  const head = g.find((w) => !w.includes(" ") && !w.includes("-")) ?? g[0];
+  return g.filter((w) => w.includes(" ")).map((w) => [w, head] as const);
+}).sort((a, b) => b[0].length - a[0].length);
+/** Collapse multi-word synonym forms in a query into one term, so "data frame" is one word, not two. */
+export function collapsePhrases(raw: string): string {
+  let out = ` ${raw} `;
+  for (const [form, head] of PHRASES) out = out.split(` ${form} `).join(` ${head} `);
+  return out.trim();
+}
 
 export function parseQuery(query: string): ParsedQuery {
   const raw = query.trim().toLowerCase().replace(/\s+/g, " ");
@@ -168,7 +229,7 @@ export function parseQuery(query: string): ParsedQuery {
   if (gh) keys.add(gh[1]);
   const words = raw.split(" ");
   if (words.length > 1 && words.length <= 4) keys.add(words.join("-")); // "react hook form" -> react-hook-form
-  const all = [...new Set(tokenize(raw))];
+  const all = [...new Set(tokenize(collapsePhrases(raw)))];
   const languages = new Set(all.flatMap((t) => LANGUAGE_WORDS[t] ?? []));
   const topical = all.filter((t) => !LANGUAGE_WORDS[t]);
   const ecosystems = new Set([...languages].map((l) => LANGUAGE_ECOSYSTEMS[l]).filter((x): x is string => !!x));
@@ -258,6 +319,8 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
   }).from(items).where(inArray(items.id, ids));
 
   const maxRank = Math.max(1e-9, ...rows.map((r) => Number(r.rank)));
+  const weights = await termWeights(db, pq.alts);
+  const coverageMin = idfCoverageMin();
   const scale = semanticScale(embedder.name);
   const rule = vec ? outlierRule(embedder.name) : null;
   let admitAt = Number.POSITIVE_INFINITY; // similarity needed to pass on meaning alone
@@ -270,8 +333,8 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
   const scored = rows.map((r) => {
     const semantic = Math.max(0, Number(r.semantic));
     const hits = (r.hits ?? []).map(Number);
-    // README-only hits count 0.4 of a head hit (name, topics, description).
-    const coverage = hits.length ? hits.reduce((a, h) => a + (h === 2 ? 1 : h === 1 ? 0.4 : 0), 0) / hits.length : 0;
+    // IDF-weighted: README-only hits count 0.4 of a head hit (name, topics, description).
+    const { coverage, distinctive } = idfCoverage(hits, weights);
     const headHits = hits.filter((h) => h === 2).length;
     const headAll = hits.length > 0 && headHits === hits.length;
     const lexical = 0.75 * coverage + 0.25 * (Number(r.rank) / maxRank);
@@ -290,19 +353,21 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
      *   - one plain word (requests, fastapi): a name lookup. Only exact matches are results; items
      *     tagged with the word (name, topics) come back separately as `related`.
      *   - an identifier (express-rate-limit): the whole identifier as a phrase in the head.
-     *   - a problem query: the content words (qualifiers like "library" or "faster" dropped, synonyms
-     *     allowed) must be found, at least one in the head, with weighted coverage of 0.7 for one or two
-     *     content words and 0.6 for three or more (head 1, README-only 0.4); or the content words as a
-     *     phrase in the head; or, with a real embedder, a clear semantic outlier for this query
-     *     (see outlierRule).
+     *   - a problem query, on words: the most distinctive content term (highest IDF) must match in the
+     *     head, and IDF-weighted coverage must reach idfCoverageMin(). Qualifiers ("library", "faster")
+     *     are dropped and synonyms allowed. Or: the content words as a phrase in the head.
+     *   - a problem query, on meaning: a clear semantic outlier for this query (outlierRule) that also
+     *     contains the most distinctive term somewhere (head or README). Meaning alone, with none of
+     *     the query's distinctive words, is not enough for a multi-word query.
      *   - a language named in the query filters; a mismatch never passes.
      */
-    const needed = hits.length <= 2 ? 0.7 : 0.6;
-    const lexicalPass = headHits >= 1 && coverage >= needed;
+    const distinctHit = distinctive >= 0 ? hits[distinctive] : 0;
+    const lexicalPass = distinctHit === 2 && coverage >= coverageMin;
+    const semanticPass = semantic >= admitAt && (hits.length <= 1 || distinctHit >= 1);
     const isMatch = exact || (
       !pq.singleWord &&
       !langMismatch &&
-      (pq.identifier ? phrase || (hits.length === 1 && headAll) : lexicalPass || phrase || semantic >= admitAt)
+      (pq.identifier ? phrase || (hits.length === 1 && headAll) : lexicalPass || phrase || semanticPass)
     );
     const isRelated = !exact && pq.singleWord && r.tagged === true && !langMismatch;
     const inputs = { semantic: relevance, weightedScore: r.item.weightedScore, health: r.item.healthScore, stars: r.item.stars, installs: r.item.installs, archived: r.item.archived, deprecated: r.item.deprecated };
@@ -328,6 +393,9 @@ export function chooseInstall(i: Pick<Item, "installPackage" | "installOptions" 
   if (i.installKind && i.installKind !== "package") return null;
   const byQuery = (i.installOptions ?? []).find((o) => ecosystems.has(o.ecosystem));
   if (byQuery) return byQuery;
+  // The query names a language whose registry this repo does not publish to: no command from another
+  // registry (an npm package is not the answer to a Python query); the UI links the install docs.
+  if (ecosystems.size) return null;
   return i.installPackage && i.packageEcosystem ? { ecosystem: i.packageEcosystem, name: i.installPackage } : null;
 }
 

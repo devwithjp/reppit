@@ -44,7 +44,7 @@ import path from "node:path";
 import { and, eq, or, desc, inArray, sql } from "drizzle-orm";
 import { getDb, items, itemAliases, type Db } from "@gitit/db";
 import {
-  fetchManifestsRaw, resolvePackages, combinePackageSignals, osvOpenAdvisoriesBatch, applySignals, noPackageSignals, trustScore,
+  fetchManifestsRaw, resolvePackages, combinePackageSignals, withReadmeKind, osvOpenAdvisoriesBatch, applySignals, noPackageSignals, trustScore,
   fetchReadmeRaw, embedderFromEnv, itemEmbeddingText, confirmNoPackage, registryReleases,
   type FetchLike, type ResolvedPackage, type ResolvedPackages,
 } from "@gitit/core";
@@ -102,7 +102,7 @@ const paced: FetchLike = async (url, init) => {
 };
 
 type Row = {
-  id: string; slug: string; name: string; description: string | null; language: string | null; topics: string[] | null;
+  id: string; slug: string; name: string; description: string | null; language: string | null; topics: string[] | null; readme: string | null;
   needsReadme: boolean; signalsDue: boolean;
 };
 
@@ -129,7 +129,7 @@ async function main() {
   const dueSql = all ? sql<boolean>`true` : sql<boolean>`(${items.signalsCheckedAt} is null or ${items.signalsCheckedAt} < ${cutoff})`;
   const readmeSql = withReadme ? sql<boolean>`(${items.readme} is null or ${items.readme} = '')` : sql<boolean>`false`;
   let q = db.select({
-    id: items.id, slug: items.slug, name: items.name, description: items.description, language: items.language, topics: items.topics,
+    id: items.id, slug: items.slug, name: items.name, description: items.description, language: items.language, topics: items.topics, readme: items.readme,
     needsReadme: readmeSql, signalsDue: dueSql,
   }).from(items).where(and(eq(items.kind, "repo"), or(dueSql, readmeSql))).orderBy(desc(items.stars)).$dynamic();
   if (limit) q = q.limit(limit);
@@ -153,16 +153,18 @@ async function main() {
         const slug = row.slug.replace(/~[0-9a-f]{8}$/, "");
         const [owner, name] = slug.split("/");
         const slugs = [slug, ...aliasRows.filter((a) => a.itemId === row.id).map((a) => a.slug)];
+        let fetchedReadme: string | null = null;
         if (row.needsReadme) {
           try {
             const readme = await fetchReadmeRaw(owner, name, paced, { strict: true, maxChars: README_CHARS });
+            fetchedReadme = readme;
             if (readme) readmes.push({ row, readme }); else tally.readmeMissing++;
           } catch (e) { console.warn(`  ${row.slug}: README left for a later run (${(e as Error).message.slice(0, 80)})`); }
         }
         if (!row.signalsDue) return;
         try {
           const manifests = await fetchManifestsRaw(owner, name, paced, { strict: true });
-          const res = await resolvePackages(slugs, manifests, paced, { language: row.language });
+          const res = withReadmeKind(await resolvePackages(slugs, manifests, paced, { language: row.language }), fetchedReadme ?? row.readme);
           resolved.push({ row, res, complete: res.packages.length ? false : await confirmNoPackage(slug, manifests, paced) });
         } catch (e) {
           tally.failed++;

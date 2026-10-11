@@ -4,7 +4,7 @@ import {
   countDistinctAdvisories, checkPackageSignals, type FetchLike,
   packageNameFromSetupCfg, packageNameFromSetupPy, packageNameFromCargoToml, checkCrates, osvOpenAdvisoriesBatch, resolvePackage,
   fetchManifestsRaw, goModInfo, goProxyEscape, checkGo, confirmNoPackage, resolvePackages, combinePackageSignals,
-  registryReleases, isPrerelease,
+  registryReleases, isPrerelease, readmeSuggestsApp, withReadmeKind,
 } from "../src/signals";
 
 /** Route table fake. Bodies below follow shapes recorded from the live APIs on 2026-10-11. */
@@ -460,9 +460,58 @@ describe("apps and registry choice", () => {
     const asPython = await resolvePackages(["pola-rs/polars"], { cargoToml: "[workspace]" }, f, { language: "Python" });
     expect(asPython.install?.ecosystem).toBe("PyPI");
   });
-  it("skips an app entry for a library entry elsewhere (uv: the crate is a binary, pip install uv is the install)", async () => {
+  it("a native app is an app even with a wrapper in another registry (uv: Rust binary, also on PyPI)", async () => {
     const f = fake({ "https://crates.io/api/v1/crates/uv": crate("uv", "astral-sh/uv", ["uv"]), "https://pypi.org/pypi/uv/json": pypi("uv", "astral-sh/uv") });
     const r = await resolvePackages(["astral-sh/uv"], { cargoToml: "[workspace]", pyproject: '[project]\nname = "uv"' }, f, { language: "Rust" });
-    expect(r).toMatchObject({ installKind: "package", install: { ecosystem: "PyPI", name: "uv" } });
+    expect(r).toMatchObject({ installKind: "app", install: null });
+    // A library crate in another language's repo is unaffected: the app rule is about the repo's own registry.
+    const lib = await resolvePackages(["acme/tool"], { cargoToml: "[workspace]", pyproject: '[project]\nname = "tool"' },
+      fake({ "https://crates.io/api/v1/crates/tool": crate("tool", "acme/tool", ["tool"]), "https://pypi.org/pypi/tool/json": pypi("tool", "acme/tool") }), { language: "Python" });
+    expect(lib).toMatchObject({ installKind: "package", install: { ecosystem: "PyPI" } });
+  });
+  it("a Go app with an npm wrapper is an app, not npm install (database migration tool shape)", async () => {
+    const f = fake({
+      "https://proxy.golang.org/github.com/acme/migrator/@latest": { Version: "v2.0.0", Origin: { URL: "https://github.com/acme/migrator" } },
+      "https://registry.npmjs.org/migrator/latest": { name: "migrator", version: "2.0.0", repository: "acme/migrator" },
+    });
+    const r = await resolvePackages(["acme/migrator"], { goMod: "module github.com/acme/migrator", goRootIsMain: true, packageJson: '{"name":"migrator"}' }, f, { language: "Go" });
+    expect(r).toMatchObject({ installKind: "app", install: null });
+  });
+});
+
+describe("Go programs: main at the root, <name>.go or cmd/<name>", () => {
+  it("detects a main package in <name>.go and cmd/<name>/main.go", async () => {
+    const files = (map: Record<string, string>) => async (url: string) => {
+      const hit = Object.entries(map).find(([k]) => url.endsWith(`/HEAD/${k}`));
+      return hit ? new Response(hit[1]) : new Response("", { status: 404 });
+    };
+    const named = await fetchManifestsRaw("acme", "yamlq", files({ "go.mod": "module github.com/acme/yamlq/v4", "yamlq.go": "package main\n\nfunc main() {}" }));
+    expect(named.goRootIsMain).toBe(true);
+    const cmd = await fetchManifestsRaw("acme", "migrator", files({ "go.mod": "module github.com/acme/migrator", "cmd/migrator/main.go": "// tool\npackage main" }));
+    expect(cmd.goRootIsMain).toBe(true);
+    const lib = await fetchManifestsRaw("acme", "yaml", files({ "go.mod": "module github.com/acme/yaml", "yaml.go": "package yaml" }));
+    expect(lib.goRootIsMain).toBe(false);
+  });
+});
+
+describe("README install section", () => {
+  it("is an app when it leads with brew, curl, a binary download or docker", () => {
+    expect(readmeSuggestsApp("# Tool\n\n## Installation\n\n```sh\nbrew install tool\n```\n\nOr npm i tool")).toBe(true);
+    expect(readmeSuggestsApp("## Install\n\n```bash\n$ curl -fsSL https://x.sh/install | sh\n```")).toBe(true);
+    expect(readmeSuggestsApp("## Install\n\nDownload the latest binary from the releases page.\n\n```\ngo install x@latest\n```")).toBe(true);
+    expect(readmeSuggestsApp("## Quick start\n\n```\ndocker run -p 80:80 acme/app\n```")).toBe(true);
+  });
+  it("is a library when it leads with adding a dependency", () => {
+    expect(readmeSuggestsApp("## Installation\n\n```\nnpm install --save-dev lib\n```\n\n```\nbrew install lib\n```")).toBe(false);
+    expect(readmeSuggestsApp("Install\n=======\n\n    pip install lib")).toBe(false);
+    expect(readmeSuggestsApp("## Install\n\n```\ncargo add lib\n```")).toBe(false);
+    expect(readmeSuggestsApp("# Lib\nNo install section here.")).toBeNull();
+    expect(readmeSuggestsApp(null)).toBeNull();
+  });
+  it("turns a package install into an app only when the README says so", () => {
+    const pkg = { ecosystem: "Go" as const, name: "x", version: "1", deprecated: false, deprecationMessage: null };
+    const r = { packages: [pkg], install: pkg, options: [pkg], installKind: "package" as const };
+    expect(withReadmeKind(r, "## Install\n```\nbrew install x\n```")).toMatchObject({ installKind: "app", install: null, options: [] });
+    expect(withReadmeKind(r, "## Install\n```\ngo get x\n```")).toBe(r);
   });
 });
