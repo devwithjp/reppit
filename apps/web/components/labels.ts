@@ -43,6 +43,12 @@ export const KIND_LABEL: Record<string, string> = { repo: "repos", skill: "skill
 export const REPPIT_PUBLISHED = process.env.NEXT_PUBLIC_REPPIT_PUBLISHED === "1";
 export const UNPUBLISHED_NOTE = "The reppit CLI and MCP server are published on launch day.";
 
+/**
+ * Agent compatibility has no reports behind it before launch. Every place that presents the feature
+ * says so, and says where a report comes from. One wording, so pages cannot drift apart.
+ */
+export const AGENT_REPORTS_NOTE = "Agent reports start at launch. When you run a library in your agent, say whether it worked; that is where this column comes from.";
+
 /** Add the MCP server to an agent. Single source so it can change with the package name. */
 export const MCP_INSTALL = "claude mcp add reppit -- npx -y reppit-mcp";
 /** The CLI, for agents without MCP. */

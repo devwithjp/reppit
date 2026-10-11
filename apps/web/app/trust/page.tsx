@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getViewer } from "@/lib/viewer";
 import { Masthead } from "@/components/Masthead";
 import { Footer } from "@/components/Footer";
+import { AGENT_REPORTS_NOTE } from "@/components/labels";
 import { VOTE_ADJUST_MAX, FLAGGED_CAP, MIN_MEASURED, STALE_CAPS, TRUST_POINTS } from "@/components/score";
 
 export const metadata: Metadata = { title: "How the trust score works" };
@@ -61,6 +62,8 @@ export default async function TrustPage() {
                 five reasons: unmaintained, insecure, broken on an agent, misleading, low quality.</p>
               <p>Stars are not an input. Neither is the licence: it decides whether you may use a project, not whether it is
                 maintained, so it is shown as a flag on the row instead.</p>
+              <p>Agent compatibility (works in Claude Code, breaks in Codex) is shown next to the score, not counted in it.
+                {" "}{AGENT_REPORTS_NOTE} Until someone reports an agent, it reads &ldquo;unknown&rdquo;, which is not the same as &ldquo;works&rdquo;.</p>
               <p>Nothing here is sponsored. Paid placement, if it ever exists, is a separate slot that never touches this number.</p>
             </section>
           </div>

@@ -9,7 +9,7 @@ import { ReppitInstall } from "@/components/ReppitInstall";
 import { Strip, ScoreNum, Measured } from "@/components/marks";
 import { compact } from "@/components/trust";
 import { trustScore, signalCells } from "@/components/score";
-import { REASONS, REASON_LABEL, REASON_GLOSS, MCP_INSTALL, itemHref } from "@/components/labels";
+import { REASONS, REASON_LABEL, REASON_GLOSS, MCP_INSTALL, AGENT_REPORTS_NOTE, itemHref } from "@/components/labels";
 import { rowColumns, recentReasons, indexCounts } from "../_data/items";
 
 /** Below this many downvotes in 30 days, the proof panel shows the taxonomy, not near-empty counts. */
@@ -99,10 +99,11 @@ export async function Landing() {
             </div>
             <div className="arg"><span className="no">02</span>
               <h2 className="h3">Works in Claude Code, breaks in Codex</h2>
-              <p>People report which agents a library actually runs in. Nobody else collects this, and it is the
-                difference between a thing that works and a thing that works where you are.</p>
+              <p>People will report which agents a library actually runs in. It is the difference between a thing
+                that works and a thing that works where you are. {AGENT_REPORTS_NOTE}</p>
               <div className="evidence">
-                <div className="agents" style={{ marginBottom: 6 }}>
+                <span className="lbl ex-lbl">Example: what a report looks like, not data</span>
+                <div className="agents" style={{ marginBottom: 6 }} aria-label="Example chips: works, breaks, unknown">
                   <span className="ag y"><span className="m">&#10003;</span><b>works</b></span>
                   <span className="ag n"><span className="m">&#10007;</span><b>breaks</b></span>
                   <span className="ag q"><span className="m">?</span><b>unknown</b></span>

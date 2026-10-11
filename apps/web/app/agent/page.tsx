@@ -10,7 +10,7 @@ import { ReppitInstall } from "@/components/ReppitInstall";
 import { nullReason, capNote } from "@/components/marks";
 import { band } from "@/components/trust";
 import { trustScore, signalCells, type SignalCell } from "@/components/score";
-import { REASON_LABEL, MCP_INSTALL, CLI_EXAMPLE, REPPIT_PUBLISHED, installCommand } from "@/components/labels";
+import { REASON_LABEL, MCP_INSTALL, CLI_EXAMPLE, REPPIT_PUBLISHED, AGENT_REPORTS_NOTE, installCommand } from "@/components/labels";
 import { rowColumns, loadExtras, indexCounts, type RowItem } from "../_data/items";
 
 export const metadata: Metadata = { title: "In your agent" };
@@ -62,11 +62,13 @@ export default async function AgentPage() {
         <ul className="tools">
           <li><code>search_repos</code><span>Reads only. Searches the index by problem and returns scores, reasons and agent reports.</span></li>
           <li><code>get_repo</code><span>Reads only. Returns one entry&rsquo;s signals, votes and agent reports.</span></li>
-          <li><code>vote</code><span>Acts as you, with your personal token. The server tells the agent to use it only when you ask.</span></li>
-          <li><code>report_compat</code><span>Acts as you, with your personal token. The server tells the agent to file a report only after you confirm how a run went.</span></li>
+          <li><code>vote</code><span>Acts as you. Needs a personal token you created with write access; tokens are read-only by default, and a read-only token cannot vote at all. The server tells the agent to vote only when you ask.</span></li>
+          <li><code>report_compat</code><span>Acts as you, with the same write access as <code>vote</code>. The server tells the agent to file a report only after you confirm how a run went.</span></li>
           <li><code>install_skill</code><span>Returns an install command. It never runs it.</span></li>
         </ul>
-        <p className="term-lede">Without a personal token the server can only read. You create and revoke the token on your account page.</p>
+        <p className="term-lede">Without a token, or with the default read-only one, the server can only read. Write access is a box you tick
+          when you create the token on your account page, and you can revoke it there.</p>
+        <p className="term-lede">{AGENT_REPORTS_NOTE}</p>
         <p className="term-lede">Below is what <code>search_repos</code> returns for one query, from today&rsquo;s index.</p>
 
         <div className="tbar" aria-hidden="true"><i className="on" /><i /><i /> ~/work/invoice-parser &nbsp;&mdash;&nbsp; claude</div>
@@ -92,7 +94,7 @@ export default async function AgentPage() {
       ? <span className="c-faint">no votes yet</span>
       : <>{row.upvotes > 0 && <span className="c-steel">{"▲"} {row.upvotes} works as described   </span>}{reasons.map(([k, n]) => <span key={k} className="c-rust">{"▼"} {n} {REASON_LABEL[k] ?? k}   </span>)}</>}{"\n"}
 {"     "}<span className="c-dim">{"│"}</span> agents  {compat.length === 0
-      ? <span className="c-faint">no reports yet</span>
+      ? <span className="c-faint">no reports yet (they start at launch)</span>
       : compat.map(([a, c]) => <span key={a}><span className={c.works > c.broken ? "c-steel" : c.broken > c.works ? "c-rust" : "c-dim"}>{c.works > c.broken ? "✓" : c.broken > c.works ? "✗" : "?"}</span> {a} {c.works + c.broken}   </span>)}{"\n"}
 {"     "}<span className="c-dim">{"│"}</span> <span className="c-faint">{installCommand(row) ?? `see install docs: ${row.url}#readme`}</span>{"\n"}
     </span>

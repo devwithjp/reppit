@@ -105,7 +105,7 @@ export function AgentLine({ compat }: { compat: Compat }) {
 /** Stand-in for both bands when nobody has said anything yet. One line, not two empty ones. */
 export function NoOpinions({ votes, reports }: { votes: boolean; reports: boolean }) {
   if (votes && reports) return null;
-  const text = !votes && !reports ? "No votes or agent reports yet. Trust is computed from the repo alone." :
-    !votes ? "No votes yet." : "No agent reports yet.";
+  const text = !votes && !reports ? "No votes yet; agent reports start at launch. Trust is computed from the repo alone." :
+    !votes ? "No votes yet." : "Agent reports start at launch.";
   return <p className="quiet">{text}</p>;
 }

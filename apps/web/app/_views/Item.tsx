@@ -14,7 +14,7 @@ import { AgentChip, agentState } from "@/components/marks";
 import { flags, ago, compact, band } from "@/components/trust";
 import { trustScore, VOTE_ADJUST_MAX, MIN_MEASURED, type SignalCell } from "@/components/score";
 import { ScoreNum, nullReason, capNote } from "@/components/marks";
-import { REASONS, REASON_LABEL, CORE_AGENTS, KIND_LABEL, MCP_INSTALL, splitSlug, itemHref, parentRepo } from "@/components/labels";
+import { REASONS, REASON_LABEL, CORE_AGENTS, KIND_LABEL, MCP_INSTALL, AGENT_REPORTS_NOTE, splitSlug, itemHref, parentRepo } from "@/components/labels";
 import { rowColumns, indexCounts } from "../_data/items";
 
 const HALF_LIFE_DAYS = 180;
@@ -276,9 +276,9 @@ export async function ItemView({ slug }: { slug: string }) {
 
             <section className="sec" id="compat" aria-labelledby="compat-h">
               <h2 id="compat-h">Agent compatibility <em>{compatRows.length === 0 ? "no reports yet" : `${compatRows.length} report${compatRows.length === 1 ? "" : "s"} from ${agentsReporting} agent${agentsReporting === 1 ? "" : "s"}`}</em></h2>
-              {compatRows.length === 0 && (
-                <p className="compat-none" data-testid="compat-none">No agent has been reported yet. Reports come from people running it in their agent.</p>
-              )}
+              <p className="compat-none" data-testid="compat-none">
+                {compatRows.length === 0 ? "No agent has been reported yet. " : ""}{AGENT_REPORTS_NOTE} Sign in and use the form below,
+                or have your agent call <code>report_compat</code> after you confirm how the run went.</p>
               <table className="sig boxed">
                 <thead><tr><th scope="col">Agent</th><th scope="col">Reports</th><th scope="col" style={{ textAlign: "right" }}>Status</th></tr></thead>
                 <tbody>

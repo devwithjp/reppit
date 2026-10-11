@@ -695,3 +695,5 @@ a.btn{text-decoration:none}
 .cmd-docs .docs-label{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
 .trust .capnote{font-family:var(--mono);font-size:10px;color:var(--amber);white-space:nowrap}
 .compat-none{font-size:13.5px;color:var(--ink-2);margin:0 0 9px;max-width:68ch}
+.evidence .ex-lbl{display:block;margin-bottom:6px;font-size:9.5px}
+.compat-none code{font-size:12px}
