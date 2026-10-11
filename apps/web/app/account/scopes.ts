@@ -1,38 +1,20 @@
-import { getTableColumns } from "drizzle-orm";
-import { apiKeys } from "@gitit/db";
+import { TOKEN_SCOPES } from "@gitit/core";
 
 /**
- * Personal-token scopes, written against the backend's `api_keys.scopes` column (read by default).
- * The column may not exist yet, so it is detected at runtime from the table definition:
- *   - absent: tokens are not scoped, so every token can act as you, and the page says so;
- *   - an array column: stored as ["read"] or ["read", "write"];
- *   - a text column: stored as "read" or "read,write".
- * WRITE_SCOPE is the scope that lets an agent vote and file agent reports. Change it here if the
- * backend names it differently.
+ * Personal-token scopes. `api_keys.scopes` is a text[] defaulting to {read}; "write" lets an
+ * agent vote, file agent reports and submit repos as you. The API enforces it; this file only
+ * shapes what the account page writes and shows.
  */
-export const WRITE_SCOPE = "write";
+export const WRITE_SCOPE: (typeof TOKEN_SCOPES)[number] = "write";
 
-const column = (getTableColumns(apiKeys) as Record<string, { columnType?: string } | undefined>).scopes;
-export const SCOPES_SUPPORTED = !!column;
-const isArray = column?.columnType === "PgArray";
-
-/** Extra insert values for a new token, or nothing when scopes are not supported yet. */
-export function scopeValues(write: boolean): Record<string, unknown> {
-  if (!SCOPES_SUPPORTED) return {};
-  const list = write ? ["read", WRITE_SCOPE] : ["read"];
-  return { scopes: isArray ? list : list.join(",") };
+/** Insert values for a new token. Read-only unless the person ticked the write box. */
+export function scopeValues(write: boolean): { scopes: string[] } {
+  return { scopes: write ? ["read", WRITE_SCOPE] : ["read"] };
 }
 
-/** Read a stored row's scopes, whatever shape the column has. */
-export function readScopes(row: unknown): string[] {
-  const v = (row as { scopes?: unknown }).scopes;
-  if (Array.isArray(v)) return v.map(String);
-  if (typeof v === "string" && v.trim()) return v.split(/[,\s]+/).filter(Boolean);
-  return ["read"];
-}
-
-/** One plain phrase for the list. */
-export function scopeLabel(row: unknown): string {
-  if (!SCOPES_SUPPORTED) return "can search, look up, vote and file agent reports (scopes not enforced yet)";
-  return readScopes(row).includes(WRITE_SCOPE) ? "read and act as you: search, look up, vote, file agent reports" : "read only: search and look up repos";
+/** One plain phrase for the token list. */
+export function scopeLabel(row: { scopes?: string[] | null }): string {
+  return (row.scopes ?? ["read"]).includes(WRITE_SCOPE)
+    ? "read and act as you: search, look up, vote, file agent reports"
+    : "read only: search and look up repos";
 }

@@ -48,3 +48,31 @@ test("magic link request answers the same way for any address", async ({ page })
   await page.getByTestId("magic-link-submit").click();
   await expect(page.getByTestId("auth-message")).toContainText(/link is on its way|too many attempts/i);
 });
+
+test("a personal token is read-only unless write is ticked", async ({ page, request }) => {
+  const slug = await firstFeedSlug(page);
+  await signIn(page, user!, "/account");
+
+  // Read token: can search, cannot vote.
+  await page.getByTestId("token-create").click();
+  const readToken = (await page.getByTestId("token-value").textContent())?.trim();
+  expect(readToken).toMatch(/^reppit_/);
+  await expect(page.getByTestId("token-scope")).toContainText(/read only/i);
+  const auth = (t: string) => ({ authorization: `Bearer ${t}` });
+  expect((await request.get("/api/search?q=pdf%20tables%20python", { headers: auth(readToken!) })).status()).toBe(200);
+  const refused = await request.post(`/api/items/by-slug/${slug}/vote`, { headers: auth(readToken!), data: { direction: "up" } });
+  expect(refused.status()).toBe(403);
+  expect((await refused.json()).error).toMatch(/read-only/i);
+
+  // Revoke it, then a write token can vote as this user.
+  await page.getByTestId("token-revoke").click();
+  await page.getByTestId("token-write").check();
+  await page.getByTestId("token-create").click();
+  const writeToken = (await page.getByTestId("token-value").textContent())?.trim();
+  await expect(page.getByTestId("token-scope")).toContainText(/act as you/i);
+  const ok = await request.post(`/api/items/by-slug/${slug}/vote`, { headers: auth(writeToken!), data: { direction: "up" } });
+  expect(ok.status()).toBe(200);
+  // The revoked read token no longer works at all.
+  const revoked = await request.post(`/api/items/by-slug/${slug}/vote`, { headers: auth(readToken!), data: { direction: "up" } });
+  expect([401, 403]).toContain(revoked.status());
+});

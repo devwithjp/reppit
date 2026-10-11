@@ -13,7 +13,7 @@ import { Footer } from "@/components/Footer";
 import { ago } from "@/components/trust";
 import { REASON_LABEL, AGENT_LABEL, itemHref } from "@/components/labels";
 import { InstallCmd } from "@/components/InstallCmd";
-import { SCOPES_SUPPORTED, scopeValues, scopeLabel } from "./scopes";
+import { scopeValues, scopeLabel } from "./scopes";
 
 export const metadata: Metadata = { title: "Account" };
 export const dynamic = "force-dynamic";
@@ -118,10 +118,11 @@ export default async function AccountPage() {
               <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>Personal token</span></div>
               <div className="panel-b">
                 <p className="meta" style={{ margin: "0 0 10px" }}>For the reppit CLI and MCP server.{" "}
-                  {SCOPES_SUPPORTED ? "A read token can search and look up repos only." : "Tokens are not scoped yet: a token can vote and file agent reports as you."}</p>
+                  A read token can search and look up repos only.</p>
                 {created && (
                   <div style={{ margin: "0 0 12px" }}>
                     <p className="auth-msg ok" role="status" style={{ marginTop: 0, marginBottom: 6 }}>Copy it now. It is not shown again.</p>
+                    <span data-testid="token-value" hidden>{created}</span>
                     <InstallCmd command={created} compact prompt="" label="Copy token" />
                   </div>
                 )}
@@ -130,17 +131,15 @@ export default async function AccountPage() {
                     <span className="meta">Created {ago(token.createdAt)} &middot; {token.createdAt.toISOString().slice(0, 10)}<br />
                       <span className="token-scope" data-testid="token-scope">{scopeLabel(token)}</span></span>
                     <form action={revokeToken}><input type="hidden" name="id" value={token.id} />
-                      <button className="btn btn-sm" type="submit">Revoke</button></form>
+                      <button className="btn btn-sm" type="submit" data-testid="token-revoke">Revoke</button></form>
                   </div>
                 ) : (
                   <form action={createToken} className="token-form">
-                    {SCOPES_SUPPORTED && (
-                      <label className="check">
-                        <input type="checkbox" name="write" data-testid="token-write" />
-                        <span>Let my agent vote and file agent reports as me</span>
-                      </label>
-                    )}
-                    <button className="btn btn-sm" type="submit">Create a token</button>
+                    <label className="check">
+                      <input type="checkbox" name="write" data-testid="token-write" />
+                      <span>Let my agent vote and file agent reports as me</span>
+                    </label>
+                    <button className="btn btn-sm" type="submit" data-testid="token-create">Create a token</button>
                   </form>
                 )}
                 {token && <p className="meta" style={{ margin: "10px 0 0" }}>Lost it, or want a different scope? Revoke this one and create another.</p>}
