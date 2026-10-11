@@ -521,16 +521,19 @@ export async function registryReleases(eco: Ecosystem, name: string, f: FetchLik
 
 /**
  * Signals from everything a repo publishes. `advisories[i]` is the OSV count for `packages[i]`
- * (null = unknown). Advisories: the sum over all verified packages, since an advisory in any package
- * the repo ships is real; null if any package's count is unknown. Deprecated: the install package's
- * flag when there is one; otherwise true only when every verified package is deprecated (a dead side
- * package does not make the project dead).
+ * (null = unknown).
+ *   - Advisories: summed over every verified package, since an advisory in anything the repo ships
+ *     is real; null if any package's count is unknown.
+ *   - Deprecation and releases: the primary package only (the install package, or an app's own
+ *     package). With no primary package (install_kind "docs": monorepo side packages only),
+ *     deprecation is unknown and releases are left as they were.
  */
 export function combinePackageSignals(r: ResolvedPackages, advisories: (number | null)[], now: Date, releases?: ReleaseInfo | null): PackageSignals {
   const lead = r.install ?? r.packages[0];
   const sum = advisories.length === r.packages.length && advisories.every((n) => typeof n === "number") ? advisories.reduce<number>((a, n) => a + (n as number), 0) : null;
-  const deprecated = r.install ? r.install.deprecated : r.packages.every((p) => p.deprecated);
-  const message = r.install ? r.install.deprecationMessage : deprecated ? lead.deprecationMessage : null;
+  const primary = r.installKind === "package" || r.installKind === "app" ? lead : null;
+  const deprecated = primary ? primary.deprecated : null;
+  const message = primary ? primary.deprecationMessage : null;
   return {
     packageEcosystem: lead.ecosystem, packageName: lead.name,
     installPackage: r.install?.name ?? null,

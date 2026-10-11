@@ -50,10 +50,11 @@ export const POST = route("items POST", async (req) => {
   if (existing) return json({ item: { id: existing.item.id, slug: existing.item.slug }, existed: true });
   const row = await ingestRepo(new GitHubClient(), ref.owner, ref.name);
   if (!row) return err("Repo not found on GitHub", 404);
-  const [embedding] = await embedder().embed([itemEmbeddingText(row)]);
+  const emb = embedder();
+  const [embedding] = await emb.embed([itemEmbeddingText(row)]);
   // Upsert by github_id: if GitHub answered under a new name we already hold, this updates that row
   // (and records the submitted name as an alias) instead of creating a duplicate.
-  const res = await upsertRepoItem(d, { ...row, embedding, embeddedAt: new Date(), submittedBy: user.id }, { requestedSlug: slug });
+  const res = await upsertRepoItem(d, { ...row, embedding, embeddingModel: emb.name, embeddedAt: new Date(), submittedBy: user.id }, { requestedSlug: slug });
   const signals = await checkPackageSignals([res.slug, slug], await fetchManifestsRaw(row.owner, row.name), fetch, new Date(), { language: row.language });
   await applySignals(d, res.id, signals);
   return json({ item: { id: res.id, slug: res.slug }, existed: res.action !== "inserted" }, { status: res.action === "inserted" ? 201 : 200 });

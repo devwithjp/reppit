@@ -3,7 +3,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
-export const EMBEDDING_DIMENSIONS = 256;
+/** gte-small (384). Every provider must produce this many dimensions; see docs/architecture/embeddings.md. */
+export const EMBEDDING_DIMENSIONS = 384;
 
 export const itemKind = pgEnum("item_kind", ["repo", "skill", "mcp"]);
 export const voteDirection = pgEnum("vote_direction", ["up", "down"]);
@@ -96,6 +97,9 @@ export const items = pgTable("items", {
   hotScore: real("hot_score").default(0).notNull(),
   commentCount: integer("comment_count").default(0).notNull(),
   embedding: vector("embedding", { dimensions: EMBEDDING_DIMENSIONS }),
+  // Which embedder produced `embedding` ("gte-small", "local", ...). Vectors from different models are
+  // not comparable; scripts/reembed.ts re-embeds every row whose model differs from the configured one.
+  embeddingModel: text("embedding_model"),
   embeddedAt: timestamp("embedded_at", { withTimezone: true }),
   submittedBy: uuid("submitted_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

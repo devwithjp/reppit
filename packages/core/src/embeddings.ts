@@ -1,3 +1,6 @@
+import { createRequire } from "node:module";
+import os from "node:os";
+import path from "node:path";
 import { EMBEDDING_DIMENSIONS } from "@gitit/db";
 
 export interface Embedder {
@@ -30,26 +33,90 @@ export class OpenAIEmbedder implements Embedder {
   }
 }
 
-export class VoyageEmbedder implements Embedder {
-  readonly name = "voyage";
-  readonly costPer1kTokens = 0.00002; // voyage-3.5-lite
-  constructor(private apiKey: string, private model = "voyage-3.5-lite") {}
-  async embed(texts: string[]) {
-    const res = await fetch("https://api.voyageai.com/v1/embeddings", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
-      body: JSON.stringify({ model: this.model, input: texts, output_dimension: EMBEDDING_DIMENSIONS }),
-    });
-    if (!res.ok) throw new Error(`voyage embeddings ${res.status}: ${await res.text()}`);
-    const json = (await res.json()) as { data: { embedding: number[] }[] };
-    return json.data.map((d) => normalize(d.embedding));
+/** The gte-small checkpoint Supabase publishes and runs in Edge Functions (`Supabase.ai.Session('gte-small')`). */
+export const GTE_SMALL_MODEL = "Supabase/gte-small";
+export const GTE_SMALL_DIMENSIONS = 384;
+/** Model files live here, outside the repo and node_modules (about 34 MB for the q8 weights). */
+export const defaultModelCache = (env = process.env) => env.REPPIT_MODEL_CACHE ?? path.join(os.homedir(), ".cache", "reppit", "transformers");
+
+type FeatureExtractor = (texts: string[], opts: { pooling: "mean"; normalize: boolean }) => Promise<{ tolist(): number[][] }>;
+
+/**
+ * gte-small in-process (transformers.js + onnxruntime-node, quantised q8 weights). Mean pooling and
+ * L2 normalisation, the same as `session.run(text, { mean_pool: true, normalize: true })` in a
+ * Supabase Edge Function. No key, no network after the first model download. The model loads lazily
+ * on first use (about 1–2 s warm from the cache, longer on the very first download).
+ */
+export class GteSmallEmbedder implements Embedder {
+  readonly name = "gte-small";
+  readonly costPer1kTokens = 0;
+  private extractor: Promise<FeatureExtractor> | null = null;
+  constructor(private opts: { cacheDir?: string; dtype?: "q8" | "fp32" } = {}) {}
+  private load(): Promise<FeatureExtractor> {
+    this.extractor ??= (async () => {
+      const t = await import("@huggingface/transformers");
+      t.env.cacheDir = this.opts.cacheDir ?? defaultModelCache();
+      return (await t.pipeline("feature-extraction", GTE_SMALL_MODEL, { dtype: this.opts.dtype ?? "q8" })) as unknown as FeatureExtractor;
+    })();
+    return this.extractor;
+  }
+  async embed(texts: string[]): Promise<number[][]> {
+    if (!texts.length) return [];
+    const fe = await this.load();
+    const out: number[][] = [];
+    for (let i = 0; i < texts.length; i += 16) {
+      const batch = texts.slice(i, i + 16).map((t) => t || " ");
+      out.push(...(await fe(batch, { pooling: "mean", normalize: true })).tolist());
+    }
+    return out;
   }
 }
 
+/**
+ * gte-small through a Supabase Edge Function (packages/db/supabase/functions/embed). For serverless
+ * hosts where onnxruntime cannot load or cold starts matter. POST { input: string[] } →
+ * { embeddings: number[][] }. Vectors come from the same checkpoint as GteSmallEmbedder.
+ */
+export class SupabaseEmbedder implements Embedder {
+  readonly name = "gte-small";
+  readonly costPer1kTokens = 0;
+  constructor(private url: string, private key?: string, private f: typeof fetch = fetch) {}
+  async embed(texts: string[]): Promise<number[][]> {
+    if (!texts.length) return [];
+    const res = await this.f(this.url, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(this.key ? { authorization: `Bearer ${this.key}` } : {}) },
+      body: JSON.stringify({ input: texts }),
+    });
+    if (!res.ok) throw new Error(`embed function ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const j = (await res.json()) as { embeddings?: number[][] };
+    if (!Array.isArray(j.embeddings) || j.embeddings.length !== texts.length || j.embeddings.some((v) => v.length !== GTE_SMALL_DIMENSIONS)) {
+      throw new Error("embed function returned an unexpected shape");
+    }
+    return j.embeddings;
+  }
+}
+
+/** Whether transformers.js can be loaded here (it is an optional dependency of the web app). */
+export function gteSmallAvailable(): boolean {
+  try { createRequire(import.meta.url).resolve("@huggingface/transformers"); return true; } catch { return false; }
+}
+
+const g = globalThis as unknown as { __reppitGte?: GteSmallEmbedder };
+
+/**
+ * EMBEDDING_PROVIDER: "gte-small" (in-process), "supabase" (EMBEDDING_FUNCTION_URL, optional
+ * EMBEDDING_FUNCTION_KEY), "local" (hashed, tests and offline dev), "openai" (OPENAI_API_KEY, asked
+ * for 384 dimensions). Unset: gte-small when transformers.js is installed, else local. Voyage cannot
+ * return 384 dimensions and is not offered.
+ * Every provider named "gte-small" yields comparable vectors; never mix models in one index
+ * (items.embedding_model records which one wrote each row).
+ */
 export function embedderFromEnv(env = process.env): Embedder {
-  const p = (env.EMBEDDING_PROVIDER ?? "local").toLowerCase();
+  const p = (env.EMBEDDING_PROVIDER ?? (gteSmallAvailable() ? "gte-small" : "local")).toLowerCase();
+  if (p === "gte-small") return (g.__reppitGte ??= new GteSmallEmbedder());
+  if (p === "supabase" && env.EMBEDDING_FUNCTION_URL) return new SupabaseEmbedder(env.EMBEDDING_FUNCTION_URL, env.EMBEDDING_FUNCTION_KEY);
   if (p === "openai" && env.OPENAI_API_KEY) return new OpenAIEmbedder(env.OPENAI_API_KEY);
-  if (p === "voyage" && env.VOYAGE_API_KEY) return new VoyageEmbedder(env.VOYAGE_API_KEY);
   return new LocalEmbedder();
 }
 

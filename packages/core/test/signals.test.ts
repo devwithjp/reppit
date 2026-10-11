@@ -400,9 +400,11 @@ describe("signals across every published package", () => {
     expect(combinePackageSignals(r, [1, 2], now)).toMatchObject({ advisoriesOpen: 3, installPackage: null, packageName: "@x/core", publishedPackages: [{ ecosystem: "npm", name: "@x/core" }, { ecosystem: "npm", name: "@x/react" }] });
     expect(combinePackageSignals(r, [1, null], now).advisoriesOpen).toBeNull();
   });
-  it("deprecation follows the install package, else needs every package deprecated", () => {
-    expect(combinePackageSignals({ packages: [pkg("a", true), pkg("b")], install: null, options: [], installKind: "docs" }, [0, 0], now).deprecated).toBe(false);
-    expect(combinePackageSignals({ packages: [pkg("a", true), pkg("b", true)], install: null, options: [], installKind: "docs" }, [0, 0], now).deprecated).toBe(true);
+  it("deprecation follows the primary package only; side packages alone leave it unknown", () => {
+    expect(combinePackageSignals({ packages: [pkg("a", true), pkg("b")], install: null, options: [], installKind: "docs" }, [0, 0], now).deprecated).toBeNull();
+    expect(combinePackageSignals({ packages: [pkg("a", true), pkg("b", true)], install: null, options: [], installKind: "docs" }, [0, 0], now).deprecated).toBeNull();
+    const app = pkg("tool", true);
+    expect(combinePackageSignals({ packages: [app], install: null, options: [], installKind: "app" }, [0], now).deprecated).toBe(true);
     const main = pkg("main", true);
     expect(combinePackageSignals({ packages: [main, pkg("side")], install: main, options: [main], installKind: "package" }, [0, 0], now)).toMatchObject({ deprecated: true, installPackage: "main" });
   });

@@ -25,7 +25,7 @@ export async function storeRepos(db: Db, embedder: Embedder, repos: PreparedRepo
   const log = opts.log ?? (() => {});
   const vecs = await embedder.embed(repos.map((r) => itemEmbeddingText(r.row)));
   for (const [i, r] of repos.entries()) {
-    const res = await upsertRepoItem(db, { ...r.row, embedding: vecs[i], embeddedAt: opts.now ?? new Date() }, { requestedSlug: r.requestedSlug, now: opts.now });
+    const res = await upsertRepoItem(db, { ...r.row, embedding: vecs[i], embeddingModel: embedder.name, embeddedAt: opts.now ?? new Date() }, { requestedSlug: r.requestedSlug, now: opts.now });
     counts[res.action]++;
     if (res.action === "renamed" || res.action === "adopted") log(`  ${res.previousSlug ?? r.requestedSlug} -> ${res.slug} (${res.action})`);
     else if (r.requestedSlug && r.requestedSlug.toLowerCase() !== res.slug.toLowerCase()) log(`  ${r.requestedSlug} -> ${res.slug} (resolved by GitHub)`);

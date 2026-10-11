@@ -50,6 +50,13 @@
       "when": 1791727661124,
       "tag": "0006_search_weights_readme_cap",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791741251463,
+      "tag": "0007_embedding_384",
+      "breakpoints": true
     }
   ]
 }

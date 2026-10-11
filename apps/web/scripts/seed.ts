@@ -84,7 +84,7 @@ async function main() {
         const rows = await ingestSkillsFromRepo(gh, o, r);
         if (!rows.length) continue;
         const vecs = await embedder.embed(rows.map(itemEmbeddingText));
-        const res = await db.insert(items).values(rows.map((x, j) => ({ ...x, embedding: vecs[j], embeddedAt: new Date() }))).onConflictDoNothing().returning({ id: items.id });
+        const res = await db.insert(items).values(rows.map((x, j) => ({ ...x, embedding: vecs[j], embeddingModel: embedder.name, embeddedAt: new Date() }))).onConflictDoNothing().returning({ id: items.id });
         console.log(`skills ${o}/${r}: +${res.length}`);
       } catch (e) { console.warn(`skills ${o}/${r} failed: ${(e as Error).message.slice(0, 120)}`); }
     }

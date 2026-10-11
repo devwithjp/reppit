@@ -207,7 +207,7 @@ async function main() {
       const vecs = await embedder.embed(readmes.map(({ row, readme }) => itemEmbeddingText({ ...row, readme })));
       if (!dryRun) {
         for (const [k, { row, readme }] of readmes.entries()) {
-          await db.update(items).set({ readme, embedding: vecs[k], embeddedAt: now, updatedAt: now }).where(eq(items.id, row.id));
+          await db.update(items).set({ readme, embedding: vecs[k], embeddingModel: embedder.name, embeddedAt: now, updatedAt: now }).where(eq(items.id, row.id));
         }
       }
       tally.readmes += readmes.length;

@@ -28,7 +28,13 @@ pnpm --filter @gitit/web seed --limit 300 --no-readme --skills   # GitHub public
 pnpm dev                                                        # http://localhost:3100
 ```
 
-No Docker or Postgres needed: without `DATABASE_URL` the app uses embedded PGlite with pgvector in `apps/web/.pglite`. For production set `DATABASE_URL` (Postgres 16 with pgvector; `docker compose up` gives you one) and `EMBEDDING_PROVIDER=openai|voyage` with the matching key. Set `ANTHROPIC_API_KEY` to have Claude write the one-line "why" per result; otherwise a template explanation is used.
+No Docker or Postgres needed: without `DATABASE_URL` the app uses embedded PGlite with pgvector in `apps/web/.pglite`. For production set `DATABASE_URL` (Postgres 16 with pgvector; `docker compose up` gives you one).
+
+Embeddings use gte-small (384 dimensions) in-process by default, with no API key; the model (about 34 MB) downloads once to `~/.cache/reppit/transformers` (`REPPIT_MODEL_CACHE` overrides). `EMBEDDING_PROVIDER=local` is the hashed test embedder, `supabase` calls the `embed` Edge Function. After changing models run `pnpm --filter @gitit/web exec tsx scripts/reembed.ts`. See `docs/architecture/embeddings.md`.
+
+Disk: `onnxruntime-node` ships binaries for every platform (about 210 MB). On a Linux x64 machine short of space, delete everything under `node_modules/.pnpm/onnxruntime-node@*/node_modules/onnxruntime-node/bin/napi-v3/` except `linux/x64` (and the matching copies in the pnpm store); a reinstall restores them.
+
+Set `ANTHROPIC_API_KEY` to have Claude write the one-line "why" per result; otherwise a template explanation is used.
 
 Without a GitHub OAuth app (`GITHUB_ID`/`GITHUB_SECRET`) a dev-only username login is enabled.
 

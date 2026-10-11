@@ -64,10 +64,31 @@ const LANGUAGE_WORDS: Record<string, string[]> = {
  * The real-embedder floor (0.45) is provisional until calibrated against eval; override with
  * SEARCH_SEMANTIC_FLOOR.
  */
+/**
+ * gte-small similarities are compressed (unrelated pairs often score 0.80+), so its floor sits high.
+ * Tuned on the eval fixtures only (scripts/eval.ts), never on the held-out queries.
+ */
+export const GTE_SMALL_SEMANTIC_FLOOR = 0.88;
+
+/**
+ * gte-small cosine similarities sit in a narrow band (about 0.75 to 0.95), so used raw they add a
+ * near-constant to every candidate's relevance and barely rank. Rescale linearly from [lo, hi] to
+ * [0, 1] before blending. Tuned on the eval fixtures only; override with SEARCH_SEMANTIC_SCALE="lo,hi".
+ */
+export const GTE_SMALL_SEMANTIC_SCALE: [number, number] = [0.82, 0.92];
+export function semanticScale(embedderName: string, env: Record<string, string | undefined> = process.env): ((sim: number) => number) {
+  const o = env.SEARCH_SEMANTIC_SCALE?.split(",").map(Number);
+  const range = o && o.length === 2 && o.every(Number.isFinite) && o[1] > o[0] ? (o as [number, number]) : embedderName === "gte-small" ? GTE_SMALL_SEMANTIC_SCALE : null;
+  if (!range) return (sim) => sim;
+  const [lo, hi] = range;
+  return (sim) => Math.max(0, Math.min(1, (sim - lo) / (hi - lo)));
+}
 export function semanticFloor(embedderName: string, env: Record<string, string | undefined> = process.env): number {
   const o = Number(env.SEARCH_SEMANTIC_FLOOR);
   if (env.SEARCH_SEMANTIC_FLOOR && Number.isFinite(o)) return o;
-  return embedderName.startsWith("local") ? Number.POSITIVE_INFINITY : 0.45;
+  if (embedderName.startsWith("local")) return Number.POSITIVE_INFINITY;
+  if (embedderName === "gte-small") return GTE_SMALL_SEMANTIC_FLOOR;
+  return 0.45;
 }
 
 /** Registry ecosystem for each language family, so "in python" also admits PyPI packages. */
@@ -181,9 +202,13 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
   }
   const live = [eq(items.archived, false), ...filters];
 
-  const [qv] = await embedder.embed([normalizeQuery(query) || pq.raw]);
-  const vec = `[${qv.join(",")}]`;
-  const similarity = sql<number>`coalesce(1 - (${items.embedding} <=> ${vec}::vector), 0)`;
+  // A failing query embedder (model not loadable on this host, edge function down) must not take
+  // search down: fall back to full-text only, and say so in the log.
+  let qv: number[] | null = null;
+  try { [qv] = await embedder.embed([normalizeQuery(query) || pq.raw]); }
+  catch (e) { console.warn(`[search] ${embedder.name} embedder failed, full-text only: ${(e as Error).message.slice(0, 120)}`); }
+  const vec = qv ? `[${qv.join(",")}]` : null;
+  const similarity = vec ? sql<number>`coalesce(1 - (${items.embedding} <=> ${vec}::vector), 0)` : sql<number>`0`;
   const anyTerm = pq.alts.length ? sql.join(pq.alts.map(termQuery), sql` || `) : null;
   const tsv = sql.raw("items.search_tsv");
   const keyList = pq.exactKeys.length ? sql.join(pq.exactKeys.map((k) => sql`${k}`), sql`, `) : null;
@@ -192,7 +217,7 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     : sql<boolean>`false`;
 
   const [semRows, lexRows, exactRows] = await Promise.all([
-    db.select({ id: items.id }).from(items).where(and(sql`${items.embedding} is not null`, ...live)).orderBy(desc(similarity)).limit(n),
+    vec ? db.select({ id: items.id }).from(items).where(and(sql`${items.embedding} is not null`, ...live)).orderBy(desc(similarity)).limit(n) : Promise.resolve([] as { id: string }[]),
     anyTerm
       ? db.select({ id: items.id }).from(items).where(and(sql`${tsv} @@ (${anyTerm})`, ...live)).orderBy(desc(sql`ts_rank(${tsv}, ${anyTerm})`)).limit(n)
       : Promise.resolve([] as { id: string }[]),
@@ -218,6 +243,7 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
 
   const maxRank = Math.max(1e-9, ...rows.map((r) => Number(r.rank)));
   const floor = semanticFloor(embedder.name);
+  const scale = semanticScale(embedder.name);
   const scored = rows.map((r) => {
     const semantic = Math.max(0, Number(r.semantic));
     const hits = (r.hits ?? []).map(Number);
@@ -232,7 +258,7 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     const ecoFits = (!!r.item.packageEcosystem && pq.ecosystems.has(r.item.packageEcosystem)) || (r.item.installOptions ?? []).some((o) => pq.ecosystems.has(o.ecosystem));
     const langMismatch = pq.languages.size > 0 && !ecoFits && !(lang && pq.languages.has(lang));
     const phrase = r.phrase === true;
-    let relevance = 0.55 * lexical + 0.45 * semantic + (nameHit ? 0.2 : 0) + (phrase ? 0.15 : 0);
+    let relevance = 0.55 * lexical + 0.45 * scale(semantic) + (nameHit ? 0.2 : 0) + (phrase ? 0.15 : 0);
     if (langMismatch) relevance *= 0.6;
     relevance = Math.min(1, relevance);
     const match: MatchKind = exact ? "exact" : headAll && (phrase || hits.length <= 2 || nameHit) ? "strong" : "partial";
