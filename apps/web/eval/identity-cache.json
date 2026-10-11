@@ -154,6 +154,11 @@
     "nameWithOwner": "jsvine/pdfplumber",
     "checkedAt": "2026-10-11T12:00:13.563Z"
   },
+  "julienschmidt/httprouter": {
+    "githubId": 14956897,
+    "nameWithOwner": "julienschmidt/httprouter",
+    "checkedAt": "2026-10-11T18:54:41.303Z"
+  },
   "kelektiv/node-cron": {
     "githubId": 734957,
     "nameWithOwner": "kelektiv/node-cron",
@@ -358,6 +363,11 @@
     "nameWithOwner": "resend/resend-node",
     "checkedAt": "2026-10-11T13:20:52.001Z"
   },
+  "rsalmei/alive-progress": {
+    "githubId": 200590949,
+    "nameWithOwner": "rsalmei/alive-progress",
+    "checkedAt": "2026-10-11T18:54:41.303Z"
+  },
   "scrapy/scrapy": {
     "githubId": 529502,
     "nameWithOwner": "scrapy/scrapy",
@@ -387,6 +397,11 @@
     "githubId": 355959597,
     "nameWithOwner": "Textualize/textual",
     "checkedAt": "2026-10-11T13:20:52.001Z"
+  },
+  "tqdm/tqdm": {
+    "githubId": 36804486,
+    "nameWithOwner": "tqdm/tqdm",
+    "checkedAt": "2026-10-11T18:54:41.303Z"
   },
   "typeorm/typeorm": {
     "githubId": 52773157,

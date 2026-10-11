@@ -1,5 +1,49 @@
 # reppit launch critique
 
+## Fifth pass, 2026-10-12 (blocker check)
+
+This was a narrow pass against the rebuilt production build (2,226 entries, gte-small embeddings), driven through Chrome with Playwright. I checked the three blockers from the fourth pass and ran 10 brand-new queries. Sign-in is still not available on this machine, so the signed-in flows were not tested. The earlier passes are below, unchanged.
+
+### The three blockers
+
+| Blocker | What I saw | Status |
+|---|---|---|
+| 1. Uncovered problems should say "not in the index" | **Better, not fixed.** Of my 7 new queries whose answer isn't indexed, 3 now say "Not in the index yet". The other 4 still show confident junk. None of the 6 fourth-pass junk queries now say "not in the index". Most return fewer rows, but "graphql client for react" still returns 23 results led by redwoodjs/graphql. "self hosted feature flags" gives PostHog, then Kavita (a comic reader), Palmr and SigNoz. "drag and drop list in react" gives Builder.io and Plasmic. "cron jobs in node" gives agenda. "best way to do things" still returns 14 rows led by home-assistant. Gibberish and unindexed single names are reliably empty. | **Partly fixed** |
+| 2. Indexed answers and named languages | "terminal ui library python" now gives textual 93, rich 88. yq is now "See install docs" instead of `go get`. But "jwt auth in fastapi" puts **golang-jwt (Go) at #1** and jjwt (Java) at #2: a framework name doesn't count as a language. "charting library for react" has plotly/dash (Python) at #2. Puppeteer still doesn't appear for HTML-to-PDF, as the team said. | **Fixed for the named case, still leaks** |
+| 3. Agent compatibility starts at launch, no sample data | The wording is right everywhere: homepage, item pages, /agent, search rows ("no reports yet (they start at launch)"). **But four skills still show reports.** anthropics/skills/skills/pdf shows "2 reports from 2 agents · ✓ Claude Code, works · last 4 days ago" right under "Agent reports start at launch". obra/superpowers brainstorming and executing-plans, and vercel-labs find-skills, show ✓ badges on the Skills tab. | **Copy fixed, data not cleared** |
+
+### 10 fresh queries
+
+| Query | Top three | Pick? | Answer indexed? | Honest? |
+|---|---|---|---|---|
+| jwt auth in fastapi | golang-jwt (Go) 89, jjwt (Java), full-stack-fastapi-template | No | No (`pyjwt`: not in index) | **No**: Go library at #1 for a Python framework |
+| read excel files in python | Not in the index yet | No | No (`openpyxl`, `pandas`: not in index) | **Yes** |
+| http router for go | chi 93, gorilla/mux **35**, gin 90 | **Yes**, #1 | Yes | n/a. The mux flag is useful. |
+| async orm for rust | Not in the index yet | No | No (`sea-orm`, `sqlx`: not in index) | **Yes** |
+| react table with sorting and pagination | TanStack/table, AFFiNE | **Yes**, #1 | Yes | n/a ("too little measured", install via docs) |
+| upload files to s3 from node | CloudFlare-ImgBed, Palmr, filepond | No | No (`aws-sdk-js-v3`: not in index) | **No** |
+| python cli framework | jc, textual, httpie 46 | No | No (`click`, `typer`: not in index) | **No** |
+| convert markdown to html in python | markitdown (converts the other way), docling, opendataloader-pdf | No | No (`mistune`: not in index; `python-markdown` returns markitdown) | **No** |
+| charting library for react | recharts 93, plotly/dash (Python), perspective (`cargo add`) | **Yes**, #1 | Yes | n/a |
+| send slack messages from python | Not in the index yet | No | No (`slack-sdk`, `bolt-python`: not in index) | **Yes** |
+
+**Fresh hit rate: 3 of 10, all at #1.** When the answer is indexed, it's #1 (3 of 3). Seven queries had no answer in the index: 3 said so honestly and 4 showed junk. The bigger finding is what's missing: pandas, click, typer, pyjwt, openpyxl, the AWS SDK, slack-sdk, sea-orm and sqlx are all absent. Across passes four and five, 9 of 25 fresh queries hit.
+
+### Ready for a public build-in-public launch? **No.**
+
+Only the blockers:
+1. **The index doesn't have the libraries people search for first.** pandas, click, typer, pyjwt, openpyxl, the AWS SDK, slack-sdk, sea-orm, sqlx, apollo-client, msw and node-cron are all missing. With 9 of 25 fresh queries hitting, most launch-day visitors' first query fails. Seed it from each registry's top packages by downloads (npm, PyPI, crates.io, Go), not from topics. That covers what people actually type. *Medium; mostly ingest time.*
+2. **Where the index is empty, it still shows junk about half the time** (4 of 7 new uncovered queries, and all 6 from the fourth pass): Go JWT for FastAPI, a comic reader for feature flags, an image host for S3 uploads. A wrong answer with a 93/100 next to it is what gets screenshotted. Blocker 1 makes this much rarer. What's left needs the cut-off to stay strict for phrase queries, plus framework-to-language mapping (fastapi → Python, express → Node). *Small to medium.*
+3. **Clear the four leftover skill compatibility reports**, or relabel them as the team's own test runs. "Reports start at launch" next to "✓ Claude Code, works · 4 days ago" looks like fake data on the most-viewed skill. *Small: minutes.*
+
+If the team launches anyway, the post must say:
+- the index is early and covers a few thousand repos;
+- "Not in the index yet" is a real, common answer;
+- scores rest on 3 to 5 of 6 signals, and issue load isn't measured yet;
+- agent reports start at zero.
+
+---
+
 ## Fourth pass, 2026-10-12 (final build)
 
 Same method: Chrome through Playwright, desktop and 400px, against the production build (2,226 entries; `/api/health` reports `"embedding":"gte-small"`). I wrote 15 queries I had never used in any pass, then ran 2 more and reran the original 12. Sign-in is still not available on this machine, so I could not see the token page or confirm that tokens are read-only by default. /agent says "without a personal token the server can only read". It does not mention a read-only default, and it still describes `vote` as "acts as you... the server tells the agent to use it only when you ask". I read no source. The earlier passes are below, unchanged.

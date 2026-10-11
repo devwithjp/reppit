@@ -112,6 +112,18 @@ describe("problem queries", () => {
   });
 });
 
+describe("framework words", () => {
+  it("imply their language but stay search terms", () => {
+    const pq = parseQuery("jwt auth in fastapi");
+    expect([...pq.languages]).toEqual(["python"]);
+    expect(pq.terms).toContain("fastapi");
+    expect([...parseQuery("charting library for react").languages].sort()).toEqual(["javascript", "typescript"]);
+  });
+  it("defer to a language named outright", () => {
+    expect([...parseQuery("react bindings in rust").languages]).toEqual(["rust"]);
+  });
+});
+
 describe("multi-word synonyms", () => {
   it("collapse into one term before matching", async () => {
     const { collapsePhrases } = await import("../src/search");

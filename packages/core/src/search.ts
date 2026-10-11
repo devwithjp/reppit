@@ -59,6 +59,19 @@ const LANGUAGE_WORDS: Record<string, string[]> = {
 };
 
 /**
+ * Framework words that imply a language. Unlike LANGUAGE_WORDS they stay topical terms ("fastapi"
+ * still has to match), but they also restrict results to that language, so "jwt auth in fastapi"
+ * cannot answer with a Go library.
+ */
+const JS = ["typescript", "javascript"];
+const FRAMEWORK_LANGUAGES: Record<string, string[]> = {
+  fastapi: ["python"], django: ["python"], flask: ["python"], pydantic: ["python"], pandas: ["python"], pytorch: ["python"],
+  react: JS, nextjs: JS, "next.js": JS, vue: JS, nuxt: JS, svelte: JS, sveltekit: JS, angular: JS, express: JS, nestjs: JS, remix: JS,
+  rails: ["ruby"], laravel: ["php"], symfony: ["php"], spring: ["java", "kotlin"], gin: ["go"], axum: ["rust"], actix: ["rust"], tokio: ["rust"],
+  phoenix: ["elixir"], flutter: ["dart"],
+};
+
+/**
  * Admission by meaning: a query-relative outlier rule, not a fixed floor.
  *
  * For each query, the similarity of a fixed pseudo-random baseline of BASELINE_SIZE indexed items
@@ -246,7 +259,9 @@ export function parseQuery(query: string): ParsedQuery {
   const words = raw.split(" ");
   if (words.length > 1 && words.length <= 4) keys.add(words.join("-")); // "react hook form" -> react-hook-form
   const all = [...new Set(tokenize(collapsePhrases(raw)))];
-  const languages = new Set(all.flatMap((t) => LANGUAGE_WORDS[t] ?? []));
+  const named = all.flatMap((t) => LANGUAGE_WORDS[t] ?? []);
+  // A framework only implies its language when the query names no language outright.
+  const languages = new Set(named.length ? named : all.flatMap((t) => FRAMEWORK_LANGUAGES[t] ?? []));
   const topical = all.filter((t) => !LANGUAGE_WORDS[t]);
   const ecosystems = new Set([...languages].map((l) => LANGUAGE_ECOSYSTEMS[l]).filter((x): x is string => !!x));
   const identifier = !raw.includes(" ") && /[-_.@/]/.test(raw);
@@ -404,6 +419,9 @@ export async function search(db: Db, embedder: Embedder, query: string, opts: Se
     if (!relatedRows.length) return none();
     return { results: [], notIndexed: true, related: await decorate(db, relatedRows, pq) };
   }
+  // A problem query of three or more content words where nothing matches strongly and nothing is a
+  // clear outlier on meaning: every row is a loose overlap ("self hosted feature flags" -> a comic reader that self-hosts). Say it is not in
+  // the index and show the closest few as related, rather than as answers with a score beside them.
   const ranked = matched.sort(compareRank).slice(0, limit);
   return { results: await decorate(db, ranked, pq), notIndexed: false };
 }
