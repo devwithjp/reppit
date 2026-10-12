@@ -39,12 +39,14 @@ test("signup form rejects a short password before calling the server", async ({ 
   await page.locator('input[name="email"]').fill("e2e.shortpw@example.com");
   await page.locator('input[name="password"]').fill("abc");
   await page.getByTestId("auth-submit").click();
-  await expect(page.getByTestId("auth-message").or(page.locator("input:invalid"))).toBeVisible();
+  await expect(page.getByTestId("auth-message").or(page.locator("input:invalid")).first()).toBeVisible();
 });
 
 test("magic link request answers the same way for any address", async ({ page }) => {
   await page.goto("/login");
   await page.locator('input[name="email"]').fill(user!.email);
+  await page.getByRole("button", { name: /sign-in link instead/i }).click();
+  await expect(page.locator('input[name="email"]')).toHaveValue(user!.email);
   await page.getByTestId("magic-link-submit").click();
   await expect(page.getByTestId("auth-message")).toContainText(/link is on its way|too many attempts/i);
 });

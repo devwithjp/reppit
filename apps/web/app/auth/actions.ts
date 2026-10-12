@@ -46,7 +46,8 @@ function plain(message: string): string {
   if (/invalid login credentials/i.test(message)) return "That email and password do not match.";
   if (/email not confirmed/i.test(message)) return "Confirm your email first. The link is in your inbox.";
   if (/rate limit/i.test(message)) return "Too many attempts. Wait a minute and try again.";
-  if (/password should be/i.test(message)) return "Use a password of at least 8 characters.";
+  if (/password should (be|contain)/i.test(message)) return "Use a longer password: at least 8 characters.";
+  if (/email address .* is invalid/i.test(message)) return "That email address cannot receive mail. Check it and try again.";
   return message;
 }
 
@@ -94,7 +95,13 @@ export async function sendMagicLink(_prev: AuthResult | null, fd: FormData): Pro
     email,
     options: { emailRedirectTo: `${await origin()}/auth/callback?next=${encodeURIComponent(next)}`, shouldCreateUser: true },
   });
-  if (error) return { ok: false, message: plain(error.message) };
+  if (error) {
+    // Only a rate limit is worth telling the person. Anything else (an address the mail provider
+    // refuses, a provider outage) is logged and answered like success, so the form never reveals
+    // which addresses exist or how our mail is set up.
+    if (/rate limit/i.test(error.message)) return { ok: false, message: plain(error.message) };
+    console.error("[auth] magic link failed:", error.message);
+  }
   // Same message whether or not the address has an account.
   return { ok: true, message: `If ${email} can sign in, a link is on its way. It expires in an hour.` };
 }

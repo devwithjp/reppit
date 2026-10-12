@@ -14,6 +14,8 @@ function Message({ state, id }: { state: AuthResult | null; id: string }) {
 
 export function LoginForm({ next }: { next: string }) {
   const [mode, setMode] = useState<"password" | "link">("password");
+  // Kept across the mode switch so "email me a link instead" does not make you retype it.
+  const [email, setEmail] = useState("");
   const [pwState, pwAction, pwPending] = useActionState(signInWithPassword, null);
   const [mlState, mlAction, mlPending] = useActionState(sendMagicLink, null);
   const signupHref = `/signup${next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`;
@@ -23,7 +25,7 @@ export function LoginForm({ next }: { next: string }) {
       <form action={mlAction} className="auth-form" aria-describedby="ml-msg">
         <input type="hidden" name="next" value={next} />
         <label className="fld"><span className="lbl">Email</span>
-          <input type="email" name="email" autoComplete="email" required autoFocus />
+          <input type="email" name="email" autoComplete="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <button type="submit" className="btn btn-primary btn-block" disabled={mlPending} data-testid="magic-link-submit">
           {mlPending ? "Sending" : "Email me a sign-in link"}
@@ -41,7 +43,7 @@ export function LoginForm({ next }: { next: string }) {
       <form action={pwAction} className="auth-form" aria-describedby="pw-msg">
         <input type="hidden" name="next" value={next} />
         <label className="fld"><span className="lbl">Email</span>
-          <input type="email" name="email" autoComplete="email" required autoFocus />
+          <input type="email" name="email" autoComplete="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label className="fld"><span className="lbl">Password</span>
           <input type="password" name="password" autoComplete="current-password" required />
