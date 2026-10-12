@@ -133,9 +133,25 @@ export async function refreshHealth(db: Db, itemId: string, now: Date = new Date
     pushedAt: items.pushedAt, lastReleaseAt: items.lastReleaseAt, openIssues: items.openIssues, closedIssues: items.closedIssues,
     stars: items.stars, archived: items.archived, license: items.license, deprecated: items.deprecated, advisoriesOpen: items.advisoriesOpen,
     packageName: items.packageName, packageEcosystem: items.packageEcosystem, releasesLastYear: items.releasesLastYear,
-    weightedScore: items.weightedScore,
+    weightedScore: items.weightedScore, kind: items.kind, slug: items.slug,
   }).from(items).where(eq(items.id, itemId));
   if (!r) return null;
+  // A skill ships inside a repo: its releases and issue load are the repo's. Fill what the skill row
+  // lacks from the parent repo, when that repo is indexed, and store it so every page agrees.
+  if (r.kind === "skill") {
+    const parts = r.slug.split("/");
+    const [p] = parts.length > 2 ? await db.select({
+      lastReleaseAt: items.lastReleaseAt, openIssues: items.openIssues, closedIssues: items.closedIssues, releasesLastYear: items.releasesLastYear,
+    }).from(items).where(and(eq(items.kind, "repo"), sql`lower(${items.slug}) = lower(${`${parts[0]}/${parts[1]}`})`)).limit(1) : [];
+    if (p) {
+      const fill = {
+        lastReleaseAt: r.lastReleaseAt ?? p.lastReleaseAt, openIssues: r.openIssues ?? p.openIssues,
+        closedIssues: r.closedIssues ?? p.closedIssues, releasesLastYear: r.releasesLastYear ?? p.releasesLastYear,
+      };
+      Object.assign(r, fill);
+      await db.update(items).set(fill).where(eq(items.id, itemId));
+    }
+  }
   const h = healthScore(r, now);
   // The same number every page shows, so "Trusted" sorts by what people see.
   const t = trustScore(r, r.weightedScore, now).score;
