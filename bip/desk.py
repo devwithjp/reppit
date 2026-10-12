@@ -21,6 +21,7 @@ import json
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 BIP = ROOT / "bip"
@@ -77,8 +78,8 @@ def items(q: dict):
 
 def fmt_slot(slot: dict) -> str:
     t = datetime.fromisoformat(slot.get("post_at_utc", slot["at_utc"]).replace("Z", "+00:00"))
-    et = t - timedelta(hours=4)  # EDT, valid until US DST ends on 1 Nov 2026
-    syd = t + timedelta(hours=11)  # AEDT
+    et = t.astimezone(ZoneInfo("America/New_York"))  # follows US daylight saving
+    syd = t.astimezone(ZoneInfo("Australia/Sydney"))
     return f"{et:%a %d %b %H:%M} ET / {syd:%a %H:%M} Sydney"
 
 
