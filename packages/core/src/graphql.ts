@@ -202,7 +202,9 @@ export class GitHubGraphQL {
       const reset = res.headers.get("x-ratelimit-reset");
       throw new GraphQLHttpError(res.status, `github graphql ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`, reset ? new Date(Number(reset) * 1000) : undefined);
     }
-    const json = (await res.json()) as GqlResponse<T>;
+    // A 200 whose body is cut off mid-stream is the gateway giving up partway: treat it like a 504.
+    let json: GqlResponse<T>;
+    try { json = (await res.json()) as GqlResponse<T>; } catch { throw new GraphQLHttpError(504, "truncated response"); }
     const rl = (json.data as { rateLimit?: { cost: number; remaining: number } } | null | undefined)?.rateLimit;
     if (rl) { this.stats.cost += rl.cost; this.stats.remaining = rl.remaining; }
     if (!json.data && json.errors?.length) {

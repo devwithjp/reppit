@@ -61,13 +61,16 @@ describe("parseRepoBatchResponse (recorded shape)", () => {
 });
 
 /** Fake GitHub GraphQL endpoint: answers each alias from a node factory, 502s above `maxOk` aliases. */
-function fakeGitHub(maxOk: number, opts: { failAlways?: Set<string> } = {}) {
+function fakeGitHub(maxOk: number, opts: { failAlways?: Set<string>; truncate?: boolean } = {}) {
   const calls: number[] = [];
   const f = async (_url: string, init?: RequestInit) => {
     const body = JSON.parse(String(init?.body)) as { query: string };
     const aliases = [...body.query.matchAll(/r(\d+): repository\(owner: "([^"]+)", name: "([^"]+)"\)/g)];
     calls.push(aliases.length);
-    if (aliases.length > maxOk || aliases.some((a) => opts.failAlways?.has(`${a[2]}/${a[3]}`))) return new Response("<html>502 Bad Gateway</html>", { status: 502 });
+    if (aliases.length > maxOk || aliases.some((a) => opts.failAlways?.has(`${a[2]}/${a[3]}`))) {
+      // The real gateway sometimes answers 200 and cuts the body off instead of sending a 502.
+      return opts.truncate ? new Response('{"data":{"r0":{"databaseId"', { status: 200 }) : new Response("<html>502 Bad Gateway</html>", { status: 502 });
+    }
     const data: Record<string, unknown> = { rateLimit: { cost: 1, remaining: 4000, resetAt: "2026-10-08T13:00:00Z" } };
     for (const [, i, owner, name] of aliases) data[`r${i}`] = { ...fixture.data.r0, databaseId: 1000 + Number(name.slice(1)), nameWithOwner: `${owner}/${name}`, name, owner: { login: owner } };
     return new Response(JSON.stringify({ data }), { status: 200, headers: { "content-type": "application/json" } });
@@ -97,6 +100,13 @@ describe("GitHubGraphQL.fetchRepos", () => {
     expect(res.map((r) => r.node?.name)).toEqual(many(30).map((r) => r.name));
     expect(res.every((r) => !r.error)).toBe(true);
     expect(gh.stats.halvings).toBe(3);
+  });
+  it("treats a 200 with a truncated body like a 502 and halves", async () => {
+    const { f, calls } = fakeGitHub(8, { truncate: true });
+    const gh = new GitHubGraphQL("t", { fetch: f });
+    const res = await gh.fetchRepos(many(30));
+    expect(calls).toEqual([30, 15, 8, 7, 15, 8, 7]);
+    expect(res.every((r) => !r.error)).toBe(true);
   });
   it("gives up on a single repo that always 502s without losing the rest of the batch", async () => {
     const { f } = fakeGitHub(1000, { failAlways: new Set(["o/n3"]) });
