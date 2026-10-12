@@ -13,6 +13,7 @@
  *   --existing       re-hydrate every repo already in the index (assigns github_id to legacy rows,
  *                    replaces REST issue counts with true ones, detects renames). Run this once after
  *                    the 0001 migration.
+ *   --stale <hours>  with --existing, skip repos updated in the last <hours> (resume an interrupted run)
  *   --stars <expr>   star filter appended to discovery queries (default ">300")
  *   --pages <n>      search pages per query, 50 repos each (default 2)
  *   --limit <n>      stop discovery after n new repos (default 5000)
@@ -89,7 +90,10 @@ async function main() {
   let refs: RepoRef[] = [];
 
   if (existingMode) {
-    const rows = await db.select({ slug: items.slug }).from(items).where(eq(items.kind, "repo"));
+    const staleHours = flag("--stale") ? intFlag("--stale", 1) : null;
+    const rows = await db.select({ slug: items.slug }).from(items).where(staleHours
+      ? sql`${items.kind} = 'repo' and ${items.updatedAt} < now() - make_interval(hours => ${staleHours})`
+      : eq(items.kind, "repo"));
     refs = rows.map((r) => r.slug.replace(/~[0-9a-f]{8}$/, "").split("/")).filter((p) => p.length === 2).map(([owner, name]) => ({ owner, name }));
     console.log(`re-hydrating ${refs.length} existing repos`);
   } else {

@@ -55,6 +55,9 @@ export async function createDb(opts: DbOptions = {}): Promise<Db> {
       idleTimeoutMillis: 10_000,
       ...(process.env.DATABASE_SSL_CA ? { ssl: { ca: process.env.DATABASE_SSL_CA.replace(/\\n/g, "\n") } } : {}),
     });
+    // An idle client whose socket drops emits on the pool; unhandled, that kills the process. The pool
+    // discards the client and the next query opens a fresh one.
+    pool.on("error", (e) => console.warn(`db: idle connection dropped (${(e as NodeJS.ErrnoException).code ?? e.message})`));
     const db = drizzlePg(pool, { schema });
     if (shouldMigrate) {
       await pool.query("CREATE EXTENSION IF NOT EXISTS vector");
