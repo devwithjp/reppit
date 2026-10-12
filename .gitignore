@@ -10,3 +10,4 @@ coverage
 __pycache__/
 e2e-report/
 test-results/
+.vercel
