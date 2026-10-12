@@ -100,7 +100,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         <div className="parsed">
           {q.length >= 3 && !failed ? (
             <>
-              <span>{notIndexed ? "Nothing in the index is close enough to show." : "Ranked by match, votes, maintenance and popularity."}</span>
+              <span>{notIndexed ? "No close matches." : "Ranked by match, then votes, maintenance, stars and installs."}</span>
               <span className="parsed-r">{counts.total.toLocaleString("en-US")} indexed{notIndexed ? "" : <> &middot; {results.length} result{results.length === 1 ? "" : "s"}</>}</span>
             </>
           ) : (
@@ -115,21 +115,20 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       <main className="wrap" id="main">
         {q.length < 3 ? (
           <div className="nothing" style={{ marginTop: 20 }}>
-            <h3>{q.length === 0 ? "Describe what you are trying to do." : "That is too short to search on."}</h3>
-            <p>Three characters at least. Write the problem the way you would say it to a colleague, not a package name:
-              &ldquo;parse invoices out of PDFs&rdquo; finds more than &ldquo;pdf&rdquo;.</p>
+            <h3>{q.length === 0 ? "Describe what you are trying to do." : "Enter at least 3 characters."}</h3>
+            <p>Describe the problem, not a package name. &ldquo;parse invoices out of PDFs&rdquo; finds more
+              than &ldquo;pdf&rdquo;.</p>
           </div>
         ) : failed ? (
           <div className="nothing" style={{ marginTop: 20 }} role="alert">
-            <h3>Search is not answering right now.</h3>
-            <p>The index did not respond. Nothing is wrong with your query. Try again in a minute, or{" "}
-              <Link className="inline-link" href="/?sort=top">browse the directory</Link> meanwhile.</p>
+            <h3>Search isn&rsquo;t working right now.</h3>
+            <p>Try again in a minute, or{" "}
+              <Link className="inline-link" href="/?sort=top">browse the directory</Link> instead.</p>
           </div>
         ) : notIndexed ? (
           <div className="nothing" style={{ marginTop: 20 }} data-testid="not-indexed">
             <h3>Not in the index yet.</h3>
-            <p>Nothing among the {counts.total.toLocaleString("en-US")} repos and skills is a good match for &ldquo;{q}&rdquo;.
-              We would rather say so than show weak matches.</p>
+            <p>No good matches for &ldquo;{q}&rdquo;. Try fewer words or add the language.</p>
             <p className="examples"><span>Try</span>
               {EXAMPLES.map((e) => <Link key={e} className="example" href={`/search?q=${encodeURIComponent(e)}`}>{e}</Link>)}
             </p>
@@ -168,8 +167,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
               </div>
             )}
 
-            <p className="meta" style={{ padding: "12px 0 0" }}>Nothing here is sponsored. Ranking and placement are separate systems
-              and always will be. <Link className="inline-link" href="/trust">How the trust score is computed</Link></p>
+            <p className="meta" style={{ padding: "12px 0 0" }}><Link className="inline-link" href="/trust">How the trust score is computed</Link></p>
           </>
         )}
       </main>

@@ -99,7 +99,7 @@ export default async function AccountPage() {
             </section>
             <section className="sec">
               <h2>Your agent reports</h2>
-              {myReports.length === 0 ? <p className="meta">None yet. They are the most useful thing you can add.</p> : (
+              {myReports.length === 0 ? <p className="meta">None yet.</p> : (
                 <table className="sig boxed"><tbody>
                   {myReports.map((r) => (
                     <tr key={`${r.slug}-${r.agent}`}>
@@ -117,8 +117,8 @@ export default async function AccountPage() {
             <div className="panel" id="token">
               <div className="panel-h"><span className="lbl">Personal token</span></div>
               <div className="panel-b">
-                <p className="meta" style={{ margin: "0 0 10px" }}>For the reppit CLI and MCP server.{" "}
-                  A read token can search and look up repos only.</p>
+                <p className="meta" style={{ margin: "0 0 10px" }}>Lets your agent use the reppit CLI and MCP server.{" "}
+                  A read-only token can only search and look up repos.</p>
                 {created && (
                   <div style={{ margin: "0 0 12px" }}>
                     <p className="auth-msg ok" role="status" style={{ marginTop: 0, marginBottom: 6 }}>Copy it now. It is not shown again.</p>
@@ -137,7 +137,7 @@ export default async function AccountPage() {
                   <form action={createToken} className="token-form">
                     <label className="check">
                       <input type="checkbox" name="write" data-testid="token-write" />
-                      <span>Let my agent vote and file agent reports as me</span>
+                      <span>Allow voting and reports (write access)</span>
                     </label>
                     <button className="btn btn-sm" type="submit" data-testid="token-create">Create a token</button>
                   </form>

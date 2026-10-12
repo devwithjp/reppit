@@ -16,7 +16,7 @@ export const REASON_GLOSS: Record<string, string> = {
   insecure: "known holes, unpatched",
   "broken-on-agent": "fails under a coding agent",
   misleading: "the README oversells it",
-  "low-quality": "works, badly",
+  "low-quality": "works, but poorly",
 };
 
 /** Agents the API accepts, in the order the item page lists them. The first four always show. */
@@ -41,13 +41,13 @@ export const KIND_LABEL: Record<string, string> = { repo: "repos", skill: "skill
  * squatting risk tomorrow. Third-party library install lines are unaffected. Render through <ReppitInstall>.
  */
 export const REPPIT_PUBLISHED = process.env.NEXT_PUBLIC_REPPIT_PUBLISHED === "1";
-export const UNPUBLISHED_NOTE = "The reppit CLI and MCP server are published on launch day.";
+export const UNPUBLISHED_NOTE = "The reppit CLI and MCP server aren't out yet.";
 
 /**
  * Agent compatibility has no reports behind it before launch. Every place that presents the feature
  * says so, and says where a report comes from. One wording, so pages cannot drift apart.
  */
-export const AGENT_REPORTS_NOTE = "Agent reports start at launch. When you run a library in your agent, say whether it worked; that is where this column comes from.";
+export const AGENT_REPORTS_NOTE = "Agent reports start at launch. Each report says whether a library worked in someone's coding agent.";
 
 /** Add the MCP server to an agent. Single source so it can change with the package name. */
 export const MCP_INSTALL = "claude mcp add reppit -- npx -y reppit-mcp";
@@ -77,7 +77,7 @@ export type Install =
 export function installFor(i: InstallRow): Install {
   if (i.kind === "skill") return { type: "command", command: `npx skills add ${i.slug}` };
   const docs = `${i.url.replace(/\/+$/, "")}#readme`;
-  if (i.installKind === "app") return { type: "docs", href: docs, label: "app", note: "An application, not a library. Install it the way its README says." };
+  if (i.installKind === "app") return { type: "docs", href: docs, label: "app", note: "This is an app, not a library. See its README to install it." };
   const pkg = i.installPackage;
   if (pkg) {
     const eco = i.publishedPackages?.find((p) => p.name === pkg)?.ecosystem ?? i.packageEcosystem;

@@ -9,6 +9,7 @@
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { items, itemAliases, type Db, type Item, type NewItem } from "@gitit/db";
 import { healthScore } from "./ranking";
+import { trustScore } from "./trust";
 
 export interface UpsertRepoResult {
   id: string;
@@ -129,12 +130,16 @@ export async function findItemByGithubId(db: Db, githubId: number): Promise<Item
  */
 export async function refreshHealth(db: Db, itemId: string, now: Date = new Date()): Promise<number | null> {
   const [r] = await db.select({
-    pushedAt: items.pushedAt, lastReleaseAt: items.lastReleaseAt, openIssues: items.openIssues, stars: items.stars,
-    archived: items.archived, license: items.license, deprecated: items.deprecated, advisoriesOpen: items.advisoriesOpen,
+    pushedAt: items.pushedAt, lastReleaseAt: items.lastReleaseAt, openIssues: items.openIssues, closedIssues: items.closedIssues,
+    stars: items.stars, archived: items.archived, license: items.license, deprecated: items.deprecated, advisoriesOpen: items.advisoriesOpen,
+    packageName: items.packageName, packageEcosystem: items.packageEcosystem, releasesLastYear: items.releasesLastYear,
+    weightedScore: items.weightedScore,
   }).from(items).where(eq(items.id, itemId));
   if (!r) return null;
   const h = healthScore(r, now);
-  await db.update(items).set({ healthScore: h }).where(eq(items.id, itemId));
+  // The same number every page shows, so "Trusted" sorts by what people see.
+  const t = trustScore(r, r.weightedScore, now).score;
+  await db.update(items).set({ healthScore: h, trustScore: t === null ? null : Math.round(t) }).where(eq(items.id, itemId));
   return h;
 }
 

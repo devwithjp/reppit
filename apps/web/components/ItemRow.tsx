@@ -42,7 +42,7 @@ function BreakLine({ cells, license, brief = false }: { cells: SignalCell[]; lic
   const unknown = cells.filter((c) => c.state === "unknown").map((c) => c.short);
   if (brief) {
     const lead = [...known].sort((a, b) => Number(b.state === "failing") - Number(a.state === "failing")).slice(0, 3);
-    if (!lead.length) return <p className="break brief">Too little is known about this one yet.</p>;
+    if (!lead.length) return <p className="break brief">Not enough is measured yet.</p>;
     return (
       <p className="break brief">
         {lead.map((c, i) => <span key={c.key}>{i > 0 && <span aria-hidden="true">{"\u00a0\u00b7\u00a0 "}</span>}{c.state === "failing" ? <s>{c.label}</s> : c.label}</span>)}

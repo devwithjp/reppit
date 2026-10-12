@@ -14,7 +14,7 @@ export function CompatForm({ slug, href, signedIn }: { slug: string; href: strin
   if (!signedIn) {
     return (
       <p className="meta" style={{ marginTop: 10 }}>
-        Ran it under an agent? <Link className="inline-link" href={`/login?next=${encodeURIComponent(`${href}#compat`)}`}>Sign in to add a report</Link>.
+        Used it with a coding agent? <Link className="inline-link" href={`/login?next=${encodeURIComponent(`${href}#compat`)}`}>Sign in to add a report</Link>.
       </p>
     );
   }

@@ -90,6 +90,9 @@ export const items = pgTable("items", {
   advisoriesOpen: integer("advisories_open"),
   signalsCheckedAt: timestamp("signals_checked_at", { withTimezone: true }),
   healthScore: real("health_score").default(0).notNull(),
+  // The 0..100 trust score shown on every page (core trustScore), null when too little is measured.
+  // Stored so the feed can sort by it; refreshed with health and after every vote.
+  trustScore: integer("trust_score"),
   // Denormalised, recomputed on every vote.
   upvotes: integer("upvotes").default(0).notNull(),
   downvotes: integer("downvotes").default(0).notNull(),

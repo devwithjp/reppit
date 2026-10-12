@@ -38,7 +38,7 @@ function About({ repos, skills, signedIn }: { repos: number; skills: number; sig
     <section className="about" aria-labelledby="about-h">
       <div className="about-b">
         <h2 id="about-h">About reppit</h2>
-        <p>Repos and agent skills ranked by whether they still work, not by stars. The score is measured from the repo itself. Votes nudge it, and fade with age.</p>
+        <p>We score repos and agent skills from their own activity: pushes, releases, advisories and more. Votes can shift a score a little.</p>
         <div className="about-stats">
           <div><b>{repos.toLocaleString("en-US")}</b><span>repos</span></div>
           <div><b>{skills.toLocaleString("en-US")}</b><span>agent skills</span></div>
@@ -69,7 +69,7 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
   const order = sort === "top" ? [desc(items.weightedScore), desc(items.stars)]
     : sort === "new" ? [desc(items.createdAt)]
     : sort === "hot" ? [desc(items.hotScore), desc(items.stars)]
-    : [sql`${items.healthScore} desc nulls last`, desc(items.weightedScore), desc(items.stars)];
+    : [sql`${items.trustScore} desc nulls last`, desc(items.weightedScore), desc(items.stars)];
   const [rows, [{ n }]] = await Promise.all([
     d.select(rowColumns).from(items).where(filter).orderBy(...order).limit(PAGE).offset((page - 1) * PAGE) as Promise<RowItem[]>,
     d.select({ n: sql<number>`count(*)::int` }).from(items).where(filter),
@@ -90,8 +90,8 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
         <div className="home-main">
         {welcome ? (
           <section className="welcome">
-            <h1>Stars say it was popular. reppit says it still works.</h1>
-            <p>Describe the problem. Get the repos that are maintained today, with the reasons people gave, not a star count from 2019.</p>
+            <h1>Stars say it was popular. reppit shows if it is still maintained.</h1>
+            <p>Describe what you need. We'll show repos ranked by how well they're kept up, not by stars.</p>
             <LandingSearch />
             <p className="hint examples"><span>Try</span>
               {["pull tables out of a pdf in python", "state management for react", "http router for go"].map((q) => (
@@ -126,11 +126,11 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
           <div className="nothing">
             <h3>{page > 1 ? "Nothing on this page." : kind === "mcp" ? "No MCP servers are indexed yet." : `No ${noun} indexed yet.`}</h3>
             <p>{page > 1
-              ? <>The list ends earlier than that. <Link className="inline-link" href={href(sort, kind)}>Back to the first page</Link>.</>
+              ? <>The list ends before this page. <Link className="inline-link" href={href(sort, kind)}>Back to the first page</Link>.</>
               : kind === "mcp"
-                ? <>None have been added to the index so far, so there is nothing to rank here. This tab shows up in the feed once there are some.{" "}
+                ? <>None have been added yet.{" "}
                     <Link className="inline-link" href={href(sort, "")}>Back to the feed</Link>.</>
-                : <>When one is submitted it shows up here, measured from its own record. <Link className="inline-link" href="/submit">Submit one</Link>.</>}</p>
+                : <>Submitted repos show up here. <Link className="inline-link" href="/submit">Submit one</Link>.</>}</p>
           </div>
         ) : (
           <div className="list">

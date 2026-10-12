@@ -292,3 +292,10 @@ a.trust.compact:hover{background:var(--sunk)}
 .votepill .v-up:hover{color:var(--rust);background:var(--rust-tint)}
 .votepill .v-dn:hover{color:var(--steel);background:var(--steel-tint)}
 .votepill .tot{min-width:20px;text-align:center;font-weight:700;font-size:14px}
+/* item page score box: a GitHub panel, not a poster */
+.cold{border:1px solid var(--rule-hard);border-radius:var(--radius-lg);padding:20px}
+.cold .big{font-family:var(--sans);font-size:56px;letter-spacing:-.03em;line-height:.9}
+.cold .big.is-nd{font-size:22px;line-height:1.2;letter-spacing:-.01em}
+.cold .big s{text-transform:none;letter-spacing:normal;font-size:12px;font-weight:500;color:var(--ink-3);margin-top:6px}
+.cold .txt h2{font-family:var(--sans);font-size:17px;font-weight:600;letter-spacing:normal}
+.cold .txt .fine{font-family:var(--sans)}

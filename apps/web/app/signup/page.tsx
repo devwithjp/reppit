@@ -18,8 +18,8 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
       <main className="wrap" id="main">
         <div className="auth">
           <h1>Create an account</h1>
-          <p className="auth-lede">An account lets you vote and file agent reports. Every downvote you cast has to name a
-            reason, and your handle is shown next to it.</p>
+          <p className="auth-lede">Sign up to vote and report how repos work with your agent.
+            Your handle is public.</p>
           <div className="panel"><div className="panel-b">
             <SignupForm next={next} />
           </div></div>

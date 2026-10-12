@@ -55,7 +55,7 @@ export function StripKey() {
     <div className="stripkey">
       <div className="strip" aria-hidden="true"><i className="ok" /><i className="ok" /><i className="ok" /><i className="mid" /><i className="bad" /><i className="unk" /></div>
       <b>=</b> {SIGNAL_ORDER.map((s) => s.short).join(" \u00b7 ")}.
-      <span>Green holds, amber slipping, red failing, grey unknown, outline not applicable.</span>
+      <span>Green: fine. Amber: slipping. Red: failing. Grey: not measured. Outline: doesn't apply.</span>
     </div>
   );
 }
@@ -105,7 +105,7 @@ export function AgentLine({ compat }: { compat: Compat }) {
 /** Stand-in for both bands when nobody has said anything yet. One line, not two empty ones. */
 export function NoOpinions({ votes, reports }: { votes: boolean; reports: boolean }) {
   if (votes && reports) return null;
-  const text = !votes && !reports ? "No votes yet; agent reports start at launch. Trust is computed from the repo alone." :
+  const text = !votes && !reports ? "No votes yet. Agent reports start at launch. The score comes from the repo's own activity." :
     !votes ? "No votes yet." : "Agent reports start at launch.";
   return <p className="quiet">{text}</p>;
 }

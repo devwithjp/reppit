@@ -26,8 +26,8 @@ export default async function TrustPage() {
       <main className="wrap" id="main">
         <div className="head">
           <h1>How the trust score works</h1>
-          <p className="sub">Six measurements of the repo itself, taken from its own record. No human sets the score. When
-            too few of the six can be measured, it says &ldquo;too little measured&rdquo; instead of guessing.</p>
+          <p className="sub">The score comes from six things we check on every repo. No person sets it. If we can&rsquo;t
+            check enough of them, we don&rsquo;t show a score.</p>
         </div>
         <div className="cols">
           <div>
@@ -50,21 +50,20 @@ export default async function TrustPage() {
             </section>
             <section className="sec prose">
               <h2>How they add up</h2>
-              <p>Each signal earns points up to its maximum, and the points add up to 100. A signal we could not measure
-                counts as half its points: neither a pass nor a zero. A repo that publishes no package cannot be deprecated on
-                a registry or carry package advisories, so those two read &ldquo;not applicable&rdquo; and also count as half, so
-                lacking a package never raises a score. With fewer than {MIN_MEASURED} signals actually measured there is no number at
-                all. The page says &ldquo;too little measured&rdquo; rather than guess, and every score says how many signals it rests on.</p>
-              <p>An archived or deprecated project is capped at {FLAGGED_CAP}, whatever else it measures. Nobody is maintaining it.
+              <p>Each signal earns up to its points, and all six add up to 100. If we can&rsquo;t measure a signal, it gets half
+                its points. If a repo publishes no package, the deprecated and advisories signals don&rsquo;t apply. They also get
+                half points, so having no package never raises a score. With fewer than {MIN_MEASURED} signals measured, we show
+                &ldquo;too little measured&rdquo; instead of a score. Every score says how many signals it rests on.</p>
+              <p>An archived or deprecated project is capped at {FLAGGED_CAP}, whatever else it measures.
                 A project with no push in a year is capped at {STALE_CAPS.find(([d]) => d === 365)?.[1]}, and after two years at {STALE_CAPS.find(([d]) => d === 730)?.[1]}.</p>
-              <p>Votes then move the score by at most &plusmn;{VOTE_ADJUST_MAX}. Each vote is weighted by the voter&rsquo;s account
-                and loses half its weight every six months, so old praise stops counting. Every downvote has to name one of
-                five reasons: unmaintained, insecure, broken on an agent, misleading, low quality.</p>
-              <p>Stars are not an input. Neither is the licence: it decides whether you may use a project, not whether it is
-                maintained, so it is shown as a flag on the row instead.</p>
-              <p>Agent compatibility (works in Claude Code, breaks in Codex) is shown next to the score, not counted in it.
-                {" "}{AGENT_REPORTS_NOTE} Until someone reports an agent, it reads &ldquo;unknown&rdquo;, which is not the same as &ldquo;works&rdquo;.</p>
-              <p>Nothing here is sponsored. Paid placement, if it ever exists, is a separate slot that never touches this number.</p>
+              <p>Votes can move the score up to {VOTE_ADJUST_MAX} points either way. Each vote is weighted by the voter&rsquo;s
+                account and loses half its weight every six months. Every downvote must name one of five reasons: unmaintained,
+                insecure, broken on an agent, misleading, low quality.</p>
+              <p>Stars and licence don&rsquo;t affect the score. We flag a missing or unclear licence on the row so you can
+                check it.</p>
+              <p>Agent compatibility (for example, works in Claude Code, breaks in Codex) is shown next to the score, not
+                counted in it.{" "}{AGENT_REPORTS_NOTE} Until someone reports on an agent, it shows &ldquo;unknown&rdquo;.</p>
+              <p>Nothing here is sponsored. If we ever sell placement, it will be a separate slot that does not change the score.</p>
             </section>
           </div>
           <aside>
@@ -72,8 +71,8 @@ export default async function TrustPage() {
               <div className="panel-h"><span className="lbl">Reading the strip</span></div>
               <div className="panel-b">
                 <div className="strip" style={{ width: 118, marginBottom: 10 }} aria-hidden="true"><i className="ok" /><i className="unk" /><i className="ok" /><i className="ok" /><i className="mid" /><i className="bad" /></div>
-                <p className="meta" style={{ margin: 0 }}>Green holds, amber is slipping, red is failing, grey is unknown. Each cell is one
-                  measurement, in the same order as the table.</p>
+                <p className="meta" style={{ margin: 0 }}>Green: fine. Amber: slipping. Red: failing. Grey: not measured.
+                  Each cell is one signal, in the same order as the table.</p>
               </div>
             </div>
             <p className="meta" style={{ marginTop: 14 }}><Link className="inline-link" href="/?sort=top">Browse the directory</Link></p>

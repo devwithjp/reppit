@@ -4,8 +4,8 @@ import type { Metadata, Viewport } from "next";
 import { themeScript } from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
-  title: { default: "reppit — stars say it was popular, reppit says it still works", template: "%s · reppit" },
-  description: "Community-ranked repos and agent skills. Every downvote carries a reason, every vote fades with age, and your coding agent can ask before it picks your next dependency.",
+  title: { default: "reppit: find libraries that are still maintained", template: "%s · reppit" },
+  description: "Repos and agent skills scored by how well they are maintained, not by stars. Every downvote names a reason.",
 };
 
 export const viewport: Viewport = {

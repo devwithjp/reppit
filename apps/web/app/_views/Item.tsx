@@ -16,7 +16,7 @@ import { flags, ago, compact, band } from "@/components/trust";
 import { trustScore, VOTE_ADJUST_MAX, MIN_MEASURED, type SignalCell } from "@/components/score";
 import { ScoreNum, nullReason, capNote } from "@/components/marks";
 import { REASONS, REASON_LABEL, CORE_AGENTS, KIND_LABEL, MCP_INSTALL, AGENT_REPORTS_NOTE, splitSlug, itemHref, parentRepo } from "@/components/labels";
-import { rowColumns, indexCounts } from "../_data/items";
+import { rowColumns } from "../_data/items";
 
 const HALF_LIFE_DAYS = 180;
 const STATE_CLASS = { good: "", slipping: " mid", failing: " bad", unknown: "", not_applicable: "" } as const;
@@ -30,9 +30,9 @@ function verdict(cells: SignalCell[], scored: boolean): string {
   if (cells.find((c) => c.key === "deprecated")?.state === "failing") return "Deprecated by its maintainers.";
   const unknown = cells.filter((c) => c.state === "unknown").length;
   if (failing.length === 0 && slipping.length === 0) {
-    return !scored ? "Too little is measured yet to give it a number." : unknown > 0 ? "What is measured is holding." : "Everything measured is holding.";
+    return !scored ? "Not enough is measured yet to give a score." : unknown > 0 ? "What we could measure looks fine." : "Everything we measured looks fine.";
   }
-  if (failing.length === 0) return `It holds, with ${list(slipping)} slipping.`;
+  if (failing.length === 0) return `Mostly fine. Slipping: ${list(slipping)}.`;
   const f = list(failing);
   return `${f.charAt(0).toUpperCase()}${f.slice(1)} ${failing.length === 1 ? "is" : "are"} failing${slipping.length ? `, and ${list(slipping)} ${slipping.length === 1 ? "is" : "are"} slipping` : ""}.`;
 }
@@ -67,7 +67,7 @@ export async function ItemView({ slug }: { slug: string }) {
 
   // A skill's stars are its parent repo's. Link the parent instead of showing them as the skill's own.
   const parent = parentRepo(item.kind, item.slug);
-  const [voteRows, compatRows, mineRows, neighbours, counts, parentRows] = await Promise.all([
+  const [voteRows, compatRows, mineRows, neighbours, parentRows] = await Promise.all([
     d.select({ login: users.login, direction: votes.direction, reason: votes.reason, weight: votes.weight, createdAt: votes.createdAt })
       .from(votes).innerJoin(users, eq(users.id, votes.userId)).where(eq(votes.itemId, item.id)).orderBy(desc(votes.createdAt)).limit(50),
     d.select({ id: agentCompatReports.id, agent: agentCompatReports.agent, status: agentCompatReports.status, note: agentCompatReports.note, login: users.login, createdAt: agentCompatReports.createdAt })
@@ -79,7 +79,6 @@ export async function ItemView({ slug }: { slug: string }) {
       .orderBy(sql`${items.embedding} <=> (select embedding from items where id = ${item.id})`)
       .limit(4)
       .catch(() => []),
-    indexCounts(d),
     parent ? d.select({ slug: items.slug }).from(items).where(and(eq(items.slug, parent), eq(items.kind, "repo"))).limit(1) : Promise.resolve([]),
   ]);
   const parentHref = parent ? (parentRows.length ? itemHref(parent) : `https://github.com/${parent}`) : null;
@@ -107,8 +106,8 @@ export async function ItemView({ slug }: { slug: string }) {
   const agentsReporting = Object.keys(byAgent).length;
   const unknownWords = t.cells.filter((c) => c.state === "unknown").map((c) => c.short);
   const unknownNote = unknownWords.length === 0 ? null : t.score === null
-    ? `${t.measured} of ${t.applicable} applicable signals are measured for this entry; ${unknownWords.join(", ")} ${unknownWords.length === 1 ? "is" : "are"} unknown. With fewer than ${MIN_MEASURED} measured we show no number rather than guess one.`
-    : `${unknownWords.join(" and ")} ${unknownWords.length === 1 ? "is" : "are"} unknown for this entry and ${unknownWords.length === 1 ? "counts" : "count"} as half points: neither a pass nor a zero.`;
+    ? `Not measured: ${unknownWords.join(", ")}. We need at least ${MIN_MEASURED} to give a score.`
+    : `Not measured: ${unknownWords.join(" and ")}. ${unknownWords.length === 1 ? "It gets" : "Each gets"} half its points.`;
 
   return (
     <>
@@ -149,7 +148,7 @@ export async function ItemView({ slug }: { slug: string }) {
                   <span className="tot" data-testid="vote-count" aria-label="no votes yet">0</span>
                   <a className="v-dn" href="#vote" aria-label="Downvote, reason required"><DownTriangle /></a>
                 </div>
-                <p className="meta" style={{ margin: "7px 0 0" }}>No votes yet. The score below is measured from the repo.</p>
+                <p className="meta" style={{ margin: "7px 0 0" }}>No votes yet.</p>
               </>
             ) : (
               <>
@@ -158,8 +157,8 @@ export async function ItemView({ slug }: { slug: string }) {
                   <span className="sum"><b className="num" style={{ color: "var(--rust)" }}>{item.downvotes > 0 ? `\u2212${item.downvotes}` : "0"}</b> reported<br /><span className="meta">every one with a reason</span></span>
                   <span className="tot num" data-testid="vote-count" aria-label={`net ${net}`}>{net < 0 ? `−${-net}` : net}</span>
                 </div>
-                <p className="meta" style={{ margin: "7px 0 0" }}>Weighted by voter and net of decay, this counts as{" "}
-                  {item.weightedScore >= 0 ? "+" : "−"}{Math.abs(item.weightedScore).toFixed(1)}. Votes halve in weight every six months.</p>
+                <p className="meta" style={{ margin: "7px 0 0" }}>After weighting, these votes count as{" "}
+                  {item.weightedScore >= 0 ? "+" : "−"}{Math.abs(item.weightedScore).toFixed(1)}. Older votes count less.</p>
               </>
             )}
           </div>
@@ -172,25 +171,23 @@ export async function ItemView({ slug }: { slug: string }) {
                 <div className="cold">
                   <div className={`big${t.score === null ? " is-nd" : ""}`}><ScoreNum score={t.score} reason={t.reason} /><s>Trust{t.score === null ? "" : ", of 100"} &middot; {t.measured} of {t.applicable} measured{capNote(t.score, t.reason) ? ` \u00b7 ${capNote(t.score, t.reason)}` : ""}</s></div>
                   <div className="txt">
-                    <h2>Nobody has voted. Here is what the repo is doing.</h2>
+                    <h2>No votes yet. Here&rsquo;s what we measured.</h2>
                     <p>{t.score === null
-                      ? <>Measured from the repo&rsquo;s own record. Too little of it can be measured yet to give a fair number, so there isn&rsquo;t one. What is known is in the table below.</>
-                      : <>Computed from the repo&rsquo;s own record. No human has touched this number and none of it is a star count.</>}{" "}
-                      If every vote on reppit vanished tonight, this page would read the same tomorrow.</p>
+                      ? <>We could only measure {t.measured} of {t.applicable} signals, so we&rsquo;re not showing a score yet. See what we found below.</>
+                      : <>This score comes from the repo&rsquo;s own activity, not from stars or votes.</>}</p>
                     {unknownNote && <p>{unknownNote}</p>}
-                    <p className="fine">Votes adjust the score by at most &plusmn;{VOTE_ADJUST_MAX} points, and they halve in weight every six months.</p>
+                    <p className="fine">Votes can move a score up to {VOTE_ADJUST_MAX} points. Older votes count less.</p>
                   </div>
                 </div>
               </section>
             ) : (
               <section className="sec">
-                <h2>Trust score <em>computed from the repo, votes adjust it</em></h2>
+                <h2>Trust score <em>from the repo, adjusted by votes</em></h2>
                 <div className="score-hero">
                   <div className={`big${t.score === null ? " is-nd" : ""}`}><ScoreNum score={t.score} reason={t.reason} /><s>{t.score === null ? "trust" : "of 100"} &middot; {t.measured} of {t.applicable} measured{capNote(t.score, t.reason) ? ` \u00b7 ${capNote(t.score, t.reason)}` : ""}</s></div>
                   <div className="txt"><b>{verdict(t.cells, t.score !== null)}</b>{" "}
                     {unknownNote && <>{unknownNote} </>}
-                    {t.base !== null && <>The measurements give {t.base}; votes move it {t.voteAdjust >= 0 ? "+" : "\u2212"}{Math.abs(t.voteAdjust)}. </>}
-                    Nothing in the measurements is a human opinion.</div>
+                    {t.base !== null && <>Measured: {t.base}. Votes: {t.voteAdjust >= 0 ? "+" : "\u2212"}{Math.abs(t.voteAdjust)}.</>}</div>
                 </div>
               </section>
             )}
@@ -233,9 +230,7 @@ export async function ItemView({ slug }: { slug: string }) {
               {cold ? (
                 <div className="nothing">
                   <h3>No reports yet.</h3>
-                  <p>Nobody has voted on this entry, so there is nothing here, and we are not going to pad it out with a star
-                    count and a contributor graph. If you have run it under an agent, that report is worth more than the next
-                    thousand stars it gets.</p>
+                  <p>Used it with a coding agent? Tell us how it went in the agent section below.</p>
                 </div>
               ) : (
                 <>
@@ -278,8 +273,8 @@ export async function ItemView({ slug }: { slug: string }) {
             <section className="sec" id="compat" aria-labelledby="compat-h">
               <h2 id="compat-h">Agent compatibility <em>{compatRows.length === 0 ? "no reports yet" : `${compatRows.length} report${compatRows.length === 1 ? "" : "s"} from ${agentsReporting} agent${agentsReporting === 1 ? "" : "s"}`}</em></h2>
               <p className="compat-none" data-testid="compat-none">
-                {compatRows.length === 0 ? "No agent has been reported yet. " : ""}{AGENT_REPORTS_NOTE} Sign in and use the form below,
-                or have your agent call <code>report_compat</code> after you confirm how the run went.</p>
+                {compatRows.length === 0 ? "No agent reports yet. " : ""}{AGENT_REPORTS_NOTE} Tried it in Claude Code, Codex or Cursor? Sign in and
+                add a report below. Once the MCP server is out, your agent can also call <code>report_compat</code>.</p>
               <table className="sig boxed">
                 <thead><tr><th scope="col">Agent</th><th scope="col">Reports</th><th scope="col" style={{ textAlign: "right" }}>Status</th></tr></thead>
                 <tbody>
@@ -298,7 +293,7 @@ export async function ItemView({ slug }: { slug: string }) {
                   })}
                 </tbody>
               </table>
-              <p className="meta" style={{ marginTop: 9 }}>Unknown is an honest answer. It is not the same as &ldquo;works&rdquo;.</p>
+              <p className="meta" style={{ marginTop: 9 }}>Unknown means no one has reported yet.</p>
 
               {compatRows.length > 0 && (
                 <div style={{ marginTop: 10 }}>
@@ -323,10 +318,10 @@ export async function ItemView({ slug }: { slug: string }) {
               {item.readme ? (
                 <>
                   <div className="readme">{readmeExcerpt(item.readme)}</div>
-                  <p className="meta" style={{ marginTop: 9 }}><a className="inline-link" href={item.url} target="_blank" rel="noreferrer">Read the whole thing on GitHub</a></p>
+                  <p className="meta" style={{ marginTop: 9 }}><a className="inline-link" href={item.url} target="_blank" rel="noreferrer">Read more on GitHub</a></p>
                 </>
               ) : (
-                <p className="meta">The README has not been fetched for this entry yet. <a className="inline-link" href={item.url} target="_blank" rel="noreferrer">Read it on GitHub</a>.</p>
+                <p className="meta">We haven&rsquo;t fetched the README yet. <a className="inline-link" href={item.url} target="_blank" rel="noreferrer">Read it on GitHub</a>.</p>
               )}
             </section>
           </div>
@@ -338,14 +333,14 @@ export async function ItemView({ slug }: { slug: string }) {
               <div className="panel-h"><span className="lbl">Ask from your agent</span></div>
               <div className="panel-b">
                 <ReppitInstall command={MCP_INSTALL} compact />
-                <p className="meta" style={{ margin: "10px 0 0" }}>Your agent gets these measurements whether or not anybody has voted.{" "}
+                <p className="meta" style={{ margin: "10px 0 0" }}>Once the MCP server is out, your agent can look up these measurements.{" "}
                   <Link className="inline-link" href="/agent">See what it returns</Link></p>
               </div>
             </div>
 
             {neighbours.length > 0 && (
               <div className="panel" style={{ marginTop: 18 }}>
-                <div className="panel-h"><span className="lbl">{cold ? "Measured, not voted" : "Considered instead"}</span></div>
+                <div className="panel-h"><span className="lbl">{`Similar ${KIND_LABEL[item.kind] ?? "repos"}`}</span></div>
                 <table className="kv kv-rel"><tbody>
                   {neighbours.map((n) => {
                     const nt = trustScore(n);
@@ -360,8 +355,7 @@ export async function ItemView({ slug }: { slug: string }) {
                 </tbody></table>
                 {cold && (
                   <div className="panel-b" style={{ borderTop: "1px solid var(--rule)" }}>
-                    <p className="meta" style={{ margin: 0 }}>{counts.total.toLocaleString("en-US")} entries indexed.{" "}
-                      {counts.unvoted.toLocaleString("en-US")} of them have no votes yet. Every one is measured from its own record.</p>
+                    <p className="meta" style={{ margin: 0 }}>Picked by how close they are to this one.</p>
                   </div>
                 )}
               </div>

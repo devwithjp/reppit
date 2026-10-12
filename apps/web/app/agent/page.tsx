@@ -48,8 +48,8 @@ export default async function AgentPage() {
       <Masthead viewer={viewer} current="agent" next="/agent" />
       <div className="term-shell">
         <h1 className="term-h1">In your agent</h1>
-        <p className="term-lede">Most people will meet reppit as a few lines of context their agent read before it installed
-          something. {REPPIT_PUBLISHED ? "Add the MCP server once:" : ""}</p>
+        <p className="term-lede">The reppit MCP server lets your coding agent check a library before it
+          installs it. {REPPIT_PUBLISHED ? "Add the MCP server once:" : ""}</p>
         <div className="term-install"><ReppitInstall command={MCP_INSTALL} /></div>
         {REPPIT_PUBLISHED && (
           <>
@@ -60,16 +60,16 @@ export default async function AgentPage() {
 
         <h2 className="term-h2">What each tool can do</h2>
         <ul className="tools">
-          <li><code>search_repos</code><span>Reads only. Searches the index by problem and returns scores, reasons and agent reports.</span></li>
-          <li><code>get_repo</code><span>Reads only. Returns one entry&rsquo;s signals, votes and agent reports.</span></li>
-          <li><code>vote</code><span>Acts as you. Needs a personal token you created with write access; tokens are read-only by default, and a read-only token cannot vote at all. The server tells the agent to vote only when you ask.</span></li>
-          <li><code>report_compat</code><span>Acts as you, with the same write access as <code>vote</code>. The server tells the agent to file a report only after you confirm how a run went.</span></li>
+          <li><code>search_repos</code><span>Read only. Searches by problem and returns scores, reasons and agent reports.</span></li>
+          <li><code>get_repo</code><span>Read only. Returns one entry&rsquo;s signals, votes and agent reports.</span></li>
+          <li><code>vote</code><span>Votes for you, only when you ask. Needs a token with write access.</span></li>
+          <li><code>report_compat</code><span>Files an agent report for you, only after you confirm how a run went. Needs the same write access as <code>vote</code>.</span></li>
           <li><code>install_skill</code><span>Returns an install command. It never runs it.</span></li>
         </ul>
-        <p className="term-lede">Without a token, or with the default read-only one, the server can only read. Write access is a box you tick
-          when you create the token on your account page, and you can revoke it there.</p>
+        <p className="term-lede">Tokens are read-only by default. To let your agent vote, tick &ldquo;write access&rdquo; when you make a
+          token on your account page. You can revoke it there.</p>
         <p className="term-lede">{AGENT_REPORTS_NOTE}</p>
-        <p className="term-lede">Below is what <code>search_repos</code> returns for one query, from today&rsquo;s index.</p>
+        <p className="term-lede">Here is what <code>search_repos</code> returns for one query, from today&rsquo;s index.</p>
 
         <div className="tbar" aria-hidden="true"><i className="on" /><i /><i /> ~/work/invoice-parser &nbsp;&mdash;&nbsp; claude</div>
         <pre className="term" aria-label={`Search results for ${QUERY}`}>
@@ -102,8 +102,6 @@ export default async function AgentPage() {
 })}
 {"\n"}<span className="c-steel">&gt;</span> <span className="cursor"> </span>
 </pre>
-        <p className="note"><b>This is a first-class screen, not an export.</b> The reason tags and the per-agent counts have to
-          survive being rendered in eighty columns of monospace, because that is where most people will read them.</p>
       </div>
     </div>
   );

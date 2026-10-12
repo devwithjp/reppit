@@ -18,8 +18,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <main className="wrap" id="main">
         <div className="auth">
           <h1>Sign in</h1>
-          <p className="auth-lede">You need an account to vote and to report how a repo runs under your agent.
-            Reading, searching and the trust score never need one.</p>
+          <p className="auth-lede">Sign in to vote and add reports.
+            You don&rsquo;t need an account to search.</p>
           <div className="panel"><div className="panel-b">
             <LoginForm next={next} />
           </div></div>

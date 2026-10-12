@@ -32,7 +32,7 @@ export function VoteComposer({
     setError(null); setDone(null);
     if (!signedIn) { needSignIn(); return; }
     if (direction === "down" && !reason) {
-      setError("Pick a reason first. A downvote without one is not accepted.");
+      setError("Pick a reason before you downvote.");
       firstReason.current?.focus();
       return;
     }
@@ -62,14 +62,14 @@ export function VoteComposer({
 
   return (
     <div className="composer" id="vote">
-      <div className="composer-h">{cold ? "Be the first report" : "Vote on this repo"}</div>
+      <div className="composer-h">{cold ? "Be the first to vote" : "Vote on this repo"}</div>
       <div className="composer-b">
         <button type="button" className={`btn btn-block${mine === "up" ? " is-on" : ""}`} data-testid="vote-up"
           aria-pressed={mine === "up"} disabled={busy} onClick={() => send(mine === "up" ? null : "up")}>
           <span className="tri-steel"><UpTriangle w={15} h={15} /></span> {mine === "up" ? "You said it works. Withdraw" : "It works as described"}
         </button>
         <button type="button" className="required as-btn" id="reason-hd" data-testid="vote-down" onClick={startDownvote}>
-          <DownTriangle w={13} h={13} /> Downvoting? Pick a reason. Required.
+          <DownTriangle w={13} h={13} /> Something wrong? Pick a reason.
         </button>
         <div className="pick" role="radiogroup" aria-labelledby="reason-hd">
           {REASONS.map((r, i) => (
@@ -90,8 +90,8 @@ export function VoteComposer({
         <p className="vote-msg" role="alert" data-testid="vote-error" hidden={!error}>{error}</p>
         <p className="vote-ok" role="status" hidden={!done}>{done}</p>
         {cold && (
-          <p className="meta" style={{ margin: "10px 0 0" }}>Which agent did you run it under? Say so in the
-            compatibility section. It is the question nobody else asks.</p>
+          <p className="meta" style={{ margin: "10px 0 0" }}>Used it with a coding agent? Add an agent report in the
+            Agent compatibility section.</p>
         )}
       </div>
     </div>

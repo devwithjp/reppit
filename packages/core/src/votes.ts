@@ -1,6 +1,7 @@
 import { eq, and, sql } from "drizzle-orm";
 import { items, votes, users, type Db } from "@gitit/db";
 import { voteWeight, weightedScore, hotScore } from "./ranking";
+import { refreshHealth } from "./identity";
 
 export type DownvoteReason = "unmaintained" | "insecure" | "broken-on-agent" | "misleading" | "low-quality";
 export const DOWNVOTE_REASONS: DownvoteReason[] = ["unmaintained", "insecure", "broken-on-agent", "misleading", "low-quality"];
@@ -43,6 +44,7 @@ export async function recomputeItemScores(db: Db, itemId: string, createdAt?: Da
   }
   const hot = hotScore(ws, created);
   await db.update(items).set({ upvotes: up, downvotes: down, weightedScore: ws, hotScore: hot, updatedAt: new Date() }).where(eq(items.id, itemId));
+  await refreshHealth(db, itemId); // votes move the stored trust score
   return { upvotes: up, downvotes: down, weightedScore: ws, hotScore: hot };
 }
 

@@ -69,11 +69,10 @@ export default async function SubmitPage({ searchParams }: { searchParams: Promi
       <main className="wrap" id="main">
         <div className="auth wide">
           <h1>Submit a repo</h1>
-          <p className="auth-lede">Give it a GitHub repo. Once it is indexed it is measured from its own record, before anybody
-            votes. Where too little can be measured, its page says so rather than show a number. If it is already here
-            you go straight to its page.</p>
+          <p className="auth-lede">Paste a GitHub repo. We&rsquo;ll measure it in a few seconds. If it&rsquo;s already
+            here, we&rsquo;ll take you to it.</p>
           {!viewer && (
-            <p className="auth-msg bad" role="status">You need to be signed in to submit.{" "}
+            <p className="auth-msg bad" role="status">Sign in to submit a repo.{" "}
               <Link className="inline-link" href="/login?next=%2Fsubmit">Sign in</Link></p>
           )}
           <div className="panel"><div className="panel-b">
@@ -84,13 +83,13 @@ export default async function SubmitPage({ searchParams }: { searchParams: Promi
               </label>
               <label className="check">
                 <input type="checkbox" name="skills" />
-                <span>Index its <code>skills/*/SKILL.md</code> folders as agent skills instead</span>
+                <span>This repo contains agent skills (<code>SKILL.md</code> files)</span>
               </label>
               <button type="submit" className="btn btn-primary" disabled={!viewer} data-testid="submit-repo-button">Submit</button>
               <p className="auth-msg bad" id="submit-error" role="alert" data-testid="submit-error" hidden={!error}>{error}</p>
             </form>
           </div></div>
-          <p className="meta" style={{ marginTop: 12 }}>Fetching from GitHub takes a few seconds. Nothing is ranked by who submitted it.</p>
+          <p className="meta" style={{ marginTop: 12 }}>Fetching from GitHub takes a few seconds.</p>
         </div>
       </main>
       <Footer />

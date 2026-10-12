@@ -18,7 +18,7 @@ export async function Footer() {
         <Link href="/submit">submit a repo</Link>
       </div>
       <div className="foot-row">
-        <span>Nothing here is sponsored. Ranking and placement are separate systems.</span>
+        <span>Nothing here is sponsored.</span>
         <ThemeToggle />
       </div>
     </div></footer>

@@ -20,7 +20,7 @@ export function LandingSearch() {
   return (
     <form className="cta" action="/search" method="get" role="search">
       <span aria-hidden="true"><SearchIcon /></span>
-      <input name="q" placeholder="pull tables out of a pdf in python" aria-label="Describe the problem"
+      <input name="q" placeholder='What do you need? e.g. "parse CLI args in rust"' aria-label="Describe the problem"
         required minLength={3} data-testid="search-input" />
       <button type="submit" data-testid="search-submit">Search</button>
     </form>
@@ -32,7 +32,7 @@ export function QuerySearch({ q, kind }: { q: string; kind?: string }) {
   return (
     <form className="query-field" action="/search" method="get" role="search">
       <span aria-hidden="true"><SearchIcon /></span>
-      <input name="q" defaultValue={q} placeholder="describe the problem, not the package" aria-label="Describe the problem"
+      <input name="q" defaultValue={q} placeholder="Describe what you need" aria-label="Describe the problem"
         required minLength={3} autoFocus={!q} data-testid="search-input" />
       {kind && <input type="hidden" name="kind" value={kind} />}
       <button type="submit" data-testid="search-submit">Search</button>
