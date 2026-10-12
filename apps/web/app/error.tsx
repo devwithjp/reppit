@@ -17,7 +17,7 @@ export default function ErrorBoundary({ error, reset }: { error: Error & { diges
           {error.digest && <p className="meta">Reference: {error.digest}</p>}
           <p className="state-links">
             <button type="button" className="btn btn-primary" onClick={() => reset()}>Try again</button>
-            <Link className="inline-link" href="/?sort=hot">Back to the directory</Link>
+            <Link className="inline-link" href="/?sort=trusted">Back to the directory</Link>
           </p>
         </div>
       </main>

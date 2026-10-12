@@ -127,6 +127,24 @@ export function splitSlug(slug: string): { owner: string; name: string } {
   return i < 0 ? { owner: "", name: slug } : { owner: slug.slice(0, i + 1), name: slug.slice(i + 1) };
 }
 
+/**
+ * How a slug reads in a list. A skill's slug carries its folder path (obra/superpowers/skills/tdd):
+ * show the repo it lives in and the skill's own name, not the folder.
+ */
+export function displaySlug(slug: string, kind: string): { owner: string; name: string } {
+  const { owner, name } = splitSlug(slug);
+  if (kind !== "skill") return { owner, name };
+  const parts = slug.split("/");
+  return { owner: parts.length > 2 ? `${parts[0]}/${parts[1]} \u203a ` : owner, name };
+}
+
+/** Descriptions lifted from YAML front matter can start with a block marker (">", "|-"). Drop it. */
+export function cleanDesc(d: string | null | undefined): string | null {
+  if (!d) return null;
+  const s = d.replace(/^\s*[>|][-+]?\s*/, "").replace(/\s+/g, " ").trim();
+  return s || null;
+}
+
 /** Path to an item page. Skills have slugs with more than two segments. */
 export const itemHref = (slug: string) => `/r/${slug.split("/").map(encodeURIComponent).join("/")}`;
 

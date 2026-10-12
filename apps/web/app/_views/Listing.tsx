@@ -19,7 +19,7 @@ export async function Listing({ title, kicker, where, here, empty }: { title: st
     <>
       <Masthead viewer={viewer} current="browse" next={here} />
       <main className="wrap" id="main">
-        <nav className="crumbs" aria-label="Breadcrumb"><Link href="/?sort=hot">browse</Link> / {kicker} / <b>{title}</b></nav>
+        <nav className="crumbs" aria-label="Breadcrumb"><Link href="/?sort=trusted">browse</Link> / {kicker} / <b>{title}</b></nav>
         <div className="toolbar"><h1 className="list-h1">{title}</h1><span className="meta">{rows.length === 50 ? "top 50" : rows.length} by community score, then stars</span></div>
         <StripKey />
         {rows.length === 0 ? (

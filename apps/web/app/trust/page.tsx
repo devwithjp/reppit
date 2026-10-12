@@ -69,11 +69,11 @@ export default async function TrustPage() {
           </div>
           <aside>
             <div className="panel">
-              <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>Reading the strip</span></div>
+              <div className="panel-h"><span className="lbl">Reading the strip</span></div>
               <div className="panel-b">
                 <div className="strip" style={{ width: 118, marginBottom: 10 }} aria-hidden="true"><i className="ok" /><i className="unk" /><i className="ok" /><i className="ok" /><i className="mid" /><i className="bad" /></div>
-                <p className="meta" style={{ margin: 0 }}>Blue holds, amber slipping, rust failing, grey unknown. Green is absent on
-                  purpose: a score of 58 is a measurement, not a pass or a fail.</p>
+                <p className="meta" style={{ margin: 0 }}>Green holds, amber is slipping, red is failing, grey is unknown. Each cell is one
+                  measurement, in the same order as the table.</p>
               </div>
             </div>
             <p className="meta" style={{ marginTop: 14 }}><Link className="inline-link" href="/?sort=top">Browse the directory</Link></p>

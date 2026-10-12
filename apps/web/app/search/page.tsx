@@ -11,7 +11,6 @@ import { Masthead } from "@/components/Masthead";
 import { Footer } from "@/components/Footer";
 import { QuerySearch } from "@/components/SearchForms";
 import { ItemRow } from "@/components/ItemRow";
-import { StripKey } from "@/components/marks";
 import { trustScore } from "@/components/score";
 import { rowColumns, loadExtras, indexCounts, type RowItem } from "../_data/items";
 
@@ -107,7 +106,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           ) : (
             <>
               <span>Try</span>
-              {EXAMPLES.map((e) => <Link key={e} className="chip" href={`/search?q=${encodeURIComponent(e)}`}>{e}</Link>)}
+              {EXAMPLES.map((e) => <Link key={e} className="example" href={`/search?q=${encodeURIComponent(e)}`}>{e}</Link>)}
             </>
           )}
         </div>
@@ -129,10 +128,15 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         ) : notIndexed ? (
           <div className="nothing" style={{ marginTop: 20 }} data-testid="not-indexed">
             <h3>Not in the index yet.</h3>
-            <p>Nothing among the {counts.total.toLocaleString("en-US")} entries is close to &ldquo;{q}&rdquo;. We would rather say
-              that than show you weak matches. If you know the repo that does this,{" "}
-              <Link className="inline-link" href="/submit">submit it</Link> and it will be measured like the rest. Or{" "}
-              <Link className="inline-link" href="/?sort=top">browse the directory</Link>.</p>
+            <p>Nothing among the {counts.total.toLocaleString("en-US")} repos and skills is a good match for &ldquo;{q}&rdquo;.
+              We would rather say so than show weak matches.</p>
+            <p className="examples"><span>Try</span>
+              {EXAMPLES.map((e) => <Link key={e} className="example" href={`/search?q=${encodeURIComponent(e)}`}>{e}</Link>)}
+            </p>
+            <div className="nothing-actions">
+              <Link className="btn" href="/?sort=trusted">Browse the directory</Link>
+              {/[aeiou]/i.test(q) && q.trim().includes(" ") && <Link className="btn" href="/submit">Know the repo? Submit it</Link>}
+            </div>
           </div>
         ) : (
           <>
@@ -150,8 +154,6 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                 <Link href={qs({ sort: "trust" })} {...(sort === "trust" ? { "aria-current": "true" as const } : {})}>Trust</Link>
               </div>
             </div>
-
-            <StripKey />
 
             {ordered.length === 0 ? (
               <div className="nothing">

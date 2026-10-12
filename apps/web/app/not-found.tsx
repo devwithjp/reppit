@@ -15,7 +15,7 @@ export default function NotFound() {
             same as a bad score.</p>
           <div className="state-search"><HeaderSearch /></div>
           <p className="state-links">
-            <Link className="inline-link" href="/?sort=hot">Browse the directory</Link>
+            <Link className="inline-link" href="/?sort=trusted">Browse the directory</Link>
             <Link className="inline-link" href="/submit">Submit a repo</Link>
           </p>
         </div>

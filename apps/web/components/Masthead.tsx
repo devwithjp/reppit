@@ -11,13 +11,13 @@ type Current = "browse" | "trust" | "agent" | null;
  */
 export function Masthead({
   viewer, current = null, variant = "default", next = "/",
-}: { viewer: Viewer | null; current?: Current; variant?: "default" | "landing" | "search" | "bare"; next?: string }) {
+}: { viewer: Viewer | null; current?: Current; variant?: "default" | "landing" | "home" | "search" | "bare"; next?: string }) {
   const aria = (c: Current) => (current === c ? { "aria-current": "page" as const } : {});
   return (
     <header className="mast"><div className="wrap mast-in">
       <Link className="logo" href="/"><i />reppit</Link>
       <nav className="mast-nav" aria-label="Primary">
-        <Link href="/?sort=hot" {...aria("browse")}>Browse</Link>
+        <Link href="/?sort=trusted" {...aria("browse")}>Browse</Link>
         <Link href="/trust" {...aria("trust")}>Trust score</Link>
         <Link href="/agent" {...aria("agent")}>In your agent</Link>
       </nav>
@@ -27,7 +27,7 @@ export function Masthead({
           {variant === "landing" && !viewer && (
             <>
               <Link className="mast-link" href={`/login?next=${encodeURIComponent(next)}`} data-testid="sign-in-link">Sign in</Link>
-              <Link className="btn btn-sm" href="/?sort=hot">Open the directory</Link>
+              <Link className="btn btn-sm" href="/?sort=trusted">Open the directory</Link>
             </>
           )}
           {viewer ? (

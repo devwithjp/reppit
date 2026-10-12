@@ -41,7 +41,7 @@ export function RailVote({
       {state.hasVotes ? (
         <span className={`score num${neg ? " neg" : ""}`}>{neg ? `−${Math.abs(state.net)}` : state.net.toLocaleString("en-US")}</span>
       ) : (
-        <span className="score num none" aria-label="no votes yet">&mdash;</span>
+        <span className="score num none" aria-label="no votes yet">0</span>
       )}
       <span className="unit">votes</span>
       <Link className={`down${state.mine === "down" ? " on" : ""}`} href={`${href}#vote`}

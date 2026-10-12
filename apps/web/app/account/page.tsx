@@ -82,7 +82,7 @@ export default async function AccountPage() {
             <section className="sec">
               <h2>Your votes <em>newest first</em></h2>
               {myVotes.length === 0 ? (
-                <p className="meta">None yet. <Link className="inline-link" href="/?sort=hot">Browse the directory</Link> and vote on something you have used.</p>
+                <p className="meta">None yet. <Link className="inline-link" href="/?sort=trusted">Browse the directory</Link> and vote on something you have used.</p>
               ) : (
                 <table className="sig boxed"><tbody>
                   {myVotes.map((v) => (
@@ -115,7 +115,7 @@ export default async function AccountPage() {
 
           <aside>
             <div className="panel" id="token">
-              <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>Personal token</span></div>
+              <div className="panel-h"><span className="lbl">Personal token</span></div>
               <div className="panel-b">
                 <p className="meta" style={{ margin: "0 0 10px" }}>For the reppit CLI and MCP server.{" "}
                   A read token can search and look up repos only.</p>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { UpTriangle, DownTriangle } from "@/components/icons";
 import { notFound } from "next/navigation";
 import { and, desc, eq, ne, isNotNull, sql } from "drizzle-orm";
 import { items, votes, users, agentCompatReports } from "@gitit/db";
@@ -143,12 +144,12 @@ export async function ItemView({ slug }: { slug: string }) {
           <div className="r">
             {cold ? (
               <>
-                <div className="votebar">
-                  <a className="v-up" href="#vote"><svg width="13" height="8" viewBox="0 0 15 9" fill="currentColor" aria-hidden="true"><path d="M7.5 0 15 9H0z" /></svg> Works</a>
-                  <a className="v-dn" href="#vote"><svg width="13" height="8" viewBox="0 0 15 9" fill="currentColor" aria-hidden="true"><path d="M7.5 9 0 0h15z" /></svg> Report</a>
-                  <span className="tot none" data-testid="vote-count">no votes yet</span>
+                <div className="votepill">
+                  <a className="v-up" href="#vote" aria-label="Upvote: works as described"><UpTriangle /></a>
+                  <span className="tot" data-testid="vote-count" aria-label="no votes yet">0</span>
+                  <a className="v-dn" href="#vote" aria-label="Downvote, reason required"><DownTriangle /></a>
                 </div>
-                <p className="meta" style={{ margin: "7px 0 0" }}>Nobody has voted on this one yet. The measurements below do not wait for them.</p>
+                <p className="meta" style={{ margin: "7px 0 0" }}>No votes yet. The score below is measured from the repo.</p>
               </>
             ) : (
               <>
@@ -334,7 +335,7 @@ export async function ItemView({ slug }: { slug: string }) {
             <VoteComposer slug={item.slug} href={href} mine={mine?.direction ?? null} mineReason={mine?.reason ?? null} signedIn={!!viewer} cold={cold} />
 
             <div className="panel" style={{ marginTop: 18 }}>
-              <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>Ask from your agent</span></div>
+              <div className="panel-h"><span className="lbl">Ask from your agent</span></div>
               <div className="panel-b">
                 <ReppitInstall command={MCP_INSTALL} compact />
                 <p className="meta" style={{ margin: "10px 0 0" }}>Your agent gets these measurements whether or not anybody has voted.{" "}
@@ -344,7 +345,7 @@ export async function ItemView({ slug }: { slug: string }) {
 
             {neighbours.length > 0 && (
               <div className="panel" style={{ marginTop: 18 }}>
-                <div className="panel-h"><span className="lbl" style={{ letterSpacing: ".1em" }}>{cold ? "Measured, not voted" : "Considered instead"}</span></div>
+                <div className="panel-h"><span className="lbl">{cold ? "Measured, not voted" : "Considered instead"}</span></div>
                 <table className="kv kv-rel"><tbody>
                   {neighbours.map((n) => {
                     const nt = trustScore(n);

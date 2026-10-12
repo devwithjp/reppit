@@ -34,10 +34,13 @@ test.describe("signed out", () => {
   });
 
   test("feed sorts and filters by kind", async ({ page }) => {
-    for (const sort of ["hot", "top", "new"]) {
+    for (const sort of ["trusted", "top", "new"]) {
       await page.goto(`/?sort=${sort}`);
-      await expect(page.getByTestId(`sort-${sort}`)).toBeVisible();
+      await expect(page.getByTestId(`sort-${sort}`)).toHaveAttribute("aria-current", "true");
     }
+    // Old links with ?sort=hot still open the feed.
+    await page.goto("/?sort=hot");
+    await expect(page.getByTestId("feed-row").first()).toBeVisible();
     await page.goto("/?kind=skill&sort=top");
     await expect(page.getByTestId("feed-row").first()).toBeVisible();
   });

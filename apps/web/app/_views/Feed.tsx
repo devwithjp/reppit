@@ -6,18 +6,18 @@ import type { Viewer } from "@/lib/viewer";
 import { Masthead } from "@/components/Masthead";
 import { Footer } from "@/components/Footer";
 import { ItemRow } from "@/components/ItemRow";
-import { StripKey } from "@/components/marks";
 import { REASON_LABEL, KIND_LABEL, REASONS, REASON_GLOSS } from "@/components/labels";
 import { LandingSearch } from "@/components/SearchForms";
 import { rowColumns, loadExtras, recentReasons, mcpCount, indexCounts, type RowItem } from "../_data/items";
 
 const PAGE = 30;
+// "Trusted" leads: with few votes, a vote-driven "hot" list is just popularity. "hot" stays a valid URL.
 const SORTS = [
-  { key: "hot", label: "Hot" },
-  { key: "top", label: "Top" },
+  { key: "trusted", label: "Trusted" },
+  { key: "top", label: "Most voted" },
   { key: "new", label: "New" },
 ] as const;
-type Sort = (typeof SORTS)[number]["key"];
+type Sort = (typeof SORTS)[number]["key"] | "hot";
 const KINDS = [
   { key: "", label: "All" },
   { key: "repo", label: "Repos" },
@@ -36,7 +36,6 @@ function href(sort: Sort, kind: string, page = 1) {
 function About({ repos, skills, signedIn }: { repos: number; skills: number; signedIn: boolean }) {
   return (
     <section className="about" aria-labelledby="about-h">
-      <div className="about-banner" aria-hidden="true" />
       <div className="about-b">
         <h2 id="about-h">About reppit</h2>
         <p>Repos and agent skills ranked by whether they still work, not by stars. The score is measured from the repo itself. Votes nudge it, and fade with age.</p>
@@ -58,7 +57,7 @@ function About({ repos, skills, signedIn }: { repos: number; skills: number; sig
 }
 
 export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage, welcome = false }: { viewer: Viewer | null; sort?: string; kind?: string; page?: string; welcome?: boolean }) {
-  const sort: Sort = SORTS.some((s) => s.key === rawSort) ? (rawSort as Sort) : "hot";
+  const sort: Sort = SORTS.some((s) => s.key === rawSort) || rawSort === "hot" ? (rawSort as Sort) : "trusted";
   const kind = rawKind === "repo" || rawKind === "skill" || rawKind === "mcp" ? rawKind : "";
   const page = Math.max(1, Math.min(1000, Number.parseInt(rawPage ?? "1", 10) || 1));
 
@@ -67,7 +66,10 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
   if (kind) where.push(eq(items.kind, kind));
   const filter = where.length ? and(...where) : undefined;
 
-  const order = sort === "top" ? [desc(items.weightedScore), desc(items.stars)] : sort === "new" ? [desc(items.createdAt)] : [desc(items.hotScore), desc(items.stars)];
+  const order = sort === "top" ? [desc(items.weightedScore), desc(items.stars)]
+    : sort === "new" ? [desc(items.createdAt)]
+    : sort === "hot" ? [desc(items.hotScore), desc(items.stars)]
+    : [sql`${items.healthScore} desc nulls last`, desc(items.weightedScore), desc(items.stars)];
   const [rows, [{ n }]] = await Promise.all([
     d.select(rowColumns).from(items).where(filter).orderBy(...order).limit(PAGE).offset((page - 1) * PAGE) as Promise<RowItem[]>,
     d.select({ n: sql<number>`count(*)::int` }).from(items).where(filter),
@@ -83,7 +85,7 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
 
   return (
     <>
-      <Masthead viewer={viewer} current="browse" next={hereHref} />
+      <Masthead viewer={viewer} current="browse" next={hereHref} variant={welcome ? "home" : "default"} />
       <main className="wrap home" id="main">
         <div className="home-main">
         {welcome ? (
@@ -91,7 +93,11 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
             <h1>Stars say it was popular. reppit says it still works.</h1>
             <p>Describe the problem. Get the repos that are maintained today, with the reasons people gave, not a star count from 2019.</p>
             <LandingSearch />
-            <p className="hint">Try &ldquo;pull tables out of a pdf in python&rdquo; or &ldquo;state management for react&rdquo;.</p>
+            <p className="hint examples"><span>Try</span>
+              {["pull tables out of a pdf in python", "state management for react", "http router for go"].map((q) => (
+                <Link key={q} className="example" href={`/search?q=${encodeURIComponent(q)}`}>{q}</Link>
+              ))}
+            </p>
           </section>
         ) : <h1 className="sr-only">Browse {noun}</h1>}
         <div className="toolbar">
@@ -108,8 +114,6 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
             ))}
           </div>
         </div>
-
-        {rows.length > 0 && <StripKey />}
 
         {rows.length > 0 && reasons.length > 0 && (
           <div className="legend">
