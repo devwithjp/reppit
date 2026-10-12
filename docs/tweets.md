@@ -1,7 +1,8 @@
 # Thread one — the case
 
-Problem only. No product, no name, no pitch. The reader should finish post 20 wanting an
-answer and not have been handed one.
+Problem only. No product, no name, no pitch. The reader should finish day 3 wanting an
+answer and not have been handed one. The first and only post to name reppit is the last
+post of day 3.
 
 Every number here comes from `docs/product/the-case.md` and is sourced there. Nothing is
 invented and nothing from the unverified list is used. Caveats stay attached to their
@@ -10,26 +11,29 @@ numbers.
 Voice: short words, short lines, one idea per post. No emoji, no hashtags, no em dashes,
 no thread numbering. Numbers get stated flatly. The number is the drama.
 
-Figures live in `docs/figures/`. The filename each post needs is on the line under it.
+Text for the day 1 to 3 threads and the five standalones is copied from
+`docs/launch-calendar.md` (slots 1 to 8, editor's pass of 2026-10-12).
+
+Figures are uploaded from `docs/screenshots/`. The filename each post needs is on the line under it.
 
 ---
 
 ## Thread: day 1
 
-Tuesday, 9:30am US Eastern. The moment, the star, the proof.
+Tuesday 13 October, 08:00 US Eastern. The moment, the star, the proof. Ends on a loop to day 2.
 
 **1**
-> You are building something. Your agent says "I'll use quickxml-parse for this."
+> Your coding agent just picked a library for you.
 >
-> You say sure.
+> You said sure.
 >
-> You have no idea if that library is any good. Neither does your agent. It saw the name a lot in training, so it said the name.
+> Neither of you knows if it still works. It saw the name a lot in training, so it said the name.
 `f1-the-moment.png`
 
 **2**
-> So you do the one check everyone does.
+> So you check the one number everyone checks.
 >
-> Open the repo. Look at the number in the corner. 12,000 stars. Fine. Good enough.
+> 12,000 stars. Fine. Good enough.
 >
 > That is the whole quality bar for code you are about to ship to other people.
 `f2-the-only-check.png`
@@ -56,89 +60,71 @@ Tuesday, 9:30am US Eastern. The moment, the star, the proof.
 **5**
 > This part is measured, not a hunch.
 >
-> Researchers correlated star counts against how actively projects were maintained. Spearman rho of 0.10. Their own word for it is "very weak."
->
-> Stars and maintenance are close to unrelated.
-`f10-the-cloud.png`
-
-**6**
-> From the same study, one project: 50,034 stars, maintenance activity level of 8.
+> A 2020 study scored GitHub projects on how actively they were maintained. One had 50,034 stars and a maintenance score of 8 out of 100.
 >
 > Fifty thousand people said nice. Almost nobody was fixing anything.
->
-> Both things were true at the same time, and only one of them was on the page.
 `f11-fifty-thousand-stars.png`
 
-**7**
-> The same paper scored other signals against maintenance.
+**6**
+> The same study checked how closely each signal tracks maintenance.
 >
-> Total contributors: 0.44.
-> Project size: 0.38.
-> Stars: 0.10.
+> Contributors: 0.44.
+> Size: 0.38.
+> Stars: 0.10. Their word: "very weak."
 >
-> Of everything they tested, the number we all actually look at came last.
+> The number we all look at came last.
+>
+> Tomorrow: how big the pile has gotten.
 `f12-weakest-signal.png`
 
 
 ## Thread: day 2
 
-Wednesday, 9:30am US Eastern. How long it has been true, and the size of the pile. Put a link to day 1 in a reply, not in a post.
+Wednesday 14 October, 08:00 US Eastern. Scale, decay, then what changed. Ends on a loop to day 3. Put a link to day 1 in a reply, not in a post.
 
 **1**
-> Yesterday I showed that stars and whether a repo is maintained barely line up. 0.10. Stars came last of everything tested.
+> GitHub gets about 230 new repos a minute.
 >
-> Today: how long that has been true, and how big the pile has gotten since.
-no image
-
-**2**
-> Worth saying plainly: that dataset is GitHub as of November 2017.
+> Review one a minute, no sleep, no weekends, and you fall 229 further behind. Every minute.
 >
-> So this is not something AI broke. Stars never tracked maintenance. They were never built to.
->
-> We kept using them because the number was already on the screen.
-`f13-never-worked.png`
-
-**3**
-> Now the size of the pile.
->
-> GitHub added 121 million repositories in the year to August 2025. About 230 a minute.
->
-> Review one a minute, no sleep, no weekends, and you fall 229 further behind every minute.
+> That is the pile your next dependency comes out of.
 `f14-repos-per-minute.png`
 
-**4**
-> Pulled from the registries this week.
+**2**
+> The package registries, counted this month:
 >
-> npm: 4,464,731 packages.
+> npm: 4,464,731.
 > PyPI: 907,001.
 > crates.io: 347,256.
 >
 > There is no version of "I'll have a quick look around" that covers that.
 `f15-three-registries.png`
 
-**5**
-> And nothing is curating it. There is no editor, no shelf, no buyer deciding what gets stocked.
+**3**
+> And nobody is curating it.
 >
-> The awesome-whatever list in your bookmarks was maintained by one person who got busy.
+> No editor. No shelf. No buyer deciding what gets stocked.
 >
-> Hand curation lost years ago. Nothing replaced it.
+> The awesome-list in your bookmarks was kept by one person who got busy. Hand curation lost. Nothing replaced it.
 no image
 
-**6**
-> This is already inside your own codebase.
+**4**
+> It is already inside your code.
 >
-> An audit of 947 commercial codebases found 93% contained at least one component with no development activity in two years.
+> An audit of 947 commercial codebases: 93% had a component nobody had worked on in two years. Only 7% of components in use were the latest version.
 >
 > You did not abandon it. It was abandoned under you.
 `f16-zombie-bar.png`
 
-**7**
-> Same audit: 7% of the components in use were the latest version.
+**5**
+> None of this is new.
 >
-> Seven. Everything else is running behind, and some of it is behind because there is nothing ahead of it. The project stopped.
-no image
+> The study that found stars don't track upkeep used GitHub data from November 2017.
+>
+> Stars never measured this. We kept using them because the number was already on the screen.
+`f13-never-worked.png`
 
-**8**
+**6**
 > Here is the thing that actually changed, and it is not the amount of code.
 >
 > Picking a dependency used to cost a human five minutes of looking around.
@@ -146,31 +132,39 @@ no image
 > Your agent picks in two seconds, off the same weak number, and cannot tell that it is weak.
 `f17-five-minutes-two-seconds.png`
 
+**7**
+> Tomorrow I argue against my own case.
+>
+> AI is the easy villain here. The numbers don't back that up, and I'll show you which ones.
+no image
+
 
 ## Thread: day 3
 
-Thursday, 9:30am US Eastern. The concessions, the trust gap, the questions, and the hook. Link day 2 in a reply.
+Thursday 15 October, 08:00 US Eastern. The concessions, the trust gap, the questions, and the hook. Link day 2 in a reply.
 
 **1**
-> So far: stars never measured upkeep, 230 new repos land every minute, and your agent now picks off the star count in two seconds.
+> Blaming AI for the state of open source would be easy.
 >
-> Today I argue against my own case. Then the part I can't stop thinking about.
+> It would also be wrong.
+>
+> Three numbers against my own case. Then the part I can't stop thinking about.
 no image
 
 **2**
-> I want to be careful, because blaming AI would be easy and it would be wrong.
+> GitHub's public repo growth, year on year: +22%, then about +17%, then +19%.
 >
-> GitHub's public repo growth, year on year: plus 22%, then about plus 17%, then plus 19%.
+> AI coding tools went from niche to everywhere in that window.
 >
-> AI went from niche to everywhere across that window. The line did not bend.
+> The line did not bend.
 `f18-the-flat-line.png`
 
 **3**
-> Duplication is not new either.
+> Copies are not new either.
 >
-> A 2017 study of 428 million files found 70% of files on GitHub were copies of files that already existed.
+> A 2017 study of 428 million files found 70% of the files on GitHub were copies of files that already existed.
 >
-> 2017. The pile was mostly copies before any of this started.
+> The pile was mostly copies before any of this started.
 `f19-clones-before-ai.png`
 
 **4**
@@ -192,11 +186,11 @@ no image
 `f21-use-vs-trust.png`
 
 **6**
-> That gap is not developers being irrational. It is developers being right.
+> That gap is not people being irrational. It is people being right.
 >
-> The tool is fast, often correct, and has no way to tell you which time this is. So you check it.
+> The tool is fast, often correct, and cannot tell you which time this is. So you check.
 >
-> Checking a dependency means looking at a star count. See above.
+> And for a library, the check is a star count.
 no image
 
 **7**
@@ -212,14 +206,17 @@ no image
 **8**
 > I'm building the place where those three have answers.
 >
-> It has one rule that fixes most of what this thread is about. The rule is one sentence long.
+> It has one rule. The rule is one sentence long, and it fixes most of what this thread is about.
 >
 > I'll show it the day reppit launches. Follow if you want to see it first.
 no image
+
 ---
 
 
 ## Standalone
+
+One a slot, in this order: 16, 19, 20, 21 and 22 October.
 
 **On stars**
 > A GitHub star is a bookmark someone made once, maybe in 2019, possibly on a phone, about a project that has since died.
@@ -227,15 +224,13 @@ no image
 > We rank the software supply chain on that.
 `f3-what-a-star-is.png`
 
-**On the weakest signal**
-> Someone measured which signals actually track whether a project is still maintained.
+**On stars only going up**
+> A GitHub star can only go up.
 >
-> Contributors: 0.44.
-> Size: 0.38.
-> Stars: 0.10.
+> There is no button for "this broke my build." No button for "the maintainer left."
 >
-> The one we print in big numbers at the top of the page finished last.
-`f12-weakest-signal.png`
+> So every repo shows the best thing anyone ever thought about it.
+no image
 
 **On the cost**
 > Being wrong about a library costs you a week. Sometimes a rewrite.
@@ -251,11 +246,14 @@ no image
 > Nobody picked a dead dependency. They picked a live one, and then nothing told them.
 `f16-zombie-bar.png`
 
-**On the number that got better**
-> The 19.7% package hallucination figure is out of date.
+**On fake stars**
+> Everyone worries about fake GitHub stars.
 >
-> Current frontier models sit at 4.6% to 6.1%. The thing people are scared of got roughly four times less common while they were sharing the old screenshot.
-`f20-the-number-that-got-better.png`
+> One study found 4.53 million suspected fakes. Sounds huge. It is 0.74% of the 610 million stars in the same data.
+>
+> Fake stars are not the problem.
+> Real ones that never expire are.
+no image
 
 ---
 
@@ -283,52 +281,49 @@ no image
 
 ## Posting notes
 
-- Post 1 to 20 in order. The arc is: it happens to you, the check you run, what that
-  check is, the proof the check is weak, the size of the pile, the decay already in your
-  code, what actually changed, two concessions, the trust gap, the questions.
-- Strongest hook is post 1, and it should stay first. It is the only post with no
-  statistic in it, it is purely the reader's own Tuesday, and the last line is the part
-  people quote without needing the thread.
-- Strongest post in the thread is 18. It is other developers, in their own survey,
-  describing the exact feeling the reader has been having privately. 83% use it, 6.6%
-  trust it. Nothing needs adding to that.
-- Posts 15, 16 and 17 are the credibility block. They concede three things the thread
+- Days 1 to 3 are 6, 7 and 8 posts, 21 in all. Post them in order. The arc is: it happens
+  to you, the check you run, what that check is, the proof the check is weak, the size of
+  the pile, the decay already in your code, what actually changed, three concessions, the
+  trust gap, the questions, the hook.
+- Day 1 post 1 is the hook and stays first. It has no statistic in it; it is the reader's
+  own Tuesday.
+- Days 2 and 3 open on a hook, not a recap. Day 1 and day 2 end on a "Tomorrow: ..." loop.
+- Day 3 posts 2, 3 and 4 are the credibility block. They concede three things the thread
   could have exaggerated. Do not move them to the end and do not cut them to two. Three
-  concessions in a row is what makes post 18 land as reporting rather than pitching.
-- Post 8 is load-bearing and easy to lose. The 2017 date has to be said by me before a
-  reply guy says it for me.
-- Standalones go out one at a time between threads, a few days apart. "On stars" first,
-  then "On the cost", then "On the weakest signal".
-- The three product posts at the bottom belong to a later thread. Nothing in thread one
-  names a product, and that is the point: the case has to be agreed with before anything
-  is sold.
+  concessions in a row is what makes day 3 post 5 (83% use it, 6.6% trust it) land as
+  reporting rather than pitching.
+- Day 2 post 5 is load-bearing and easy to lose. The 2017 date has to be said by me before
+  a reply guy says it for me.
+- Standalones go out one at a time after the threads, in the order above: "On stars",
+  "On stars only going up", "On the cost", "On zombies", "On fake stars".
+- The three product posts above belong to a later phase. Nothing in the problem phase
+  pitches a product: the case has to be agreed with before anything is sold.
+- `quickxml-parse` (shown in f1) must not be a real package on npm or PyPI. Check before
+  day 1. The post text no longer names it.
 
-## Figures already drawn and used here
+## Figures used here
+
+All in `docs/screenshots/`, all already drawn.
 
 | File | Post |
 |---|---|
-| `f1-the-moment.png` | 1 |
-| `f2-the-only-check.png` | 2 |
-| `f3-what-a-star-is.png` | 3, and the "On stars" standalone |
-| `f4-the-mismatch.png` | 4 |
-| `f5-what-you-want.png` | 20 |
+| `f1-the-moment.png` | day 1 post 1 |
+| `f2-the-only-check.png` | day 1 post 2 |
+| `f3-what-a-star-is.png` | day 1 post 3, and "On stars" |
+| `f4-the-mismatch.png` | day 1 post 4 |
+| `f11-fifty-thousand-stars.png` | day 1 post 5 |
+| `f12-weakest-signal.png` | day 1 post 6 |
+| `f14-repos-per-minute.png` | day 2 post 1 |
+| `f15-three-registries.png` | day 2 post 2 |
+| `f16-zombie-bar.png` | day 2 post 4, and "On zombies" |
+| `f13-never-worked.png` | day 2 post 5 |
+| `f17-five-minutes-two-seconds.png` | day 2 post 6 |
+| `f18-the-flat-line.png` | day 3 post 2 |
+| `f19-clones-before-ai.png` | day 3 post 3 |
+| `f20-the-number-that-got-better.png` | day 3 post 4 |
+| `f21-use-vs-trust.png` | day 3 post 5 |
+| `f5-what-you-want.png` | day 3 post 7 |
 
-`f6-the-reason-tag.png`, `f7-number-vs-sentence.png`, `f8-the-agent-grid.png` and
-`f9-the-loop.png` are product figures. Not used in thread one.
-
-## New figures needed
-
-| File | Post | What it should show |
-|---|---|---|
-| `f10-the-cloud.png` | 5 | Scatter plot, stars on one axis, maintenance activity on the other. The point is that it has no shape: a shapeless cloud of dots with no line through it. A faint trend line that is almost flat is fine if it helps. Label it rho = 0.10. |
-| `f11-fifty-thousand-stars.png` | 6 | One dot from that same cloud, pulled out and circled: 50,034 stars, maintenance activity 8. Far right on the star axis, near the floor on the other. The loneliness of the dot is the joke. |
-| `f12-weakest-signal.png` | 7 | Three bars, longest to shortest: contributors 0.44, size 0.38, stars 0.10. The stars bar is a stub, and it is the only one with a star icon on it. |
-| `f13-never-worked.png` | 8 | A horizontal timeline. A marker at November 2017 reading "measured here". The AI coding tools arriving much further right. The gap between them is the whole image. |
-| `f14-repos-per-minute.png` | 9 | Two columns for one minute. Left: a dense block of 230 tiny repo squares. Right: one square, with a tired person next to it. No big number needed. |
-| `f15-three-registries.png` | 10 | Three stacked counters, npm 4,464,731 / PyPI 907,001 / crates.io 347,256, drawn at true relative size so npm dwarfs the others. A person standing at the bottom for scale. |
-| `f16-zombie-bar.png` | 12, and the "On zombies" standalone | Two bars in one chart: 93% of codebases contain a zombie component, 7% of components in use are the latest version. Same axis, so the two numbers sit in the same picture. |
-| `f17-five-minutes-two-seconds.png` | 14 | Side by side. A person with a five minute timer, three browser tabs open, reading. An agent with a two second timer, already finished, one tab. Same decision, same weak number underneath both. |
-| `f18-the-flat-line.png` | 15 | A line chart of GitHub public repo growth: plus 22%, plus 17%, plus 19%. Flat to slightly down. An arrow pointing at the window where AI tools went mainstream, with no bend in the line under it. |
-| `f19-clones-before-ai.png` | 16 | Timeline again. The 2017 study marked at 70% of files were already clones, with the AI tool launches far to the right of it. Can share visual language with f13. |
-| `f20-the-number-that-got-better.png` | 17, and the matching standalone | Before and after bars: 19.7% in 2025, 4.6% to 6.1% in 2026, arrow pointing down. Drawn as good news, because it is. |
-| `f21-use-vs-trust.png` | 18 | Two circles or two bars, side by side and badly mismatched: 83% use AI tools, 6.6% trust the output for an important decision. The empty space between them is the image. |
+Spares for replies, not attached to any post: `f10-the-cloud.png` (if someone asks for the
+full scatter behind rho 0.10) and `f7-number-vs-sentence.png`. `f6-the-reason-tag.png`,
+`f8-the-agent-grid.png` and `f9-the-loop.png` are product figures for later phases.

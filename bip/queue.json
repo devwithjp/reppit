@@ -11,8 +11,7 @@
     "thread-3",
     "thread-4",
     "thread-5",
-    "thread-6",
-    "thread-7"
+    "thread-6"
    ],
    "kind": "thread",
    "approved": false
@@ -21,14 +20,13 @@
    "name": "day-2",
    "at_utc": "2026-10-14T12:00:00Z",
    "posts": [
+    "thread-7",
     "thread-8",
     "thread-9",
     "thread-10",
     "thread-11",
     "thread-12",
-    "thread-13",
-    "thread-14",
-    "thread-15"
+    "thread-13"
    ],
    "kind": "thread",
    "approved": false,
@@ -38,14 +36,14 @@
    "name": "day-3",
    "at_utc": "2026-10-15T12:00:00Z",
    "posts": [
+    "thread-14",
+    "thread-15",
     "thread-16",
     "thread-17",
     "thread-18",
     "thread-19",
     "thread-20",
-    "thread-21",
-    "thread-22",
-    "thread-23"
+    "thread-21"
    ],
    "kind": "thread",
    "approved": false,
@@ -105,22 +103,20 @@
   "thread-5": "evidence",
   "thread-6": "evidence",
   "thread-7": "evidence",
+  "thread-8": "evidence",
   "thread-9": "evidence",
   "thread-10": "evidence",
   "thread-11": "evidence",
   "thread-12": "evidence",
-  "thread-13": "evidence",
-  "thread-14": "evidence",
-  "thread-15": "evidence",
-  "thread-8": "recap",
-  "thread-16": "recap",
+  "thread-13": "hook",
+  "thread-14": "hook",
+  "thread-15": "concession",
+  "thread-16": "concession",
   "thread-17": "concession",
-  "thread-18": "concession",
-  "thread-19": "concession",
-  "thread-20": "trust-gap",
-  "thread-21": "trust-gap",
-  "thread-22": "questions",
-  "thread-23": "hook"
+  "thread-18": "trust-gap",
+  "thread-19": "trust-gap",
+  "thread-20": "questions",
+  "thread-21": "hook"
  },
  "posted": {}
 }
