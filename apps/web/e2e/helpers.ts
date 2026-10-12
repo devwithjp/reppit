@@ -1,5 +1,8 @@
 import { expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { eq, inArray, like } from "drizzle-orm";
+import { getDb, users, votes, items, agentCompatReports } from "@gitit/db";
+import { recomputeItemScores, refreshHealth } from "@gitit/core";
 
 /** A confirmed throwaway account, created through the Supabase admin API and deleted afterwards. */
 export interface TestUser {
@@ -26,8 +29,36 @@ export async function createTestUser(tag: string): Promise<TestUser> {
   return { id: data.user.id, email, password, handle };
 }
 
+/**
+ * Remove every trace of test accounts from the app database: their votes, reports and comments
+ * (cascade), their name on anything they submitted, and the vote totals those votes moved.
+ * Without this, a test run leaves "e2e-..." voters on public item pages.
+ */
+async function purgeAppUsers(where: ReturnType<typeof eq>) {
+  const d = await getDb({});
+  const gone = await d.select({ id: users.id }).from(users).where(where);
+  if (!gone.length) return 0;
+  const ids = gone.map((u) => u.id);
+  const touched = new Set([
+    ...(await d.select({ id: votes.itemId }).from(votes).where(inArray(votes.userId, ids))).map((r) => r.id),
+    ...(await d.select({ id: agentCompatReports.itemId }).from(agentCompatReports).where(inArray(agentCompatReports.userId, ids))).map((r) => r.id),
+  ]);
+  await d.update(items).set({ submittedBy: null }).where(inArray(items.submittedBy, ids));
+  await d.delete(users).where(inArray(users.id, ids));
+  for (const id of touched) { await recomputeItemScores(d, id); await refreshHealth(d, id); }
+  return ids.length;
+}
+
 export async function deleteTestUser(u: TestUser | undefined) {
-  if (u) await admin().auth.admin.deleteUser(u.id).catch(() => {});
+  if (!u) return;
+  // Only against Postgres: a local PGlite directory is held by the running server.
+  if (process.env.DATABASE_URL) await purgeAppUsers(eq(users.authUserId, u.id)).catch((e) => console.error("[e2e] purge failed:", e));
+  await admin().auth.admin.deleteUser(u.id).catch(() => {});
+}
+
+/** Sweep test accounts a crashed run left behind. Only handles made by createTestUser ("e2e-"). */
+export async function purgeStaleTestUsers() {
+  return purgeAppUsers(like(users.login, "e2e-%") as ReturnType<typeof eq>);
 }
 
 export async function signIn(page: Page, u: TestUser, next = "/") {

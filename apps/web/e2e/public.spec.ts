@@ -2,11 +2,12 @@ import { test, expect } from "@playwright/test";
 import { expectNoHorizontalScroll, firstFeedSlug } from "./helpers";
 
 test.describe("signed out", () => {
-  test("landing states the claim and shows reason tags above the fold @phone", async ({ page }) => {
+  test("home states the claim, puts the problem search above the fold and lists repos @phone", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText(/stars say it was popular/i).first()).toBeVisible();
-    await expect(page.getByText(/unmaintained/i).first()).toBeInViewport();
-    await expect(page.getByTestId("search-input").first()).toBeVisible();
+    await expect(page.locator(".welcome").getByTestId("search-input")).toBeInViewport();
+    await expect(page.getByTestId("feed-row").first()).toBeVisible();
+    await expect(page.getByText(/every downvote names a reason/i)).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 

@@ -7,8 +7,9 @@ import { Masthead } from "@/components/Masthead";
 import { Footer } from "@/components/Footer";
 import { ItemRow } from "@/components/ItemRow";
 import { StripKey } from "@/components/marks";
-import { REASON_LABEL, KIND_LABEL } from "@/components/labels";
-import { rowColumns, loadExtras, recentReasons, mcpCount, type RowItem } from "../_data/items";
+import { REASON_LABEL, KIND_LABEL, REASONS, REASON_GLOSS } from "@/components/labels";
+import { LandingSearch } from "@/components/SearchForms";
+import { rowColumns, loadExtras, recentReasons, mcpCount, indexCounts, type RowItem } from "../_data/items";
 
 const PAGE = 30;
 const SORTS = [
@@ -31,7 +32,32 @@ function href(sort: Sort, kind: string, page = 1) {
   return `/?${p}`;
 }
 
-export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage }: { viewer: Viewer | null; sort?: string; kind?: string; page?: string }) {
+/** Reddit's "about this community" card: what the ranking is, in numbers and the five reasons. */
+function About({ repos, skills, signedIn }: { repos: number; skills: number; signedIn: boolean }) {
+  return (
+    <section className="about" aria-labelledby="about-h">
+      <div className="about-banner" aria-hidden="true" />
+      <div className="about-b">
+        <h2 id="about-h">About reppit</h2>
+        <p>Repos and agent skills ranked by whether they still work, not by stars. The score is measured from the repo itself. Votes nudge it, and fade with age.</p>
+        <div className="about-stats">
+          <div><b>{repos.toLocaleString("en-US")}</b><span>repos</span></div>
+          <div><b>{skills.toLocaleString("en-US")}</b><span>agent skills</span></div>
+        </div>
+        <p style={{ margin: "0 0 6px", fontWeight: 600, fontSize: 13 }}>Every downvote names a reason</p>
+        <ol>
+          {REASONS.map((r) => <li key={r}><b>{REASON_LABEL[r]}</b><span>{REASON_GLOSS[r]}</span></li>)}
+        </ol>
+        {signedIn
+          ? <Link className="btn btn-primary" href="/submit">Submit a repo</Link>
+          : <Link className="btn btn-primary" href="/signup">Join to vote</Link>}
+        <Link className="btn" href="/trust">How the score works</Link>
+      </div>
+    </section>
+  );
+}
+
+export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage, welcome = false }: { viewer: Viewer | null; sort?: string; kind?: string; page?: string; welcome?: boolean }) {
   const sort: Sort = SORTS.some((s) => s.key === rawSort) ? (rawSort as Sort) : "hot";
   const kind = rawKind === "repo" || rawKind === "skill" || rawKind === "mcp" ? rawKind : "";
   const page = Math.max(1, Math.min(1000, Number.parseInt(rawPage ?? "1", 10) || 1));
@@ -48,7 +74,7 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
   ]);
   const total = Number(n);
 
-  const [extras, reasons, mcps] = await Promise.all([loadExtras(d, rows.map((r) => r.id), viewer?.id ?? null), recentReasons(d, 30), mcpCount(d)]);
+  const [extras, reasons, mcps, counts] = await Promise.all([loadExtras(d, rows.map((r) => r.id), viewer?.id ?? null), recentReasons(d, 30), mcpCount(d), indexCounts(d)]);
   // Hide the MCP tab while the index has none, unless someone is already on it (keep the URL working).
   const kinds = KINDS.filter((k) => k.key !== "mcp" || mcps > 0 || kind === "mcp");
   const from = (page - 1) * PAGE;
@@ -58,14 +84,16 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
   return (
     <>
       <Masthead viewer={viewer} current="browse" next={hereHref} />
-      <div className="statement"><div className="wrap statement-in">
-        <b>Ranked by whether it still works.</b>
-        <span>No human sets the score: it is six measurements of the repo itself. Votes adjust it by at most &plusmn;12,
-          lose half their weight every six months, and every downvote names a reason.</span>
-      </div></div>
-
-      <main className="wrap" id="main">
-        <h1 className="sr-only">Browse {noun}</h1>
+      <main className="wrap home" id="main">
+        <div className="home-main">
+        {welcome ? (
+          <section className="welcome">
+            <h1>Stars say it was popular. reppit says it still works.</h1>
+            <p>Describe the problem. Get the repos that are maintained today, with the reasons people gave, not a star count from 2019.</p>
+            <LandingSearch />
+            <p className="hint">Try &ldquo;pull tables out of a pdf in python&rdquo; or &ldquo;state management for react&rdquo;.</p>
+          </section>
+        ) : <h1 className="sr-only">Browse {noun}</h1>}
         <div className="toolbar">
           <nav className="tabs" aria-label="Kind">
             {kinds.map((k) => (
@@ -118,6 +146,10 @@ export async function Feed({ viewer, sort: rawSort, kind: rawKind, page: rawPage
             </div>
           </div>
         )}
+        </div>
+        <aside className="home-side">
+          <About repos={counts.repo} skills={counts.skill} signedIn={!!viewer} />
+        </aside>
       </main>
       <Footer />
     </>

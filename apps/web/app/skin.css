@@ -1,0 +1,242 @@
+/*
+ * reppit skin: GitHub's information design, Reddit's voting grammar.
+ * Loaded after globals.css. It remaps the tokens and overrides type, radius and chrome, so every
+ * screen follows without touching per-component rules. Mono is kept only for code and commands.
+ */
+:root{
+  color-scheme: light;
+  --paper:#f6f8fa; --surface:#ffffff; --sunk:#f6f8fa; --sunk-2:#eff2f5;
+  --rule:#d8dee4; --rule-hard:#d1d9e0;
+  --ink:#1f2328; --ink-2:#3d444d; --ink-3:#59636e;
+  /* brand + upvote: an orange-red, the Reddit cue; downvote and links: GitHub blue */
+  --rust:#d93900; --rust-ink:#b53000; --rust-tint:#fff1ea; --rust-rule:#ffc8b0;
+  --steel:#0969da; --steel-tint:#ddf4ff; --steel-rule:#b6e3ff;
+  --amber:#9a6700; --amber-tint:#fff8c5;
+  --green:#1f883d; --green-ink:#1a7f37; --green-hover:#1c8139;
+  --sel:#1f2328;
+  --radius:6px; --radius-lg:8px;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --paper:#0d1117; --surface:#151b23; --sunk:#151b23; --sunk-2:#212830;
+    --rule:#262c36; --rule-hard:#3d444d;
+    --ink:#f0f6fc; --ink-2:#d1d7e0; --ink-3:#9198a1;
+    --rust:#ff6a33; --rust-ink:#ff8a5c; --rust-tint:#2d1810; --rust-rule:#6b2b12;
+    --steel:#4493f8; --steel-tint:#121d2f; --steel-rule:#1f4473;
+    --amber:#d29922; --amber-tint:#272115;
+    --green:#238636; --green-ink:#3fb950; --green-hover:#29903b;
+    --sel:#f0f6fc;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --paper:#0d1117; --surface:#151b23; --sunk:#151b23; --sunk-2:#212830;
+  --rule:#262c36; --rule-hard:#3d444d;
+  --ink:#f0f6fc; --ink-2:#d1d7e0; --ink-3:#9198a1;
+  --rust:#ff6a33; --rust-ink:#ff8a5c; --rust-tint:#2d1810; --rust-rule:#6b2b12;
+  --steel:#4493f8; --steel-tint:#121d2f; --steel-rule:#1f4473;
+  --amber:#d29922; --amber-tint:#272115;
+  --green:#238636; --green-ink:#3fb950; --green-hover:#29903b;
+  --sel:#f0f6fc;
+}
+
+body{font-size:14px;line-height:1.5}
+::selection{background:var(--steel-tint);color:var(--ink)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--steel);outline-offset:-1px;border-radius:var(--radius)}
+label:focus-within{outline:0}
+.inline-link,.kv-link,.sec a.inline-link{color:var(--steel);text-decoration:none}
+.inline-link:hover,.kv-link:hover{text-decoration:underline}
+
+/* ---- type: sans everywhere, mono only for code and commands ---- */
+.meta,.num,.logo,.mast-nav a,.searchbox span,.btn,.crumbs,.tabs a,.sorts a,.rail .score,.rail .unit,.ttl .repo,
+.reasons,.flag,.trust .hd,.trust .n,.trust .cap,.agents,.kv td,.query-field span,.query-field button,.break,
+.head h1,.sec > h2,.score-hero .big,.sig thead th,.sig td.val,.sig td.pts,.report .who,.required,.claim,.rank,
+.votebar .tot,.cold .big,.cold .txt h2,.nothing h3,.kicker b,.cta span,.cta button,.undercta,.rrow .n,.rrow .t,
+.arg h3,.arg .no,.pull p,.skip,.linkish,.searchbox .go,.mast-link,.theme button,.rail-err,.quiet,.list-h1,
+.vote-msg,.vote-ok,.cold .txt .fine,.compat-h,.fld select,.fld .hint,.auth h1,.auth-msg,.arg h2.h3,.tail h2.h3,
+.state h1,.state-links,.required.as-btn,.trust .meas,.unpublished,.cmd-docs .docs-link,.cmd-docs .docs-label,
+.trust .capnote,.lbl,.stripkey,.parsed{font-family:var(--sans);letter-spacing:normal}
+.lbl,.sig thead th,.trust .hd,.rail .unit,.kicker,.kicker b{text-transform:none;letter-spacing:normal;font-size:12px;font-weight:600;color:var(--ink-3)}
+.meta{font-size:12px}
+code,.cmd code,.mono{font-family:var(--mono)}
+.head h1,.auth h1,.state h1,.list-h1{font-weight:600;letter-spacing:-.01em}
+.head h1{font-size:24px}
+.head h1 .ow{font-weight:400;color:var(--steel)}
+.sec > h2{font-size:16px;font-weight:600;letter-spacing:normal;border-bottom:1px solid var(--rule);padding-bottom:8px;text-transform:none}
+
+/* ---- masthead: a GitHub header with a Reddit-orange mark ---- */
+.mast{background:var(--surface);border-bottom:1px solid var(--rule-hard)}
+.mast-in{height:56px;gap:16px}
+.logo{font-size:20px;font-weight:700;letter-spacing:-.03em;align-items:center;gap:8px}
+.logo i{width:26px;height:26px;border-radius:50%;background:var(--rust);position:relative;align-self:center}
+.logo i::after{content:"";position:absolute;left:7px;top:6px;border:6px solid transparent;border-bottom:9px solid #fff;border-top:0}
+.mast-nav{gap:4px}
+.mast-nav a{font-size:14px;color:var(--ink);padding:6px 10px;border-radius:var(--radius);border:0;font-weight:500}
+.mast-nav a:hover{background:var(--sunk-2)}
+.mast-nav a[aria-current]{background:var(--sunk-2);border:0;font-weight:600}
+.searchbox{height:34px;border-radius:999px;border:1px solid var(--rule-hard);background:var(--sunk);padding-left:4px}
+.searchbox:focus-within{border-color:var(--steel);background:var(--surface);box-shadow:0 0 0 3px var(--steel-tint)}
+.searchbox span{color:var(--ink-3);font-size:14px}
+.searchbox input{width:300px;font-size:14px;height:32px}
+.mast-link{font-size:14px;font-weight:500;color:var(--ink)}
+
+/* ---- buttons: GitHub ---- */
+.btn{font-size:14px;font-weight:500;line-height:20px;padding:5px 16px;border-radius:var(--radius);
+  background:var(--sunk);border:1px solid var(--rule-hard);color:var(--ink);box-shadow:0 1px 0 rgba(31,35,40,.04)}
+.btn:hover{background:var(--sunk-2);border-color:var(--rule-hard)}
+.btn-primary{background:var(--green);border-color:rgba(31,35,40,.15);color:#fff}
+.btn-primary:hover{background:var(--green-hover);border-color:rgba(31,35,40,.15)}
+.btn-sm{padding:3px 12px;font-size:12px;line-height:20px}
+.btn-block{justify-content:center}
+
+/* ---- tabs and sorts: GitHub underline nav ---- */
+.toolbar{padding:16px 0 12px;border-bottom:0}
+.tabs{gap:4px}
+.tabs a{font-size:14px;color:var(--ink);padding:6px 12px;border-radius:var(--radius);border:0}
+.tabs a:hover{background:var(--sunk-2)}
+.tabs a[aria-current]{background:var(--surface);border:1px solid var(--rule-hard);font-weight:600;box-shadow:0 1px 0 rgba(31,35,40,.04)}
+.sorts{gap:4px}
+.sorts a{font-size:13px;color:var(--ink-3);padding:4px 10px;border-radius:999px}
+.sorts a:hover{background:var(--sunk-2);color:var(--ink)}
+.sorts a[aria-current]{box-shadow:none;background:var(--steel-tint);color:var(--steel);font-weight:600}
+
+/* ---- feed: Reddit cards with a vote rail ---- */
+.list{border:0;background:transparent;display:flex;flex-direction:column;gap:10px}
+.row{background:var(--surface);border:1px solid var(--rule-hard);border-radius:var(--radius-lg);padding:12px 14px 12px 8px}
+.row:last-child{border-bottom:1px solid var(--rule-hard)}
+.row:hover{background:var(--surface);border-color:var(--ink-3)}
+.rank{display:none}
+.rail{flex:0 0 44px}
+.rail button,.rail .down{border-radius:4px;padding:4px 6px;color:var(--ink-3)}
+.rail .up:hover,.rail .up[aria-pressed="true"]{color:var(--rust);background:var(--rust-tint)}
+.rail .down:hover,.rail .down.on{color:var(--steel);background:var(--steel-tint)}
+.rail .score{font-size:13px;font-weight:700}
+.rail .score.neg{color:var(--steel)}
+.rail .unit{display:none}
+.ttl .repo{font-size:16px;font-weight:600;color:var(--steel);letter-spacing:normal}
+.ttl .repo:hover{text-decoration:underline;text-decoration-color:currentColor;text-decoration-thickness:1px}
+.ttl .repo .ow{color:var(--steel);font-weight:400}
+.desc,.matched{font-size:14px;color:var(--ink-2)}
+.tag{border-radius:999px;padding:0 10px;font-size:12px;line-height:22px;font-weight:500}
+.tag.plain{background:var(--steel-tint);border-color:transparent;color:var(--steel)}
+.flag{border-radius:999px;padding:0 8px;font-size:12px;line-height:20px}
+
+/* trust block: a score badge, not a newspaper figure */
+.trust{flex-basis:112px}
+.trust .n{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.trust .cap,.trust .meas,.trust .capnote{font-size:11px}
+.strip{gap:2px}
+.strip i{height:6px;border-radius:2px}
+.strip i.ok{background:var(--green-ink)}
+.strip i.bad{background:#cf222e}
+
+/* ---- boxes: rounded, bordered, GitHub panels ---- */
+.panel,.sig.boxed,.score-hero,.cmd,.query-field,.auth-form,.nothing,.cold,.legend,.stripkey,.claim{border-radius:var(--radius)}
+.panel{border-color:var(--rule-hard);overflow:hidden}
+.panel-h{background:var(--sunk)}
+.panel-h .lbl{font-size:14px;color:var(--ink)}
+.sig.boxed{border:1px solid var(--rule-hard);border-collapse:separate;border-spacing:0;overflow:hidden}
+.sig thead th{background:var(--sunk);font-size:12px}
+.cmd{background:var(--sunk)}
+.cmd b{color:var(--ink-3)}
+input[type="text"],input[type="email"],input[type="password"],input[type="search"],input:not([type]),textarea,select{border-radius:var(--radius)}
+.fld input,.fld select,.fld textarea{border-radius:var(--radius);border:1px solid var(--rule-hard);background:var(--surface)}
+.fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--steel);box-shadow:0 0 0 3px var(--steel-tint);outline:0}
+
+/* big search: a rounded, raised field */
+.query-field{border:1px solid var(--rule-hard);background:var(--surface);height:46px;border-radius:999px;padding-left:6px;overflow:hidden;
+  box-shadow:0 1px 3px rgba(31,35,40,.06)}
+.query-field:focus-within{border-color:var(--steel);box-shadow:0 0 0 3px var(--steel-tint)}
+.query-field span{color:var(--ink-3);font-weight:400}
+.query-field button{background:var(--rust);color:#fff;font-weight:600;font-size:14px;border-radius:999px;margin:4px;padding:0 18px;height:36px;
+  display:inline-flex;align-items:center;text-transform:none;letter-spacing:normal}
+.query-field button:hover{background:var(--rust-ink)}
+
+/* header strip under the masthead: a quiet info banner */
+.statement{background:var(--surface);border-bottom:1px solid var(--rule)}
+.statement-in{font-size:13px}
+.crumbs{font-size:14px;padding-top:16px}
+.crumbs b{font-weight:600}
+
+footer.foot{background:transparent;border-top:1px solid var(--rule);font-size:12px}
+footer.foot .mono{font-family:var(--sans);font-size:12px}
+footer.foot a{color:var(--steel)}
+
+/* home: Reddit layout, feed + sidebar */
+.home{display:grid;grid-template-columns:minmax(0,1fr) 312px;gap:24px;align-items:start;padding-top:20px}
+.home-side{display:flex;flex-direction:column;gap:16px;position:sticky;top:16px}
+.welcome{background:var(--surface);border:1px solid var(--rule-hard);border-radius:var(--radius-lg);padding:20px 20px 16px;margin-bottom:12px}
+.welcome h1{font-size:22px;line-height:1.25;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
+.welcome p{margin:0 0 14px;color:var(--ink-2);font-size:14px;max-width:62ch}
+.welcome .hint{margin:8px 0 0;font-size:12px;color:var(--ink-3)}
+.about{background:var(--surface);border:1px solid var(--rule-hard);border-radius:var(--radius-lg);overflow:hidden}
+.about-banner{height:34px;background:var(--rust)}
+.about-b{padding:12px 16px 16px}
+.about-b h2{font-size:16px;font-weight:600;margin:0 0 6px;display:flex;align-items:center;gap:8px}
+.about-b p{margin:0 0 12px;font-size:14px;color:var(--ink-2)}
+.about-stats{display:flex;gap:24px;padding:12px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);margin-bottom:12px}
+.about-stats b{display:block;font-size:16px;font-weight:600;color:var(--ink)}
+.about-stats span{font-size:12px;color:var(--ink-3)}
+.about-b ol{margin:0;padding:0;list-style:none;font-size:13px}
+.about-b ol li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--rule)}
+.about-b ol li:first-child{border-top:0}
+.about-b ol li b{font-weight:600}
+.about-b ol li span{color:var(--ink-3);text-align:right}
+.about-b .btn{width:100%;justify-content:center;margin-top:12px}
+@media (max-width:960px){
+  .home{grid-template-columns:1fr}
+  .home-side{position:static}
+}
+@media (max-width:960px){
+  .home{grid-template-columns:minmax(0,1fr)}
+}
+.home-main{min-width:0}
+@media (max-width:720px){
+  .mast-in{height:auto;min-height:52px}
+  .welcome{padding:16px}
+  .welcome h1{font-size:19px}
+  .searchbox input{width:100%}
+  .row{padding:10px 10px 10px 4px}
+}
+
+/* welcome search (LandingSearch, .cta): same raised pill as the /search field */
+.cta{display:flex;align-items:center;border:1px solid var(--rule-hard);background:var(--surface);height:46px;border-radius:999px;margin-top:0;
+  padding-left:14px;overflow:hidden;box-shadow:0 1px 3px rgba(31,35,40,.06);max-width:none}
+.cta:focus-within{border-color:var(--steel);box-shadow:0 0 0 3px var(--steel-tint)}
+.cta span{color:var(--ink-3);padding:0;display:inline-flex}
+.cta input{flex:1 1 auto;min-width:0;border:0;background:transparent;font-family:var(--sans);font-size:15px;color:var(--ink);padding:0 10px;height:44px;outline:0}
+.cta button{all:unset;cursor:pointer;background:var(--rust);color:#fff;font-weight:600;font-size:14px;border-radius:999px;margin:4px;padding:0 20px;height:36px;
+  display:inline-flex;align-items:center}
+.cta button:hover{background:var(--rust-ink)}
+.cta button:focus-visible{outline:2px solid var(--steel);outline-offset:2px}
+.searchbox .go{color:var(--ink-3);display:inline-flex;align-items:center;padding:0 6px 0 8px;background:transparent;border:0;cursor:pointer}
+.about-b .btn + .btn{margin-top:8px}
+
+/* ---- item page: vote panel, chips, docs link, side panels ---- */
+.tag,.pick label,.composer-h,.evidence,.votebar .sum,.votebar a,.votebar button,.term-h1,.term-h2,.cmd .copy,.chips .tag{font-family:var(--sans);letter-spacing:normal}
+.composer{border-radius:var(--radius);overflow:hidden}
+.composer-h{font-size:14px;font-weight:600}
+.pick label{border:1px solid var(--rule-hard);background:var(--surface);color:var(--ink);border-radius:999px;font-size:13px;padding:4px 12px}
+.pick label:hover{border-color:var(--rust);background:var(--rust-tint)}
+.pick label:has(input:checked){border-color:var(--rust);background:var(--rust-tint);color:var(--rust-ink);font-weight:600}
+.required{font-family:var(--sans);font-size:12px;letter-spacing:normal}
+.votebar{border-radius:var(--radius);overflow:hidden}
+.votebar .v-up:hover{color:var(--rust)} .votebar .v-dn:hover{color:var(--steel)}
+.score-hero{border:1px solid var(--rule-hard);border-radius:var(--radius)}
+.matched{border-left-color:var(--rule-hard);font-size:14px}
+.cmd-docs .docs-link{font-family:var(--sans);color:var(--steel);text-decoration:none;font-weight:500}
+.cmd-docs .docs-link:hover{color:var(--steel);text-decoration:underline}
+.cmd-docs .docs-label{font-family:var(--sans);font-size:12px}
+.cmd .copy{border-radius:var(--radius)}
+.term-h1,.term-h2{font-weight:600;letter-spacing:-.01em}
+@media (max-width:720px){
+  .trust{flex-wrap:wrap;row-gap:2px}
+  .trust .cap{white-space:normal}
+}
+@media (max-width:520px){
+  .sig th,.sig td{padding:6px 6px}
+  .sig{font-size:12px}
+}

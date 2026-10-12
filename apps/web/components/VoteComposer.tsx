@@ -66,10 +66,10 @@ export function VoteComposer({
       <div className="composer-b">
         <button type="button" className={`btn btn-block${mine === "up" ? " is-on" : ""}`} data-testid="vote-up"
           aria-pressed={mine === "up"} disabled={busy} onClick={() => send(mine === "up" ? null : "up")}>
-          <span className="tri-steel"><UpTriangle w={13} h={8} /></span> {mine === "up" ? "You said it works. Withdraw" : "It works as described"}
+          <span className="tri-steel"><UpTriangle w={15} h={15} /></span> {mine === "up" ? "You said it works. Withdraw" : "It works as described"}
         </button>
         <button type="button" className="required as-btn" id="reason-hd" data-testid="vote-down" onClick={startDownvote}>
-          <DownTriangle w={9} h={6} /> Downvoting? Pick a reason. Required.
+          <DownTriangle w={13} h={13} /> Downvoting? Pick a reason. Required.
         </button>
         <div className="pick" role="radiogroup" aria-labelledby="reason-hd">
           {REASONS.map((r, i) => (

@@ -1,10 +1,7 @@
 import "./globals.css";
+import "./skin.css";
 import type { Metadata, Viewport } from "next";
-import { JetBrains_Mono, IBM_Plex_Sans } from "next/font/google";
 import { themeScript } from "@/components/ThemeToggle";
-
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
-const sans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-sans", display: "swap" });
 
 export const metadata: Metadata = {
   title: { default: "reppit — stars say it was popular, reppit says it still works", template: "%s · reppit" },
@@ -17,13 +14,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
-    { media: "(prefers-color-scheme: dark)", color: "#191714" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d1117" },
   ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${mono.variable} ${sans.variable}`} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

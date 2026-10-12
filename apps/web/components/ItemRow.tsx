@@ -4,7 +4,7 @@ import { flags, ago } from "./trust";
 import { trustScore, signalCells, type SignalCell } from "./score";
 import { itemHref, splitSlug, cleanWhy } from "./labels";
 import { Install } from "./Install";
-import { Strip, ScoreNum, Measured, CapNote, ReasonLine, AgentLine, NoOpinions } from "./marks";
+import { Strip, ScoreNum, Measured, CapNote, ReasonLine, AgentLine } from "./marks";
 import { RailVote } from "./RailVote";
 
 /** The trust block on the right of a row: TRUST label, score, strip, last push. */
@@ -25,7 +25,10 @@ export function TrustBlock({ score, reason, measured, applicable, cells, pushedA
 
 /** The search-result fact line: known signals as observed (failing ones in rust), unknown ones named once. */
 function BreakLine({ cells, license }: { cells: SignalCell[]; license: string | null }) {
-  const known = cells.filter((c) => c.state !== "unknown" && !(c.key === "archived" && c.state === "good"));
+  // Two signals can read the same ("publishes no package" for deprecated and advisories): say it once.
+  const seen = new Set<string>();
+  const known = cells.filter((c) => c.state !== "unknown" && !(c.key === "archived" && c.state === "good"))
+    .filter((c) => !seen.has(c.label) && !!seen.add(c.label));
   const unknown = cells.filter((c) => c.state === "unknown").map((c) => c.short);
   const parts: React.ReactNode[] = known.map((c) => (c.state === "failing" ? <s key={c.key}>{c.label}</s> : <span key={c.key}>{c.label}</span>));
   if (license && license !== "NOASSERTION") parts.push(<span key="lic">{license}</span>);
@@ -51,7 +54,6 @@ export function ItemRow({
   const reasons = extras.reasons.get(item.id) ?? {};
   const compat = extras.compat.get(item.id) ?? {};
   const hasVotes = item.upvotes + item.downvotes > 0;
-  const hasReports = Object.keys(compat).length > 0;
   const href = itemHref(item.slug);
   const testid = variant === "search" ? "result" : "feed-row";
 
@@ -78,7 +80,6 @@ export function ItemRow({
         {variant === "search" && <BreakLine cells={cells} license={item.license} />}
         <ReasonLine upvotes={item.upvotes} reasons={reasons} />
         <AgentLine compat={compat} />
-        <NoOpinions votes={hasVotes} reports={hasReports} />
         {variant === "search" && <Install item={item} compact />}
       </div>
       <TrustBlock score={score} reason={ts.reason} measured={ts.measured} applicable={ts.applicable} cells={cells} pushedAt={item.pushedAt} />

@@ -55,7 +55,7 @@ export function StripKey() {
     <div className="stripkey">
       <div className="strip" aria-hidden="true"><i className="ok" /><i className="ok" /><i className="ok" /><i className="mid" /><i className="bad" /><i className="unk" /></div>
       <b>=</b> {SIGNAL_ORDER.map((s) => s.short).join(" \u00b7 ")}.
-      <span>Blue holds, amber slipping, rust failing, grey unknown, outline not applicable.</span>
+      <span>Green holds, amber slipping, red failing, grey unknown, outline not applicable.</span>
     </div>
   );
 }
