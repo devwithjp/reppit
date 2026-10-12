@@ -14,7 +14,9 @@ async function main() {
   const db = await getDb({ migrationsFolder: path.resolve(process.cwd(), process.env.GITIT_MIGRATIONS_DIR ?? "../../packages/db/drizzle") });
   const rows = await db.select({ id: items.id }).from(items);
   const now = new Date();
-  for (const r of rows) await refreshHealth(db, r.id, now);
+  // Each item is independent; a few at a time keeps a remote database from taking minutes per hundred.
+  const width = Number(process.env.DATABASE_POOL_MAX ?? 5);
+  for (let i = 0; i < rows.length; i += width) await Promise.all(rows.slice(i, i + width).map((r) => refreshHealth(db, r.id, now)));
   console.log(`recomputed health for ${rows.length} items`);
   process.exit(0);
 }
