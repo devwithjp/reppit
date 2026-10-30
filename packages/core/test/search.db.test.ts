@@ -186,4 +186,11 @@ describe("query parsing and wording", () => {
     expect(w).toMatch(/^Matches every term: last push 3 days ago, npm: ws, no open advisories\.$/);
     expect(w).not.toMatch(/stars|good match/i);
   });
+  it("skill explanations state what the skill does", () => {
+    const why = explain({ kind: "skill", description: "Create a new Remotion video", archived: false, deprecated: null,
+      advisoriesOpen: null, pushedAt: new Date(Date.now() - 3 * 86_400_000), lastReleaseAt: null, packageName: null,
+      installPackage: null, packageEcosystem: null, upvotes: 0, downvotes: 0, stars: 0, installs: 0,
+      deprecationMessage: null, publishedPackages: null, installKind: null } as never, "partial", {}, {});
+    expect(why).toMatch(/^Partial match: Create a new Remotion video; last push 3 days ago\.$/);
+  });
 });

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { UpTriangle, DownTriangle } from "@/components/icons";
 import { notFound } from "next/navigation";
 import { and, desc, eq, ne, isNotNull, sql } from "drizzle-orm";
-import { items, votes, users, agentCompatReports } from "@gitit/db";
+import { items, votes, users, agentCompatReports, comments, commentVotes } from "@gitit/db";
 import { db } from "@/lib/db";
 import { getViewer } from "@/lib/viewer";
 import { Masthead } from "@/components/Masthead";
@@ -11,6 +11,8 @@ import { ReppitInstall } from "@/components/ReppitInstall";
 import { Install } from "@/components/Install";
 import { VoteComposer } from "@/components/VoteComposer";
 import { CompatForm } from "@/components/CompatForm";
+import { CommentForm } from "@/components/CommentForm";
+import { CommentThread } from "@/components/CommentThread";
 import { AgentChip, agentState } from "@/components/marks";
 import { flags, ago, compact, band } from "@/components/trust";
 import { trustScore, VOTE_ADJUST_MAX, MIN_MEASURED, type SignalCell } from "@/components/score";
@@ -67,7 +69,7 @@ export async function ItemView({ slug }: { slug: string }) {
 
   // A skill's stars are its parent repo's. Link the parent instead of showing them as the skill's own.
   const parent = parentRepo(item.kind, item.slug);
-  const [voteRows, compatRows, mineRows, neighbours, parentRows] = await Promise.all([
+  const [voteRows, compatRows, mineRows, neighbours, parentRows, commentRows] = await Promise.all([
     d.select({ login: users.login, direction: votes.direction, reason: votes.reason, weight: votes.weight, createdAt: votes.createdAt })
       .from(votes).innerJoin(users, eq(users.id, votes.userId)).where(eq(votes.itemId, item.id)).orderBy(desc(votes.createdAt)).limit(50),
     d.select({ id: agentCompatReports.id, agent: agentCompatReports.agent, status: agentCompatReports.status, note: agentCompatReports.note, login: users.login, createdAt: agentCompatReports.createdAt })
@@ -80,6 +82,15 @@ export async function ItemView({ slug }: { slug: string }) {
       .limit(4)
       .catch(() => []),
     parent ? d.select({ slug: items.slug }).from(items).where(and(eq(items.slug, parent), eq(items.kind, "repo"))).limit(1) : Promise.resolve([]),
+    d.select({
+      id: comments.id, parentId: comments.parentId, body: comments.body, userId: comments.userId,
+      login: users.login, createdAt: comments.createdAt, upvotes: comments.upvotes,
+      downvotes: comments.downvotes, deleted: comments.deleted, mine: commentVotes.direction,
+      authorSuspendedAt: users.suspendedAt,
+    }).from(comments)
+      .innerJoin(users, eq(users.id, comments.userId))
+      .leftJoin(commentVotes, and(eq(commentVotes.commentId, comments.id), viewer ? eq(commentVotes.userId, viewer.id) : sql`false`))
+      .where(eq(comments.itemId, item.id)).orderBy(desc(comments.createdAt)),
   ]);
   const parentHref = parent ? (parentRows.length ? itemHref(parent) : `https://github.com/${parent}`) : null;
 
@@ -108,6 +119,14 @@ export async function ItemView({ slug }: { slug: string }) {
   const unknownNote = unknownWords.length === 0 ? null : t.score === null
     ? `Not measured: ${unknownWords.join(", ")}. We need at least ${MIN_MEASURED} to give a score.`
     : `Not measured: ${unknownWords.join(" and ")}. ${unknownWords.length === 1 ? "It gets" : "Each gets"} half its points.`;
+  const discussion = commentRows.map((comment) => ({
+    ...comment,
+    createdAt: comment.createdAt.toISOString(),
+    mine: comment.mine ?? null,
+    canDelete: viewer?.id === comment.userId || viewer?.isDev === true,
+    canModerate: viewer?.isDev === true && viewer.id !== comment.userId,
+    authorSuspended: comment.authorSuspendedAt !== null,
+  }));
 
   return (
     <>
@@ -268,6 +287,12 @@ export async function ItemView({ slug }: { slug: string }) {
                   <p className="meta" style={{ marginTop: 10 }}>Each vote is shown at its current weight: the voter&rsquo;s weight at the time, halved for every six months since.</p>
                 </>
               )}
+            </section>
+
+            <section className="sec discussion" id="comments" aria-labelledby="comments-h">
+              <h2 id="comments-h">Discussion <em>{item.commentCount === 0 ? "no comments yet" : `${item.commentCount} ${item.commentCount === 1 ? "comment" : "comments"}`}</em></h2>
+              <CommentForm slug={item.slug} href={href} signedIn={!!viewer} />
+              <CommentThread initial={discussion} slug={item.slug} href={href} signedIn={!!viewer} />
             </section>
 
             <section className="sec" id="compat" aria-labelledby="compat-h">

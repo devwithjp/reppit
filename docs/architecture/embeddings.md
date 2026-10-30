@@ -82,4 +82,4 @@ Checked with `next build` + `next start -p 3100`: `/api/health` reports `gte-sma
    - **When:** if the Edge Function's cold start turns out to be slow.
 3. **Not used:** paid embedding APIs. The index is small (about 2,000 items), and gte-small runs free on our own hardware.
 
-To deploy the function: `supabase functions deploy embed`. Then set `EMBEDDING_PROVIDER=supabase`, `EMBEDDING_FUNCTION_URL=https://<project>.supabase.co/functions/v1/embed` and `EMBEDDING_FUNCTION_KEY=<anon key>` on Vercel. Keep building the index in-process.
+Set a dedicated random `REPPIT_EMBED_KEY` as a Supabase function secret, then deploy with `supabase functions deploy embed`. On Vercel set `EMBEDDING_PROVIDER=supabase`, `EMBEDDING_FUNCTION_URL=https://<project>.supabase.co/functions/v1/embed`, and `EMBEDDING_FUNCTION_KEY` to that same dedicated secret. Never reuse the browser publishable key. Keep the key server-side and keep building the index in-process.

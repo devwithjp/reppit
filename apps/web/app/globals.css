@@ -176,6 +176,39 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .ag.y .m{color:var(--steel)} .ag.n{border-color:var(--rust-rule);background:var(--rust-tint)} .ag.n .m{color:var(--rust)}
 .ag.q .m{color:var(--ink-3)}
 
+.row-actions{display:flex;gap:10px;margin-top:5px;font-family:var(--mono);font-size:11.5px}
+.row-actions a{color:var(--ink-3)}
+.row-actions a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+
+/* ============ item discussion ============ */
+.discussion > .comment-composer{margin-bottom:16px}
+.comment-composer{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.comment-composer textarea{width:100%;resize:vertical;padding:10px 12px;border:1px solid var(--rule-hard);background:var(--surface);color:var(--ink);font:14px/1.5 var(--sans)}
+.comment-composer textarea:focus{border-color:var(--steel);box-shadow:0 0 0 3px var(--steel-tint);outline:0}
+.comment-composer.signed-out{padding:10px 12px;border:1px dashed var(--rule-hard);background:var(--sunk)}
+.comment-submit{display:flex;justify-content:flex-end}
+.discussion-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--rule);font-size:12px;color:var(--ink-3)}
+.discussion-toolbar label{display:flex;align-items:center;gap:6px}
+.discussion-toolbar select{border:1px solid var(--rule-hard);background:var(--surface);color:var(--ink);padding:4px 8px}
+.comment-list{margin-top:2px}
+.comment{display:flex;gap:9px;padding:14px 0;border-bottom:1px solid var(--rule)}
+.comment.is-reply{margin-top:10px;padding:10px 0 0 12px;border-bottom:0;border-left:2px solid var(--rule)}
+.comment-vote{flex:0 0 28px;display:flex;flex-direction:column;align-items:center;gap:1px;color:var(--ink-3)}
+.comment-vote button{all:unset;cursor:pointer;line-height:0;padding:3px;border-radius:4px}
+.comment-vote button:hover,.comment-vote button[aria-pressed="true"]:first-child{color:var(--rust);background:var(--rust-tint)}
+.comment-vote button:last-child:hover,.comment-vote button:last-child[aria-pressed="true"]{color:var(--steel);background:var(--steel-tint)}
+.comment-vote button:disabled{cursor:default;opacity:.45}
+.comment-vote b{font-size:12px;color:var(--ink-2)}
+.comment-body{flex:1 1 auto;min-width:0}
+.comment-meta{display:flex;gap:8px;align-items:baseline;font-size:12px;color:var(--ink-3)}
+.comment-meta b{color:var(--ink);font-weight:600}
+.comment-body > p{margin:5px 0 6px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;color:var(--ink-2)}
+.comment-body > p.comment-deleted{color:var(--ink-3);font-style:italic}
+.comment-actions{display:flex;gap:10px;font-size:12px}
+.comment-actions button{all:unset;cursor:pointer;color:var(--ink-3)}
+.comment-actions button:hover,.comment-actions a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+.comment-actions a{color:var(--ink-3)}
+
 /* ============ panels, tables ============ */
 .panel{border:1px solid var(--rule-hard);background:var(--surface)}
 .panel-h{display:flex;align-items:baseline;gap:10px;padding:8px 12px;border-bottom:1px solid var(--rule);background:var(--sunk)}

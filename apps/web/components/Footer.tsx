@@ -16,6 +16,8 @@ export async function Footer() {
         <Link href="/trust">how the trust score works</Link>
         <Link href="/agent">mcp server</Link>
         <Link href="/submit">submit a repo</Link>
+        <Link href="/privacy">privacy</Link>
+        <Link href="/terms">terms</Link>
       </div>
       <div className="foot-row">
         <span>Nothing here is sponsored.</span>

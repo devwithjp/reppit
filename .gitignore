@@ -1,5 +1,6 @@
 node_modules
 dist
+target
 .next
 .env
 .env.local
@@ -11,3 +12,9 @@ __pycache__/
 e2e-report/
 test-results/
 .vercel
+bip/campaign-state.json
+bip/campaign-assets/composer-preview.png
+bip/campaign-assets/app-*-local.png
+bip/campaign-assets/app-*-social.png
+bip/review/
+atlas/

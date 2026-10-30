@@ -3,7 +3,7 @@ import { items } from "@gitit/db";
 import { GitHubClient, ingestRepo, parseRepoRef, itemEmbeddingText, resolveItemBySlug, upsertRepoItem, applySignals, checkPackageSignals, fetchManifestsRaw, trustScore, writeRefusal, RULES } from "@gitit/core";
 import { db } from "@/lib/db";
 import { embedder, rateLimiter } from "@/lib/services";
-import { requestUser } from "@/lib/request-user";
+import { requestUser, suspensionRefusal } from "@/lib/request-user";
 import { route, json, err, readJsonObject, intParam, limitByIp } from "../_lib/http";
 
 const SORTS = new Set(["hot", "top", "new"]);
@@ -36,6 +36,8 @@ export const GET = route("items GET", async (req) => {
 export const POST = route("items POST", async (req) => {
   const { user, apiKeyId, scopes } = await requestUser(req);
   if (!user) return err(req.headers.get("authorization") ? "Invalid or revoked API token" : "Sign in to submit", 401);
+  const suspended = suspensionRefusal(user);
+  if (suspended) return err(suspended, 403);
   const refused = writeRefusal({ apiKeyId, scopes });
   if (refused) return err(refused, 403);
   const rl = await rateLimiter().check(RULES.submitPerUser, `submit:${user.id}`);

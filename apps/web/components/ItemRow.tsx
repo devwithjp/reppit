@@ -100,6 +100,11 @@ export function ItemRow({
         <BreakLine cells={cells} license={item.license} brief={variant === "feed"} />
         <ReasonLine upvotes={item.upvotes} reasons={reasons} />
         <AgentLine compat={compat} />
+        <div className="row-actions">
+          <Link href={`${href}#comments`} data-testid="comment-link">
+            {item.commentCount.toLocaleString("en-US")} {item.commentCount === 1 ? "comment" : "comments"}
+          </Link>
+        </div>
         {variant === "search" && <Install item={item} compact />}
       </div>
       <TrustBlock score={score} reason={ts.reason} measured={ts.measured} applicable={ts.applicable} cells={cells} pushedAt={item.pushedAt} compact={variant === "feed"} />

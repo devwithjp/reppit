@@ -17,7 +17,7 @@ const migrationsFolder = path.resolve(process.cwd(), process.env.GITIT_MIGRATION
 const rls = process.argv.includes("--rls");
 
 async function main() {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
   const db = await createDb({ url, dataDir: url ? undefined : (process.env.PGLITE_DIR ?? ".pglite"), migrate: true, migrationsFolder });
   console.log(`migrated ${url ? "postgres" : `pglite (${process.env.PGLITE_DIR ?? ".pglite"})`} from ${migrationsFolder}`);
   if (rls) {

@@ -85,7 +85,10 @@ export class SupabaseEmbedder implements Embedder {
     if (!texts.length) return [];
     const res = await this.f(this.url, {
       method: "POST",
-      headers: { "content-type": "application/json", ...(this.key ? { authorization: `Bearer ${this.key}` } : {}) },
+      headers: {
+        "content-type": "application/json",
+        ...(this.key ? { "x-reppit-embed-key": this.key } : {}),
+      },
       body: JSON.stringify({ input: texts }),
     });
     if (!res.ok) throw new Error(`embed function ${res.status}: ${(await res.text()).slice(0, 200)}`);

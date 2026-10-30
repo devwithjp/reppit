@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const actor = vi.hoisted(() => ({ current: {} as { user: unknown; apiKeyId?: string; scopes?: string[] } }));
 vi.mock("@/lib/request-user", () => {
   const json = (data: unknown, init: ResponseInit = {}) => new Response(JSON.stringify(data), { ...init, headers: { "content-type": "application/json", ...(init.headers ?? {}) } });
-  return { requestUser: async () => actor.current, json, err: (message: string, status = 400) => json({ error: message }, { status }) };
+  return { requestUser: async () => actor.current, suspensionRefusal: () => null, json, err: (message: string, status = 400) => json({ error: message }, { status }) };
 });
 vi.mock("@/lib/db", () => ({ db: async () => { throw new Error("db reached"); } }));
 vi.mock("@/lib/services", () => ({ rateLimiter: () => ({ check: async () => ({ ok: true, limit: 0 }) }), clientIp: () => "127.0.0.1", embedder: () => null }));

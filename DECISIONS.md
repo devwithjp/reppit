@@ -17,6 +17,8 @@ A downvote without a reason tag is rejected by the API. Reason tags (`unmaintain
 ## 2026-10-08 Single app for web and API
 Next.js route handlers serve the HTTP API; no separate API server in v1. The MCP server and CLI are thin HTTP clients. Reason: one deploy, one auth session model, and the plan allowed either Hono or route handlers.
 
+Superseded on 2026-10-29 by [ADR-0001](docs/adr/0001-rust-agent-interface.md): the finished Next.js frontend stays, while the agent-facing interface and CLI move to Rust behind `/api/v1`.
+
 ## 2026-10-08 Name is reppit
 Checked 12 single-word English candidates on npm; 11 were taken, which killed the dictionary-word direction outright. reppit wins on the namespace that matters, because the CLI and MCP server both ship as npm packages and `reppit` is free there. Ships on reppit.dev since .com and .app are gone. GitHub username is held by a dormant 2015 account, so the org is reppit-dev. Register repit.dev as a typo redirect; the double p is the name's only real weakness. Rejected repit (npm name held by a dormant 2022 package) and repvote (clean namespace but names one feature and would age badly).
 
@@ -49,3 +51,14 @@ The score people see is a single core function used by the site, API, MCP server
 
 ## 2026-10-11 A personal token ships in v1
 Agent compatibility reports are meant to come from inside the agent, and that needs a credential. The api_keys table and the Bearer check already existed, so v1 ships one revocable personal token per account. Paid API tiers and metering stay in v2.
+
+## 2026-10-29 Discussion ships in v1, separate from item ranking
+The earlier cold-start plan hid threaded comments until v2. That decision is reversed: the product is now explicitly a Reddit-style discovery community, so public comments and replies are part of the launch experience. Repo votes remain the only human discussion signal that can change an item's community score. Comment votes order the discussion and never change item rank or trust score. This keeps the ranking interface small and auditable while allowing people to explain tradeoffs in their own words.
+
+## 2026-10-30 Rust owns CLI behavior; npm owns installation
+
+The command implementation is one native Rust binary. `npx reppit` remains the main beta entry point through a dependency-free JavaScript launcher that selects an exact-version platform package, verifies the binary SHA-256, and forwards arguments and exit status. Search, ranking, and policy remain server-side. The launcher does not duplicate CLI behavior. Direct archives and Homebrew can follow, but do not replace the `npx` path at beta launch.
+
+## 2026-10-30 X scheduling prepares review packets, not browser posts
+
+The randomized 20-night schedule stays, but its cron job only creates a private local page with the approved copy and figures and shows a reminder. A person publishes the thread and records its URLs. If automatic publishing is added, it must use the official X API. Scripting the X website with Playwright, CDP, or similar browser control is not an accepted campaign path because X explicitly prohibits non-API website automation and warns it can suspend the account.

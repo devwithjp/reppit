@@ -9,7 +9,7 @@
   "scripts": {
     "generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.0",

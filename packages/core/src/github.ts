@@ -94,29 +94,48 @@ export function parseRepoRef(input: string): { owner: string; name: string } | n
 }
 
 /** Discover SKILL.md folders in a repo (e.g. anthropics/skills → skills/<name>/SKILL.md) and shape them as skill items. */
-export async function ingestSkillsFromRepo(gh: GitHubClient, owner: string, repo: string, dir = "skills"): Promise<NewItem[]> {
+export async function ingestSkillsFromRepo(
+  gh: GitHubClient,
+  owner: string,
+  repo: string,
+  dir = "skills",
+  sourceTopics: readonly string[] = [],
+): Promise<NewItem[]> {
   const r = await gh.repo(owner, repo);
   if (!r) return [];
-  const entries = await gh.get<{ name: string; type: string; path: string; html_url: string }[]>(`/repos/${owner}/${repo}/contents/${dir}`).catch(() => null);
-  if (!entries) return [];
+  const commit = await gh.get<{ sha: string }>(`/repos/${owner}/${repo}/commits/HEAD`);
+  if (!commit || !/^[a-f0-9]{40}$/i.test(commit.sha)) {
+    throw new Error(`Cannot resolve an immutable commit for ${owner}/${repo}`);
+  }
+  const revision = commit.sha.toLowerCase();
+  const tree = await gh.get<{ truncated?: boolean; tree: { type: string; path: string }[] }>(`/repos/${owner}/${repo}/git/trees/${revision}?recursive=1`);
+  if (!tree) return [];
+  if (tree.truncated) throw new Error(`Skill tree for ${owner}/${repo} was truncated; refusing a partial import`);
+  const prefix = dir.replace(/^\/+|\/+$/g, "");
+  const entries = tree.tree.filter(e => e.type === "blob" && e.path.endsWith("/SKILL.md") && (!prefix || e.path.startsWith(prefix + "/")));
   const out: NewItem[] = [];
   for (const e of entries) {
-    if (e.type !== "dir") continue;
-    const res = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${e.path}/SKILL.md`, { headers: { "user-agent": "gitit-ingest" } });
-    if (!res.ok) continue;
+    const folder = e.path.slice(0, -"/SKILL.md".length);
+    const res = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${revision}/${e.path}`, { headers: { "user-agent": "gitit-ingest" }, signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error(`Skill ${e.path}: HTTP ${res.status}`);
     const md = await res.text();
     const fm = parseFrontmatter(md);
     const pushedAt = r.pushed_at ? new Date(r.pushed_at) : null;
+    const topicText = `${fm.name ?? ""} ${fm.description ?? ""} ${md}`.toLowerCase();
+    const relevantTopics = sourceTopics.filter((topic) => {
+      const words = topic.toLowerCase().split("-").filter((word) => word.length > 2);
+      return words.length > 0 && words.every((word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(topicText));
+    });
     out.push({
       kind: "skill",
-      slug: `${owner}/${repo}/${e.path}`,
+      slug: `${owner}/${repo}/${folder}`,
       owner,
-      name: fm.name ?? e.name,
-      url: e.html_url,
+      name: fm.name ?? folder.split("/").at(-1)!,
+      url: `https://github.com/${owner}/${repo}/tree/${revision}/${folder}`,
       description: fm.description ?? null,
       readme: md.slice(0, 20_000),
       language: null,
-      topics: ["agent-skill", ...(fm.description ? [] : [])],
+      topics: [...new Set(["agent-skill", ...relevantTopics])],
       license: r.license?.spdx_id ?? null,
       // A skill is one folder in a repo: the repo's stars and forks are not the skill's own, and
       // showing them (296k on a single skill) floods popularity-weighted results. Unknown is 0 here.

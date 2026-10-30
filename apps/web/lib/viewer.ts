@@ -12,6 +12,8 @@ export interface Viewer {
   id: string; // our users.id
   login: string; // display handle
   avatarUrl: string | null;
+  isDev: boolean; // operators can remove abusive discussion content
+  suspendedAt: Date | null;
 }
 
 /** Handles are lowercase letters, digits and dashes, 2 to 30 long. */
@@ -53,5 +55,5 @@ export async function getViewerUser(): Promise<User | null> {
 
 export async function getViewer(): Promise<Viewer | null> {
   const u = await getViewerUser();
-  return u ? { id: u.id, login: u.login, avatarUrl: u.avatarUrl } : null;
+  return u ? { id: u.id, login: u.login, avatarUrl: u.avatarUrl, isDev: u.isDev, suspendedAt: u.suspendedAt } : null;
 }

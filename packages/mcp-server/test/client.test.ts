@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { envConfig, slugPath, formatTrust, installCommand, formatResults, DEFAULT_API_URL } from "../src/client";
 
 describe("envConfig", () => {
-  it("defaults to reppit.dev", () => expect(envConfig({})).toEqual({ baseUrl: DEFAULT_API_URL, apiKey: undefined }));
+  it("defaults to api.reppit.dev", () => expect(envConfig({})).toEqual({ baseUrl: DEFAULT_API_URL, apiKey: undefined }));
   it("prefers REPPIT_* and falls back to GITIT_*", () => {
     expect(envConfig({ GITIT_API_URL: "http://old/", GITIT_API_KEY: "k1" })).toEqual({ baseUrl: "http://old", apiKey: "k1" });
     expect(envConfig({ REPPIT_API_URL: "http://new", GITIT_API_URL: "http://old", REPPIT_API_KEY: "k2", GITIT_API_KEY: "k1" })).toEqual({ baseUrl: "http://new", apiKey: "k2" });
@@ -29,6 +29,7 @@ describe("installCommand", () => {
     expect(installCommand({ ...base, slug: "TanStack/query", url: "https://github.com/TanStack/query", packageEcosystem: "npm", packageName: "@tanstack/query-core", installPackage: null }))
       .toBe("# no single package to install verified; see the install docs at https://github.com/TanStack/query#readme");
     expect(installCommand(base)).not.toMatch(/git clone|npm install/);
+    expect(installCommand({ ...base, kind: "skill", slug: "o/r/skills/x" })).toBe("npx reppit add o/r/skills/x --yes");
   });
   it("follows the query's registry choice and sends apps to their docs", () => {
     const polars = { ...base, slug: "pola-rs/polars", url: "https://github.com/pola-rs/polars", packageEcosystem: "crates.io", installPackage: "polars", installKind: "package" as const };

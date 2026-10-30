@@ -25,6 +25,7 @@ const sha = (t: string) => createHash("sha256").update(t).digest("hex");
 async function createToken(fd: FormData) {
   "use server";
   const v = await getViewer(); if (!v) redirect("/login?next=%2Faccount");
+  if (v.suspendedAt) redirect("/account?suspended=1");
   const d = await db();
   const [existing] = await d.select({ id: apiKeys.id }).from(apiKeys).where(and(eq(apiKeys.userId, v.id), isNull(apiKeys.revokedAt))).limit(1);
   if (existing) redirect("/account#token");
@@ -45,7 +46,8 @@ async function revokeToken(fd: FormData) {
   redirect("/account#token");
 }
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ suspended?: string }> }) {
+  const { suspended } = await searchParams;
   const viewer = await getViewer();
   if (!viewer) redirect("/login?next=%2Faccount");
   const d = await db();
@@ -65,6 +67,7 @@ export default async function AccountPage() {
     <>
       <Masthead viewer={viewer} next="/account" />
       <main className="wrap" id="main">
+        {(suspended || viewer.suspendedAt) && <p className="auth-msg bad" role="status">This account is suspended from community actions.</p>}
         <div className="head"><div className="head-row">
           <div className="l">
             <h1><span className="ow">@</span>{viewer.login}</h1>

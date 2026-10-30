@@ -2,6 +2,11 @@ import { test, expect } from "@playwright/test";
 import { expectNoHorizontalScroll, firstFeedSlug } from "./helpers";
 
 test.describe("signed out", () => {
+  test("an expired sign-in link explains how to recover", async ({ page }) => {
+    await page.goto("/login?error=link");
+    await expect(page.getByRole("main").getByRole("alert")).toContainText("Request a new link");
+    await expect(page.getByRole("button", { name: /email me a sign-in link instead/i })).toBeVisible();
+  });
   test("home states the claim, puts the problem search above the fold and lists repos @phone", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText(/stars say it was popular/i).first()).toBeVisible();
@@ -54,6 +59,17 @@ test.describe("signed out", () => {
     await expect(page.getByTestId("signal-table").locator("tbody tr")).toHaveCount(6);
     await expect(page.getByTestId("install-command").first()).not.toBeEmpty();
     await expectNoHorizontalScroll(page);
+  });
+
+  test("feed links to a repo discussion and the item page shows comments", async ({ page }) => {
+    await page.goto("/?sort=top&kind=repo");
+    const row = page.getByTestId("feed-row").first();
+    const discussion = row.getByTestId("comment-link");
+    await expect(discussion).toBeVisible();
+    await discussion.click();
+    await expect(page).toHaveURL(/#comments$/);
+    await expect(page.getByRole("heading", { name: /discussion/i })).toBeVisible();
+    await expect(page.getByTestId("comment-composer")).toContainText(/sign in to comment/i);
   });
 
   test("voting while signed out sends you to sign in, it does not fail silently", async ({ page }) => {

@@ -3,7 +3,7 @@ export interface ReppitClientOptions { baseUrl?: string; apiKey?: string }
 /** @deprecated use ReppitClientOptions */
 export type GititClientOptions = ReppitClientOptions;
 
-export const DEFAULT_API_URL = "https://reppit.dev";
+export const DEFAULT_API_URL = "https://api.reppit.dev";
 
 /** REPPIT_* wins; the old GITIT_* names are still read as a fallback. */
 export function envConfig(env: Record<string, string | undefined> = process.env) {
@@ -39,11 +39,11 @@ export class ReppitClient {
   }
   search(problem: string, opts: { language?: string; kind?: string; limit?: number } = {}) {
     const q = new URLSearchParams({ q: problem, ...(opts.language ? { language: opts.language } : {}), ...(opts.kind ? { kind: opts.kind } : {}), ...(opts.limit ? { limit: String(opts.limit) } : {}) });
-    return this.req<{ results: SearchResult[]; notIndexed?: boolean; cached: boolean }>("GET", `/api/search?${q}`);
+    return this.req<{ results: SearchResult[]; notIndexed?: boolean; cached: boolean }>("GET", `/api/v1/search?${q}`);
   }
-  item(slug: string) { return this.req<ItemDetail>("GET", `/api/items/by-slug/${slugPath(slug)}`); }
-  vote(slug: string, direction: "up" | "down", reason?: string) { return this.req<unknown>("POST", `/api/items/by-slug/${slugPath(slug)}/vote`, { direction, reason }); }
-  reportCompat(slug: string, agent: string, status: "works" | "broken", note?: string) { return this.req<unknown>("POST", `/api/items/by-slug/${slugPath(slug)}/compat`, { agent, status, note }); }
+  item(slug: string) { return this.req<ItemDetail>("GET", `/api/v1/items/by-slug/${slugPath(slug)}`); }
+  vote(slug: string, direction: "up" | "down", reason?: string) { return this.req<unknown>("POST", `/api/v1/items/by-slug/${slugPath(slug)}/vote`, { direction, reason }); }
+  reportCompat(slug: string, agent: string, status: "works" | "broken", note?: string) { return this.req<unknown>("POST", `/api/v1/items/by-slug/${slugPath(slug)}/compat`, { agent, status, note }); }
 }
 /** @deprecated use ReppitClient */
 export const GititClient = ReppitClient;
@@ -98,7 +98,7 @@ const COMMAND: Record<string, (n: string) => string> = {
  * and monorepos without an obvious package get the repo's install docs. Never `git clone`.
  */
 export function installCommand(r: SearchResult["item"], install?: { ecosystem: string; name: string } | null): string {
-  if (r.kind === "skill") return `npx skills add ${r.slug}`;
+  if (r.kind === "skill") return `npx reppit add ${r.slug} --yes`;
   if (r.kind === "mcp") return `# add to your MCP config: see ${r.url}`;
   if (r.installKind === "app") return `# an application, not a library: install it from ${r.url}#readme`;
   const pick = install ?? (r.installPackage && r.packageEcosystem ? { ecosystem: r.packageEcosystem, name: r.installPackage } : null);

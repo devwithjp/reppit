@@ -4,8 +4,8 @@
 //   → { embeddings: number[][] }, 384 dimensions, mean-pooled and L2-normalised.
 // Same checkpoint and pooling as GteSmallEmbedder in packages/core (Supabase/gte-small), so vectors
 // from this function and from the in-process embedder that built the index are comparable.
-// Called by core's SupabaseEmbedder (EMBEDDING_PROVIDER=supabase, EMBEDDING_FUNCTION_URL,
-// EMBEDDING_FUNCTION_KEY = the project's anon key). Deno runtime; not type-checked by the Node build.
+// Called server-to-server by core's SupabaseEmbedder. JWT verification is disabled in config.toml;
+// this handler requires a separate REPPIT_EMBED_KEY secret and never accepts the browser key.
 
 // @ts-nocheck  Deno + Supabase globals
 const session = new Supabase.ai.Session("gte-small");
@@ -15,6 +15,10 @@ const json = (body: unknown, status = 200) =>
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ error: "POST { input: string[] }" }, 405);
+  const expectedKey = Deno.env.get("REPPIT_EMBED_KEY");
+  if (!expectedKey) return json({ error: "service is not configured" }, 503);
+  const providedKey = req.headers.get("x-reppit-embed-key") ?? "";
+  if (!(await equalSecret(providedKey, expectedKey))) return json({ error: "unauthorized" }, 401);
   let input: unknown;
   try { input = (await req.json())?.input; } catch { return json({ error: "body must be JSON" }, 400); }
   if (!Array.isArray(input) || input.length === 0 || input.length > 16 || !input.every((s) => typeof s === "string")) {
@@ -27,3 +31,18 @@ Deno.serve(async (req: Request) => {
   }
   return json({ embeddings });
 });
+
+async function equalSecret(left: string, right: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const [leftHash, rightHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(left)),
+    crypto.subtle.digest("SHA-256", encoder.encode(right)),
+  ]);
+  const a = new Uint8Array(leftHash);
+  const b = new Uint8Array(rightHash);
+  let difference = a.length ^ b.length;
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    difference |= (a[index] ?? 0) ^ (b[index] ?? 0);
+  }
+  return difference === 0;
+}

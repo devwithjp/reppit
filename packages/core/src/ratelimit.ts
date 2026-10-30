@@ -27,6 +27,7 @@ export const RULES = {
   votePerUser: { limit: 60, windowMs: 60 * 60_000 },        // 60 votes / hour / user
   votePerIp: { limit: 120, windowMs: 60 * 60_000 },
   commentPerUser: { limit: 30, windowMs: 60 * 60_000 },
+  commentVotePerUser: { limit: 120, windowMs: 60 * 60_000 },
   submitPerUser: { limit: 10, windowMs: 24 * 60 * 60_000 },
   searchAnon: { limit: 30, windowMs: 60 * 60_000 },
   readPerIp: { limit: 600, windowMs: 60 * 60_000 },         // item list / detail reads / hour / ip         // anonymous search / hour / ip

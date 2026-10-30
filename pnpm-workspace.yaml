@@ -5,5 +5,8 @@ allowBuilds:
   '@electric-sql/pglite': true
   esbuild: true
   sharp: true
+  # CPU binaries ship in the package; its install script downloads optional CUDA libraries.
+  onnxruntime-node: false
+  protobufjs: false
 minimumReleaseAgeExclude:
   - '@anthropic-ai/sdk@0.132.0'

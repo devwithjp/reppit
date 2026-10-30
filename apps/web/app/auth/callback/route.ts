@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabase/server";
 import { userForAuth } from "@/lib/viewer";
+import { safeNext } from "@/components/labels";
 
 /**
  * Landing point for email confirmation and magic links. Handles both the PKCE `code` flow
@@ -10,7 +11,7 @@ import { userForAuth } from "@/lib/viewer";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const nextRaw = url.searchParams.get("next") ?? "/";
-  const next = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/";
+  const next = safeNext(nextRaw);
   const sb = await supabaseServer();
   if (!sb) return NextResponse.redirect(new URL("/login?error=unavailable", url));
 

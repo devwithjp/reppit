@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { supabaseServer } from "@/lib/supabase/server";
 import { cleanHandle, userForAuth } from "@/lib/viewer";
+import { safeNext } from "@/components/labels";
 
 /**
  * Sign-in server actions. UI posts forms to these and never calls an auth provider itself.
@@ -22,12 +23,6 @@ export interface AuthResult {
 }
 
 const UNAVAILABLE: AuthResult = { ok: false, message: "Sign-in is not available right now. Try again in a few minutes." };
-
-/** Only allow same-site relative paths, so a crafted link cannot bounce people off-site. */
-function safeNext(raw: FormDataEntryValue | null): string {
-  const s = typeof raw === "string" ? raw : "";
-  return s.startsWith("/") && !s.startsWith("//") ? s : "/";
-}
 
 async function origin(): Promise<string> {
   const h = await headers();

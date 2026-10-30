@@ -9,7 +9,7 @@ above them approving dependencies. Solo builders, founding engineers, small prod
 the only sanity check available is a star count that does not say whether the thing still
 works.
 
-**v1:** six items, listed below, buildable in two weeks because four of them already exist.
+**v1:** seven items, listed below, with the community discussion restored as a launch requirement.
 
 ---
 
@@ -89,14 +89,13 @@ Four of these already exist in the prototype and need carrying over, not rebuild
 | 4 | Per-agent compatibility reports | exists | The one thing no competitor has |
 | 5 | MCP server and cross-agent skill | exists | Distribution. This is how people find it. |
 | 6 | Item page and feed | exists as scaffolding, **needs Phase 4 design** | The front door |
+| 7 | Threaded discussion and comment votes | partially exists | The Reddit-style community experience |
 
 New build inside v1 is small: deprecation and advisory ingestion, a wider index, real
 embeddings, and the designed interface. The rest is carry-over.
 
 ## v2 — after there are users
 
-- Threaded comments. They are in the prototype and they will be cut from v1, because an
-  empty comment section looks worse than no comment section.
 - Submit flow beyond a basic form.
 - Topic and language pages, for search traffic.
 - API keys, metering, paid tiers.
@@ -123,7 +122,7 @@ embeddings, and the designed interface. The rest is carry-over.
 |---|---|
 | Ranking, vote weighting, health score | Keep as is |
 | Reason tags, compat reports | Keep as is |
-| Comments | Keep the code, hide the UI until v2 |
+| Comments | Ship the UI in v1 with replies and discussion-only votes |
 | Topic and language pages | Hide until v2 |
 | API keys and sponsored slot | Keep the schema, hide the UI |
 | Seeder | Rebuild, it is the binding constraint on search quality |
@@ -134,7 +133,7 @@ from ranking, so hiding the UI costs nothing and keeps the wall intact.
 
 ## Verification for this phase
 
-- Every v1 item names the beachhead pain it serves. Six items, six pains, no exceptions.
+- Every v1 item names the beachhead pain it serves. Seven items, seven pains, no exceptions.
 - The two-week estimate assumes four carry-overs and one new ingestion path. If Phase 4
   design runs long, design is what slips, not the trust score.
 - Before any public launch, run the search eval with the index rebuilt and publish the real

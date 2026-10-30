@@ -27,6 +27,7 @@ export const users = pgTable("users", {
   followers: integer("followers").default(0).notNull(),
   isDev: boolean("is_dev").default(false).notNull(),
   shadowBanned: boolean("shadow_banned").default(false).notNull(),
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -114,6 +115,7 @@ export const items = pgTable("items", {
   index("items_weighted_idx").on(t.weightedScore),
   index("items_language_idx").on(t.language),
   index("items_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
+  index("items_trust_score_idx").on(t.trustScore.desc()),
 ]);
 
 // Previous slugs of an item, so old URLs and fixtures keep resolving after a rename or transfer.
@@ -144,9 +146,20 @@ export const comments = pgTable("comments", {
   parentId: uuid("parent_id"),
   body: text("body").notNull(),
   upvotes: integer("upvotes").default(0).notNull(),
+  downvotes: integer("downvotes").default(0).notNull(),
   deleted: boolean("deleted").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("comments_item_idx").on(t.itemId), index("comments_parent_idx").on(t.parentId)]);
+
+export const commentVotes = pgTable("comment_votes", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  commentId: uuid("comment_id").notNull().references(() => comments.id, { onDelete: "cascade" }),
+  direction: voteDirection("direction").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.commentId] }),
+  index("comment_votes_comment_idx").on(t.commentId),
+]);
 
 export const tags = pgTable("tags", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -210,4 +223,5 @@ export type NewItem = typeof items.$inferInsert;
 export type ItemAlias = typeof itemAliases.$inferSelect;
 export type Vote = typeof votes.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
+export type CommentVote = typeof commentVotes.$inferSelect;
 export type CompatReport = typeof agentCompatReports.$inferSelect;

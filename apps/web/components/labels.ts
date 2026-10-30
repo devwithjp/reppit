@@ -75,7 +75,11 @@ export type Install =
  * the source is never an install, least of all when an agent reads the line.
  */
 export function installFor(i: InstallRow): Install {
-  if (i.kind === "skill") return { type: "command", command: `npx skills add ${i.slug}` };
+  if (i.kind === "skill") return {
+    type: "command",
+    command: `npx reppit add ${i.slug} --yes`,
+    note: "Reppit verifies the indexed commit before handing the skill to the agent installer.",
+  };
   const docs = `${i.url.replace(/\/+$/, "")}#readme`;
   if (i.installKind === "app") return { type: "docs", href: docs, label: "app", note: "This is an app, not a library. See its README to install it." };
   const pkg = i.installPackage;
@@ -151,5 +155,8 @@ export const itemHref = (slug: string) => `/r/${slug.split("/").map(encodeURICom
 /** Only allow same-site relative return paths. */
 export function safeNext(next: unknown, fallback = "/"): string {
   const n = typeof next === "string" ? next : "";
-  return n.startsWith("/") && !n.startsWith("//") && !n.startsWith("/\\") ? n : fallback;
+  if (!n.startsWith("/") || /[\\\u0000-\u0020\u007f]/.test(n)) return fallback;
+  try {
+    return new URL(n, "https://reppit.invalid").origin === "https://reppit.invalid" ? n : fallback;
+  } catch { return fallback; }
 }

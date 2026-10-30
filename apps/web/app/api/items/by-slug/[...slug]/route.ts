@@ -1,9 +1,9 @@
 import { eq, and, desc } from "drizzle-orm";
 import { comments, users, agentCompatReports } from "@gitit/db";
-import { castVote, bumpCommentCount, resolveItemBySlug, writeRefusal, VoteError, RULES, type DownvoteReason } from "@gitit/core";
+import { castVote, createComment, resolveItemBySlug, writeRefusal, VoteError, CommentError, RULES, type DownvoteReason } from "@gitit/core";
 import { db } from "@/lib/db";
 import { rateLimiter, clientIp } from "@/lib/services";
-import { requestUser } from "@/lib/request-user";
+import { requestUser, suspensionRefusal } from "@/lib/request-user";
 import { route, json, err, readJsonObject, limitByIp, itemPayload, UUID_RE } from "../../../_lib/http";
 
 const ACTIONS = new Set(["vote", "comments", "compat"]);
@@ -63,6 +63,8 @@ export const POST = route<Ctx>("items/by-slug POST", async (req, ctx) => {
   if (!p || !p.action) return err("Not found", 404);
   const { user, apiKeyId, scopes } = await requestUser(req);
   if (!user) return err(req.headers.get("authorization") ? "Invalid or revoked API token" : "Sign in required", 401);
+  const suspended = suspensionRefusal(user);
+  if (suspended) return err(suspended, 403);
   const refused = writeRefusal({ apiKeyId, scopes });
   if (refused) return err(refused, 403);
   const body = await readJsonObject(req);
@@ -90,18 +92,16 @@ export const POST = route<Ctx>("items/by-slug POST", async (req, ctx) => {
   if (p.action === "comments") {
     const rl = await rateLimiter().check(RULES.commentPerUser, `comment:${user.id}`);
     if (!rl.ok) return err("Too many comments", 429);
-    const text = typeof body.body === "string" ? body.body.trim() : "";
-    if (text.length < 2 || text.length > 5000) return err("Comment must be 2–5000 characters");
+    const text = typeof body.body === "string" ? body.body : "";
     let parentId: string | null = null;
     if (body.parentId !== undefined && body.parentId !== null) {
       if (typeof body.parentId !== "string" || !UUID_RE.test(body.parentId)) return err("parentId must be a comment id");
-      const [parent] = await d.select({ id: comments.id }).from(comments).where(and(eq(comments.id, body.parentId), eq(comments.itemId, item.id)));
-      if (!parent) return err("parentId is not a comment on this item");
-      parentId = parent.id;
+      parentId = body.parentId;
     }
-    const [c] = await d.insert(comments).values({ itemId: item.id, userId: user.id, body: text, parentId }).returning();
-    await bumpCommentCount(d, item.id, 1);
-    return json({ comment: { ...c, user: user.login } }, { status: 201 });
+    try {
+      const comment = await createComment(d, user.id, item.id, text, parentId);
+      return json({ comment: { ...comment, user: user.login } }, { status: 201 });
+    } catch (e) { if (e instanceof CommentError) return err(e.message, e.status); throw e; }
   }
 
   // compat

@@ -116,6 +116,8 @@ code,.cmd code,.mono{font-family:var(--mono)}
 .rail .score{font-size:13px;font-weight:700}
 .rail .score.neg{color:var(--steel)}
 .rail .unit{display:none}
+.row-actions{font-family:var(--sans);font-size:12px}
+.row-actions a{color:var(--ink-3);font-weight:500}
 .ttl .repo{font-size:16px;font-weight:600;color:var(--steel);letter-spacing:normal}
 .ttl .repo:hover{text-decoration:underline;text-decoration-color:currentColor;text-decoration-thickness:1px}
 .ttl .repo .ow{color:var(--steel);font-weight:400}

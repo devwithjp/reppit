@@ -24,9 +24,9 @@ not part of it. Use it instead of guessing from star counts.
    If the MCP server is unavailable, run `npx reppit find "<problem>"` instead.
 2. Present the top 3 results as a short list: slug, one-line why, trust score, votes, and any
    flags or "broken on <agent>" reports. Lead with the top result and say why it beat the others.
-3. Offer the install command from the result. For skills this is `npx skills add <slug>`; for
+3. Offer the install command from the result. For skills this is `npx reppit add <slug> --yes`; for
    libraries it is a package-manager command the user should confirm. Do not run installs
-   without the user's go-ahead (`npx reppit add <slug>` asks for confirmation; only pass `--yes`
+   without the user's go-ahead (`npx reppit add <slug>` stops after showing the command; only pass `--yes`
    after the user has agreed).
 4. After the user tries it, if they say it worked or failed on this agent, call `report_compat`
    so the next person benefits. Only vote (`vote` tool) when the user explicitly asks.

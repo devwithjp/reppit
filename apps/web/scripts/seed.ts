@@ -79,9 +79,9 @@ async function main() {
   }
 
   if (withSkills) {
-    for (const [o, r] of SKILL_REPOS) {
+    for (const { owner: o, repo: r, candidateTopics } of SKILL_REPOS) {
       try {
-        const rows = await ingestSkillsFromRepo(gh, o, r);
+        const rows = await ingestSkillsFromRepo(gh, o, r, "skills", candidateTopics);
         if (!rows.length) continue;
         const vecs = await embedder.embed(rows.map(itemEmbeddingText));
         const res = await db.insert(items).values(rows.map((x, j) => ({ ...x, embedding: vecs[j], embeddingModel: embedder.name, embeddedAt: new Date() }))).onConflictDoNothing().returning({ id: items.id });

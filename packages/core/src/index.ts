@@ -11,3 +11,5 @@ export * from "./cache";
 export * from "./ingest";
 export * from "./trust";
 export * from "./apikeys";
+export * from "./comments";
+export * from "./moderation";

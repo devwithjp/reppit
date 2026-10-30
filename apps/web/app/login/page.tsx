@@ -9,8 +9,12 @@ import { safeNext } from "@/components/labels";
 export const metadata: Metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const next = safeNext((await searchParams).next);
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
+  const params = await searchParams;
+  const next = safeNext(params.next);
+  const message = params.error === "link"
+    ? "That sign-in link has expired or was already used. Request a new link below."
+    : params.error === "unavailable" ? "Sign-in is not available right now. Try again in a few minutes." : null;
   if (await getViewer()) redirect(next);
   return (
     <>
@@ -21,6 +25,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <p className="auth-lede">Sign in to vote and add reports.
             You don&rsquo;t need an account to search.</p>
           <div className="panel"><div className="panel-b">
+            {message && <p role="alert" className="auth-msg bad">{message}</p>}
             <LoginForm next={next} />
           </div></div>
         </div>

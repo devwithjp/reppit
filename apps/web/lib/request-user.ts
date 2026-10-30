@@ -21,6 +21,10 @@ export async function requestUser(req: Request): Promise<{ user: User | null; ap
   return { user: await getViewerUser() };
 }
 
+export function suspensionRefusal(user: User): string | null {
+  return user.suspendedAt ? "This account is suspended from community actions" : null;
+}
+
 export function json(data: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(data), { ...init, headers: { "content-type": "application/json", ...(init.headers ?? {}) } });
 }

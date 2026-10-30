@@ -4,12 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 3100",
+    "dev": "tsx scripts/local-next.ts dev",
     "build": "next build",
     "start": "next start -p 3100",
+    "start:local": "tsx scripts/local-next.ts start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "seed": "tsx scripts/seed.ts",
+    "refresh:skills": "tsx scripts/seed-skills.ts",
+    "refresh:repos": "tsx scripts/backfill.ts --existing --stale 20",
     "eval": "tsx scripts/eval.ts"
   },
   "dependencies": {
@@ -22,13 +25,13 @@
     "@supabase/supabase-js": "2.117.3",
     "drizzle-orm": "^0.44.0",
     "next": "^15.3.0",
-    "next-auth": "5.0.0-beta.29",
     "pg": "^8.13.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@playwright/test": "1.64.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "tsx": "^4.19.0",

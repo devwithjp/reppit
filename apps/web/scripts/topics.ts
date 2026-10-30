@@ -7,4 +7,16 @@ export const TOPICS = [
   "websocket", "graphql", "validation", "date", "logging", "config", "cron", "email", "payments", "i18n", "ocr",
   "speech-to-text", "video", "game-engine", "terminal-ui", "parser", "compiler", "mcp", "mcp-server", "claude-code",
 ];
-export const SKILL_REPOS = [["anthropics", "skills"], ["vercel-labs", "skills"], ["obra", "superpowers"]];
+export interface SkillSource {
+  owner: string;
+  repo: string;
+  candidateTopics: readonly string[];
+}
+
+export const SKILL_REPOS: readonly SkillSource[] = [
+  { owner: "anthropics", repo: "skills", candidateTopics: [] },
+  { owner: "vercel-labs", repo: "skills", candidateTopics: [] },
+  { owner: "obra", repo: "superpowers", candidateTopics: [] },
+  { owner: "mattpocock", repo: "skills", candidateTopics: ["typescript", "testing", "developer-tools"] },
+  { owner: "remotion-dev", repo: "skills", candidateTopics: ["video", "video-editing", "cinematic-video", "animation", "motion-graphics", "video-effects"] },
+] as const;

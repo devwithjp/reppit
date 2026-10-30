@@ -24,12 +24,16 @@ describe("helpers", () => {
   it("keeps next on site", () => {
     expect(safeNext("//evil.example.com")).toBe("/");
     expect(safeNext("/r/a/b")).toBe("/r/a/b");
+    expect(safeNext("/\\evil.example.com")).toBe("/");
+    expect(safeNext("/\n/evil.example.com")).toBe("/");
+    expect(safeNext("https://evil.example.com")).toBe("/");
+    expect(safeNext("/search?q=video%20editing")).toBe("/search?q=video%20editing");
   });
   it("installs only the verified primary package", () => {
     expect(installCommand({ kind: "repo", slug: "a/b", url: "https://github.com/a/b", installPackage: "b", packageEcosystem: "npm" })).toBe("npm install b");
     expect(installCommand({ kind: "repo", slug: "a/b", url: "https://github.com/a/b", installPackage: "b", publishedPackages: [{ ecosystem: "PyPI", name: "b" }] })).toBe("pip install b");
     expect(installCommand({ kind: "repo", slug: "a/b", url: "https://github.com/a/b", installPackage: "b", packageEcosystem: "crates.io" })).toBe("cargo add b");
-    expect(installCommand({ kind: "skill", slug: "o/r/skills/x", url: "https://github.com/o/r" })).toBe("npx skills add o/r/skills/x");
+    expect(installCommand({ kind: "skill", slug: "o/r/skills/x", url: "https://github.com/o/r" })).toBe("npx reppit add o/r/skills/x --yes");
   });
 
   it("never offers git clone: no primary package means the install docs", () => {

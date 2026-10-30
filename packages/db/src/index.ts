@@ -42,7 +42,7 @@ export interface DbOptions {
 }
 
 export async function createDb(opts: DbOptions = {}): Promise<Db> {
-  const url = opts.url ?? process.env.DATABASE_URL;
+  const url = opts.url ?? process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
   const shouldMigrate = opts.migrate ?? process.env.GITIT_AUTO_MIGRATE !== "0";
   const migrationsFolder = opts.migrationsFolder ?? process.env.GITIT_MIGRATIONS_DIR ?? defaultMigrationsFolder();
   if (url) {
@@ -51,7 +51,7 @@ export async function createDb(opts: DbOptions = {}): Promise<Db> {
     // DATABASE_SSL_CA (PEM, "\n" escapes allowed) pins Supabase's CA; otherwise TLS follows sslmode in the URL.
     const pool = new pg.Pool({
       connectionString: url,
-      max: Number(process.env.DATABASE_POOL_MAX ?? 5),
+      max: Number(process.env.DATABASE_POOL_MAX ?? 1),
       idleTimeoutMillis: 10_000,
       ...(process.env.DATABASE_SSL_CA ? { ssl: { ca: process.env.DATABASE_SSL_CA.replace(/\\n/g, "\n") } } : {}),
     });
@@ -79,6 +79,7 @@ export async function createDb(opts: DbOptions = {}): Promise<Db> {
 const g = globalThis as unknown as { __gititDb?: Promise<Db> };
 /** Process-wide singleton for the web app. Survives Next.js HMR via globalThis. */
 export function getDb(opts: DbOptions = {}): Promise<Db> {
-  if (!g.__gititDb) g.__gititDb = createDb({ dataDir: process.env.DATABASE_URL ? undefined : (process.env.PGLITE_DIR ?? ".pglite"), ...opts });
+  const postgresUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+  if (!g.__gititDb) g.__gititDb = createDb({ dataDir: postgresUrl ? undefined : (process.env.PGLITE_DIR ?? ".pglite"), ...opts });
   return g.__gititDb;
 }

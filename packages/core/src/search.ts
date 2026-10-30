@@ -503,7 +503,9 @@ export function explain(i: Item, match: MatchKind, reasons: Record<string, numbe
   const broken = Object.entries(compat).filter(([, v]) => v.broken > v.works).map(([a]) => a);
   if (works.length) parts.push(`works on ${works.join(", ")}`);
   if (broken.length) parts.push(`reported broken on ${broken.join(", ")}`);
-  return `${MATCH_LABEL[match]}${parts.length ? ": " + parts.join(", ") : ""}.`;
+  const task = i.kind === "skill" && i.description ? truncate(i.description, 120) : null;
+  const basis = task ? `${MATCH_LABEL[match]}: ${task}` : MATCH_LABEL[match];
+  return `${basis}${parts.length ? `${task ? "; " : ": "}${parts.join(", ")}` : ""}.`;
 }
 
 function pick(i: Item): SearchResult["item"] {

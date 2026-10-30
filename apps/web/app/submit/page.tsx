@@ -20,6 +20,7 @@ async function submit(fd: FormData) {
   "use server";
   const viewer = await getViewer();
   if (!viewer) redirect(`/login?next=${encodeURIComponent("/submit")}`);
+  if (viewer.suspendedAt) fail("This account is suspended from community actions.");
   const raw = String(fd.get("repo") ?? "").trim();
   const ref = parseRepoRef(raw);
   if (!ref) fail("That is not a GitHub repo. Use owner/name or a github.com URL.", raw);
@@ -85,7 +86,7 @@ export default async function SubmitPage({ searchParams }: { searchParams: Promi
                 <input type="checkbox" name="skills" />
                 <span>This repo contains agent skills (<code>SKILL.md</code> files)</span>
               </label>
-              <button type="submit" className="btn btn-primary" disabled={!viewer} data-testid="submit-repo-button">Submit</button>
+              <button type="submit" className="btn btn-primary" disabled={!viewer || Boolean(viewer.suspendedAt)} data-testid="submit-repo-button">Submit</button>
               <p className="auth-msg bad" id="submit-error" role="alert" data-testid="submit-error" hidden={!error}>{error}</p>
             </form>
           </div></div>

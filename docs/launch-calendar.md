@@ -811,7 +811,7 @@ Image: `docs/screenshots/shot-item-signals.png` (spec: `docs/figures/TODO-shot-i
 
 > Your agent can ask it too.
 >
-> There is an MCP server and a CLI. Without a token they only read. reppit never installs anything. It hands back the command.
+> There is an MCP server and a CLI. Search is read-only. Installing a skill needs an explicit `--install` or `--install-top` flag, and reppit checks the exact indexed commit first.
 >
 > Your agent picks a dependency in two seconds. Now it can check first.
 

@@ -66,7 +66,7 @@ Tuesday 13 October, 08:00 US Eastern. The moment, the star, the proof. Ends on a
 `f11-fifty-thousand-stars.png`
 
 **6**
-> The same study checked how closely each signal tracks maintenance.
+> The same study used GitHub data from November 2017. It checked how closely each signal tracks maintenance.
 >
 > Contributors: 0.44.
 > Size: 0.38.
@@ -327,3 +327,313 @@ All in `docs/screenshots/`, all already drawn.
 Spares for replies, not attached to any post: `f10-the-cloud.png` (if someone asks for the
 full scatter behind rho 0.10) and `f7-number-vs-sentence.png`. `f6-the-reason-tag.png`,
 `f8-the-agent-grid.png` and `f9-the-loop.png` are product figures for later phases.
+
+---
+
+## 20-day build-in-public campaign
+
+Approved by the user in this project conversation on 29 October 2026. The exact scheduled copy follows.
+
+### Day 1: The number in the corner
+
+**Post 1**
+
+> Your agent picks a repo. You open GitHub, see a big star count, and move on.
+>
+> That number tells you who clicked a button. It does not tell you what happened when someone used the code.
+
+**Post 2**
+
+> I am building reppit around two ways to find useful code: browse repos with reasons behind the votes, or ask for a skill that fits your task.
+>
+> I will share the work here over the next 20 days.
+
+### Day 2: A star never leaves
+
+**Post 1**
+
+> Here is what a star actually is.
+>
+> 2019: someone sees a link on a lunch break and clicks a button.
+> 2021: the project stops getting commits.
+> 2026: the star is still there.
+>
+> Nobody goes back and un-stars a dead repo.
+
+**Post 2**
+
+> So you get pairs like this.
+>
+> 40,000 stars, archived, last commit 2023.
+> 300 stars, updated Tuesday, maintainer replies in a day.
+>
+> The first one wins every search box you own, and every suggestion your agent makes.
+
+### Day 3: The weak signal
+
+**Post 1**
+
+> This part is measured, not a hunch.
+>
+> A 2020 study scored GitHub projects on how actively they were maintained. One had 50,034 stars and a maintenance score of 8 out of 100.
+>
+> Fifty thousand people said nice. Almost nobody was fixing anything.
+
+**Post 2**
+
+> The same study used GitHub data from November 2017. It checked how closely each signal tracks maintenance.
+>
+> Contributors: 0.44.
+> Size: 0.38.
+> Stars: 0.10. Their word: "very weak."
+>
+> The number we all look at came last.
+
+### Day 4: The pile
+
+**Post 1**
+
+> GitHub gets about 230 new repos a minute.
+>
+> Review one a minute, no sleep, no weekends, and you fall 229 further behind. Every minute.
+>
+> That is the pile your next dependency comes out of.
+
+**Post 2**
+
+> The package registries, counted this month:
+>
+> npm: 4,464,731.
+> PyPI: 907,001.
+> crates.io: 347,256.
+>
+> There is no version of "I'll have a quick look around" that covers that.
+
+### Day 5: No one tends the shelf
+
+**Post 1**
+
+> Nobody is curating this whole pile.
+>
+> No editor. No shelf. No buyer deciding what gets stocked.
+>
+> The list in your bookmarks was kept by one person who got busy. Hand curation lost. Nothing replaced it.
+
+**Post 2**
+
+> It is already inside your code.
+>
+> An audit of 947 commercial codebases found 93% had a component nobody had worked on in two years. Only 7% of components in use were the latest version.
+>
+> You did not abandon it. It was abandoned under you.
+
+### Day 6: The repo feed
+
+**Post 1**
+
+> The first half of reppit is a Reddit-style feed for repos and agent skills.
+>
+> Each item has a vote rail, a discussion, and a trust score built from what the project is doing now.
+
+**Post 2**
+
+> Upvote when it works. Downvote with a reason when it does not. Comment when the tradeoff needs more than a tag.
+>
+> Repo votes affect the ranking. Comment votes only order the discussion.
+
+### Day 7: Read before installing
+
+**Post 1**
+
+> Sometimes an agent needs a shortlist. Sometimes it needs the skill instructions. Sometimes the user has already decided to install.
+>
+> One command should support all three without guessing which one you meant.
+
+**Post 2**
+
+> The CLI starts with recommendations. You can ask for instructions, choose a result, or explicitly install the top match.
+>
+> Agents get the same options as people.
+
+### Day 8: A clean answer for agents
+
+**Post 1**
+
+> Terminal output can be easy for a person to scan and awkward for an agent to parse.
+>
+> The skill command needs JSON output as well as readable text. The result should carry the source and the reason it matched.
+
+**Post 2**
+
+> An agent should not have to scrape a pretty table to find a skill's source.
+>
+> Structured output makes it easier to inspect the recommendation before taking the next step.
+
+### Day 9: The wrong answer looks tidy
+
+**Post 1**
+
+> A search result can look polished and still miss the task.
+>
+> That matters more when an agent reads it. A confident wrong result can become a command a few seconds later.
+
+**Post 2**
+
+> I am checking searches the ranking was not tuned on.
+>
+> The useful question is whether the result fits the task. A passing test suite cannot answer that on its own.
+
+### Day 10: An empty result is useful
+
+**Post 1**
+
+> If the right skill is missing, showing a loosely related one does not fill the gap.
+>
+> It hides the gap. The person or agent still has the original problem.
+
+**Post 2**
+
+> reppit needs to say when the index has no credible match.
+>
+> That also gives me a useful list of what to add next. Empty searches are product feedback.
+
+### Day 11: Installing is a choice
+
+**Post 1**
+
+> For repeat workflows, asking the same install question each time gets old.
+>
+> The CLI needs an explicit auto-install option for people and agents who want it. The default should still be a recommendation.
+
+**Post 2**
+
+> The intended flow is:
+> reppit get skills "cinematic video editing" --install-top
+>
+> The flag makes the choice visible. If there is no match, there should be nothing to install.
+
+### Day 12: The source matters
+
+**Post 1**
+
+> A skill is a set of instructions your agent may follow. The source deserves a place next to the recommendation.
+>
+> I want you to see where it came from before deciding what to do with it.
+
+**Post 2**
+
+> A useful result needs more than a title. It needs a source link, a reason for the match, and a clear next action.
+>
+> That is the small contract shared by the site and the CLI.
+
+### Day 13: Browsing on a phone
+
+**Post 1**
+
+> A repo feed is also a thing people open from a link on their phone.
+>
+> The name, reason, and warning need to fit on that screen. If those disappear, the mobile page loses the part that helps you choose.
+
+**Post 2**
+
+> I am checking the same discovery flow on desktop and phone.
+>
+> Open a result, read the signals, find the source. Small screens should not turn a useful page into a row of unexplained numbers.
+
+### Day 14: Let people try it first
+
+**Post 1**
+
+> You should be able to browse and search before creating an account.
+>
+> Signing up makes sense when you want to vote or leave a report. It is a strange first step when you are still finding out what the site does.
+
+**Post 2**
+
+> I am treating signup as part of the product: clear fields, a useful confirmation message, and a return to where you started.
+>
+> A working homepage is not enough to onboard someone.
+
+### Day 15: A token has a job
+
+**Post 1**
+
+> A coding agent that searches does not need permission to vote as you.
+>
+> The token page needs to make those choices plain. Reading results and changing community data are different actions.
+
+**Post 2**
+
+> I am checking the whole path: sign in, create a read-only token, search, then try an action it should refuse.
+>
+> The label on the page and the server's behavior need to agree.
+
+### Day 16: Two doors, one index
+
+**Post 1**
+
+> The site and the CLI should not give two different stories about the same item.
+>
+> If the browser shows a warning, the agent should receive it too. If a signal is unknown, both should say that.
+
+**Post 2**
+
+> The two experiences share the same index and ranking.
+>
+> You browse when you want to explore. Your agent searches when the task is already in front of it.
+
+### Day 17: What a comic can explain
+
+**Post 1**
+
+> The stick figures here have one job: show the decision.
+>
+> A person sees a number, skips a check, or finds a reason to choose differently. The drawing should make that moment easier to understand.
+
+**Post 2**
+
+> That is also the job of reppit's result page.
+>
+> Show the facts that change the next step. Leave room for the person to decide.
+
+### Day 18: Check the path people use
+
+**Post 1**
+
+> Before I call reppit ready, I need to follow the path a new user takes.
+>
+> Open the site. Search. Sign up. Confirm the account. Vote. Use the CLI. Each step can fail on its own.
+
+**Post 2**
+
+> A green build proves the code builds. It does not prove the confirmation email arrives or the published command installs.
+>
+> Those need checks against the live setup.
+
+### Day 19: The honest launch line
+
+**Post 1**
+
+> The launch message needs to match the product people can open.
+>
+> If a feature is still being checked, I will say that. If a search misses, it stays a miss. The first visit should not require translating the pitch.
+
+**Post 2**
+
+> reppit's promise is small enough to check: find repos through a useful community feed, and find agent skills by describing a task.
+>
+> That is what I want the launch to prove.
+
+### Day 20: Try a task
+
+**Post 1**
+
+> Twenty days of showing the problem and the two parts of reppit.
+>
+> The next useful test is a task I did not choose. Try describing what you need, then check whether the result would help you do it.
+
+**Post 2**
+
+> If you try reppit, tell me the task and where the result missed.
+>
+> A specific miss gives me something to fix. A useful match tells me which part is worth keeping.

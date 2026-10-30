@@ -31,8 +31,8 @@ Agents (fixed set, seven): `claude-code`, `codex`, `cursor`, `gemini-cli`, `copi
 
 | Status | Count |
 |---|---|
-| v1 | 37 |
-| v2 | 8 |
+| v1 | 38 |
+| v2 | 7 |
 | not doing | 6 |
 | **Total** | **51** |
 
@@ -298,7 +298,7 @@ it, so that I can decide in under a minute.
 5. Reports can be filtered by reason; selecting `unmaintained` shows only those reports.
 6. A slug that is not indexed returns the 404 page (F-35) with the submit prompt.
 7. The page has a canonical URL and an Open Graph title of `owner/name — trust nn/100`.
-8. No comment section is rendered (F-46).
+8. A Discussion section renders comments and replies, with a clear empty state (F-38).
 
 ### F-14 Item page at cold start — `v1`
 
@@ -546,9 +546,9 @@ command, so that it can explain its pick and I can confirm the install.
 1. `get_repo` with a valid slug returns description, trust score with all six signals, vote summary,
    reason counts, agent compatibility and a README excerpt up to 3,000 characters.
 2. `get_repo` with an unknown slug returns "Not indexed on reppit" and a submit URL, not an error trace.
-3. `get_repo` does not return comments in v1.
+3. `get_repo` returns the public discussion with comment scores; deleted bodies remain hidden.
 4. `install_skill` returns the command only; the server never executes it.
-5. For skills the command is `npx skills add <slug>`; for libraries it is the package-manager command
+5. For skills the command is `npx reppit add <slug> --yes`; for libraries it is the package-manager command
    for the item's language.
 
 ### F-28 MCP server: `vote` and `report_compat` — `v1` (depends on Open question 2)
@@ -579,14 +579,13 @@ agent that can run a shell can use reppit.
 1. `reppit find "<problem>" [--lang x] [--kind repo|skill|mcp] [-n 5]` prints the same results as F-26
    in a fixed-width layout no wider than 80 columns.
 2. `reppit show <owner/name>` prints the item summary with trust score and install command.
-3. `reppit add <owner/name>` prints the install command; for skills it asks "Run it? [y/N]" and runs
-   `npx skills add` only on `y`.
+3. `reppit add <owner/name>` prints the install command and stops unless `--yes` is present. With
+   `--yes`, a skill is fetched at its indexed commit, that commit is verified, and only then is the
+   local snapshot handed to the agent skill installer.
 4. `reppit vote` and `reppit compat` behave as F-28, including the reason requirement.
 5. Any failure exits non-zero with a one-line message on stderr; `reppit` with no arguments prints help
    and exits 0.
 6. Output contains no colour codes when stdout is not a TTY.
-
-Note: today `add` runs `npx skills add` for skills without asking (criterion 3 is a change).
 
 ### F-30 Cross-agent skill `find-repo` — `v1`
 
@@ -723,16 +722,16 @@ not look abandoned.
 
 ---
 
-## 9. v2
+## 9. Community and v2
 
-### F-38 Threaded comments — `v2`
+### F-38 Threaded comments — `v1`
 
-**Why cut from v1.** An empty comment section looks worse than no comment section, and at launch every
-section would be empty. The reason tag and the optional note on a vote carry the one thing a comment
-would add: why. Comments also need moderation tooling that does not exist yet. The code and API stay;
-the UI and the `comments` part of `get_repo` are hidden.
+**Decision update, 29 October.** Threaded discussion is now part of the launch product. A clear empty
+state handles cold start. Repo votes affect item ranking; comment votes order the discussion only.
 
-**v2 entry criteria.** At least 200 items with five or more notes, and an operator moderation queue.
+**Acceptance criteria.** Visitors can read comments and replies. Signed-in users can comment, reply,
+vote comments up or down, and delete their own comments. Deleted parents remain as placeholders when
+they have replies. Operators can remove abusive content. Comments are escaped plain text.
 
 ### F-39 API keys — `v2`
 
@@ -775,9 +774,9 @@ Asked for by nobody yet; noted because the score history (F-06) makes it cheap l
 
 ## 10. Not doing
 
-### F-46 Comments in v1 — `not doing`
+### F-46 Direct messages — `not doing`
 
-See F-38. Stated here so nobody ships the hidden UI by accident.
+Discussion stays attached to an item. There are no private messages or standalone forums in v1.
 
 ### F-47 Skills marketplace with payments — `not doing`
 
@@ -809,7 +808,7 @@ plain number, not as a level.
   scan code.
 - **Not an installer.** reppit prints install commands. Nothing on the site, in MCP or in the skill runs
   an install without the user's explicit yes.
-- **Not a discussion forum.** No comments, no replies, no DMs.
+- **Not a chat app.** Comments and replies stay attached to an item; there are no DMs or standalone forums.
 - **No free-text-only downvotes.** A note is optional; the reason tag is not.
 - **No agent votes on the user's behalf.** MCP write tools are only called on explicit instruction.
 - **No personalised ranking.** Everyone sees the same order for the same query.

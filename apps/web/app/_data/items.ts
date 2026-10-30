@@ -10,14 +10,14 @@ export const rowColumns = {
   deprecated: items.deprecated, deprecationMessage: items.deprecationMessage, advisoriesOpen: items.advisoriesOpen,
   closedIssues: items.closedIssues, packageName: items.packageName, packageEcosystem: items.packageEcosystem, installPackage: items.installPackage, publishedPackages: items.publishedPackages,
   healthScore: items.healthScore, upvotes: items.upvotes, downvotes: items.downvotes,
-  weightedScore: items.weightedScore, createdAt: items.createdAt,
+  weightedScore: items.weightedScore, commentCount: items.commentCount, createdAt: items.createdAt,
 };
 
 export type RowItem = {
   id: string; kind: string; slug: string; url: string; description: string | null; language: string | null;
   license: string | null; stars: number; openIssues: number | null; closedIssues: number | null; pushedAt: Date | null; lastReleaseAt: Date | null;
   archived: boolean; deprecated: boolean | null; deprecationMessage: string | null; advisoriesOpen: number | null;
-  packageName: string | null; packageEcosystem: string | null; installPackage: string | null; publishedPackages: { ecosystem: string; name: string }[] | null; healthScore: number; upvotes: number; downvotes: number; weightedScore: number;
+  packageName: string | null; packageEcosystem: string | null; installPackage: string | null; publishedPackages: { ecosystem: string; name: string }[] | null; healthScore: number; upvotes: number; downvotes: number; weightedScore: number; commentCount: number;
 };
 
 export type Compat = Record<string, { works: number; broken: number }>;

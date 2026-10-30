@@ -20,10 +20,11 @@ describe("SupabaseEmbedder (client side of the embed edge function)", () => {
   it("posts { input } with the key and returns the vectors", async () => {
     let sent: { url: string; init?: RequestInit } | null = null;
     const f = (async (url: string, init?: RequestInit) => { sent = { url, init }; return new Response(JSON.stringify({ embeddings: [vec, vec] })); }) as typeof fetch;
-    const e = new SupabaseEmbedder("https://p.supabase.co/functions/v1/embed", "anon", f);
+    const e = new SupabaseEmbedder("https://p.supabase.co/functions/v1/embed", "service-secret", f);
     expect(await e.embed(["a", "b"])).toEqual([vec, vec]);
     expect(JSON.parse(String(sent!.init!.body))).toEqual({ input: ["a", "b"] });
-    expect((sent!.init!.headers as Record<string, string>).authorization).toBe("Bearer anon");
+    expect((sent!.init!.headers as Record<string, string>)["x-reppit-embed-key"]).toBe("service-secret");
+    expect((sent!.init!.headers as Record<string, string>).authorization).toBeUndefined();
   });
   it("rejects errors and wrong shapes rather than storing garbage", async () => {
     const bad = (body: unknown, status = 200) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;

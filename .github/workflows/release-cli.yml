@@ -1,0 +1,203 @@
+name: Release Rust CLI
+
+on:
+  push:
+    tags:
+      - "cli-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            executable: reppit
+          - platform: linux-arm64
+            runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            executable: reppit
+          - platform: darwin-x64
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            executable: reppit
+          - platform: darwin-arm64
+            runner: macos-15
+            target: aarch64-apple-darwin
+            executable: reppit
+          - platform: win32-x64
+            runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            executable: reppit.exe
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ce8d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - run: rustup target add ${{ matrix.target }}
+      - run: cargo test --locked --manifest-path packages/cli-rs/Cargo.toml
+      - run: cargo build --release --locked --manifest-path packages/cli-rs/Cargo.toml --target ${{ matrix.target }}
+      - name: Package native npm artifact
+        shell: bash
+        run: >-
+          node scripts/package-cli-native.mjs
+          --platform ${{ matrix.platform }}
+          --target ${{ matrix.target }}
+          --binary packages/cli-rs/target/${{ matrix.target }}/release/${{ matrix.executable }}
+          --out dist/cli-native
+      - name: Smoke test native executable
+        shell: bash
+        run: packages/cli-rs/target/${{ matrix.target }}/release/${{ matrix.executable }} --version
+      - name: Pack native npm package
+        shell: bash
+        run: >-
+          npm pack dist/cli-native/${{ matrix.platform }}/package
+          --pack-destination dist/cli-native/${{ matrix.platform }}
+      - name: Smoke test the packed npx path
+        shell: bash
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          node scripts/prepare-cli-smoke-wrapper.mjs \
+            dist/cli-native/${{ matrix.platform }}/checksum.json
+          npm pack ./packages/cli --pack-destination dist/cli-native/${{ matrix.platform }}
+          smoke="$RUNNER_TEMP/reppit-npx-smoke"
+          mkdir -p "$smoke"
+          cd "$smoke"
+          npm init --yes >/dev/null
+          npm install --ignore-scripts --omit=optional \
+            "$GITHUB_WORKSPACE/dist/cli-native/${{ matrix.platform }}"/reppit-cli-*.tgz \
+            "$GITHUB_WORKSPACE/dist/cli-native/${{ matrix.platform }}"/reppit-[0-9]*.tgz
+          npx --no-install reppit --version
+      - name: Create direct-download archive
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          version="$(node -p "require('./packages/cli/package.json').version")"
+          tar -C dist/cli-native/${{ matrix.platform }}/package/bin \
+            -czf "dist/cli-native/${{ matrix.platform }}/reppit-${version}-${{ matrix.platform }}.tar.gz" \
+            reppit
+      - name: Create Windows direct-download archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = (Get-Content packages/cli/package.json | ConvertFrom-Json).version
+          Compress-Archive `
+            -Path dist/cli-native/${{ matrix.platform }}/package/bin/reppit.exe `
+            -DestinationPath "dist/cli-native/${{ matrix.platform }}/reppit-$version-${{ matrix.platform }}.zip"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: reppit-cli-${{ matrix.platform }}
+          path: dist/cli-native/${{ matrix.platform }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ce8d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: reppit-cli-*
+          path: dist/cli-release
+      - name: Verify release version
+        shell: bash
+        run: |
+          npm_version="$(node -p "require('./packages/cli/package.json').version")"
+          rust_version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' packages/cli-rs/Cargo.toml | head -n 1)"
+          test "$npm_version" = "$rust_version"
+          if [[ "$GITHUB_REF" == refs/tags/cli-v* ]]; then
+            version="${GITHUB_REF_NAME#cli-v}"
+            test "$version" = "$npm_version"
+          fi
+      - name: Assemble wrapper checksums
+        shell: bash
+        run: node scripts/assemble-cli-wrapper.mjs dist/cli-release/*/checksum.json
+      - name: Build wrapper
+        shell: bash
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm --dir packages/cli build
+          npm pack ./packages/cli --pack-destination dist/cli-release
+      - name: Generate release checksums
+        shell: bash
+        run: |
+          : > dist/cli-release/SHA256SUMS
+          for file in dist/cli-release/*/*.tar.gz dist/cli-release/*/*.zip dist/cli-release/reppit-*.tgz; do
+            test -f "$file" || continue
+            checksum="$(sha256sum "$file" | cut -d' ' -f1)"
+            printf '%s  %s\n' "$checksum" "$(basename "$file")" >> dist/cli-release/SHA256SUMS
+          done
+          sort -o dist/cli-release/SHA256SUMS dist/cli-release/SHA256SUMS
+      - name: Attest release archives
+        if: startsWith(github.ref, 'refs/tags/cli-v')
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45
+        with:
+          subject-path: |
+            dist/cli-release/**/*.tar.gz
+            dist/cli-release/**/*.zip
+            dist/cli-release/*.tgz
+      - name: Publish native npm packages
+        if: startsWith(github.ref, 'refs/tags/cli-v')
+        shell: bash
+        run: |
+          npm install --global npm@11.6.2
+          for package in dist/cli-release/*/package; do
+            name="$(node -p "require('./$package/package.json').name")"
+            version="$(node -p "require('./$package/package.json').version")"
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version is already published; keeping the immutable release."
+            else
+              npm publish "$package" --access public --provenance
+            fi
+          done
+      - name: Publish npm launcher last
+        if: startsWith(github.ref, 'refs/tags/cli-v')
+        shell: bash
+        run: |
+          version="$(node -p "require('./packages/cli/package.json').version")"
+          if npm view "reppit@$version" version >/dev/null 2>&1; then
+            echo "reppit@$version is already published; keeping the immutable release."
+          else
+            npm publish packages/cli --access public --provenance
+          fi
+      - name: Create or refresh GitHub release
+        if: startsWith(github.ref, 'refs/tags/cli-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" --clobber \
+              dist/cli-release/*/*.tar.gz \
+              dist/cli-release/*/*.zip \
+              dist/cli-release/reppit-*.tgz \
+              dist/cli-release/SHA256SUMS
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+              dist/cli-release/*/*.tar.gz \
+              dist/cli-release/*/*.zip \
+              dist/cli-release/reppit-*.tgz \
+              dist/cli-release/SHA256SUMS
+          fi

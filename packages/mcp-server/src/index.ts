@@ -66,7 +66,7 @@ export function buildServer(client = new ReppitClient()) {
 
   server.registerTool("install_skill", {
     title: "Get the install command for a result",
-    description: "Returns the exact shell command to install a skill (via npx skills add) or add a library. Does not execute it.",
+    description: "Returns the exact shell command to install a skill through Reppit's commit-pinned installer, or add a library. Does not execute it.",
     inputSchema: { slug: z.string() },
   }, async ({ slug }) => {
     const item = await client.item(slug);
