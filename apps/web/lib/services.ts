@@ -1,6 +1,7 @@
-import { RateLimiter, embedderFromEnv } from "@gitit/core";
+import { DatabaseRateLimitStore, RateLimiter, embedderFromEnv } from "@gitit/core";
+import { db } from "@/lib/db";
 const g = globalThis as unknown as { __rl?: RateLimiter; __emb?: ReturnType<typeof embedderFromEnv>; __cache?: Map<string, { v: unknown; exp: number }> };
-export const rateLimiter = () => (g.__rl ??= new RateLimiter());
+export const rateLimiter = () => (g.__rl ??= new RateLimiter(new DatabaseRateLimitStore(db)));
 export const embedder = () => (g.__emb ??= embedderFromEnv());
 /** Tiny TTL cache for hot search queries. Redis-backed in production; see DECISIONS.md. */
 export const cache = {

@@ -13,6 +13,7 @@
     "seed": "tsx scripts/seed.ts",
     "refresh:skills": "tsx scripts/seed-skills.ts",
     "refresh:repos": "tsx scripts/backfill.ts --existing --stale 20",
+    "refresh:votes": "tsx scripts/recompute-votes.ts",
     "eval": "tsx scripts/eval.ts"
   },
   "dependencies": {

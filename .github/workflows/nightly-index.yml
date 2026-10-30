@@ -44,3 +44,7 @@ jobs:
           EMBEDDING_PROVIDER: supabase
           EMBEDDING_FUNCTION_URL: ${{ secrets.EMBEDDING_FUNCTION_URL }}
           EMBEDDING_FUNCTION_KEY: ${{ secrets.EMBEDDING_FUNCTION_KEY }}
+      - name: Advance vote decay and trust scores
+        run: pnpm --filter @gitit/web refresh:votes
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

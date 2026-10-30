@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { createDb, items, users, type Db } from "@gitit/db";
-import { castVote, VoteError } from "../src/votes";
+import { eq } from "drizzle-orm";
+import { createDb, items, users, votes, type Db } from "@gitit/db";
+import { castVote, recomputeAllItemScores, VoteError } from "../src/votes";
 import { search } from "../src/search";
 import { LocalEmbedder, itemEmbeddingText } from "../src/embeddings";
 
@@ -37,6 +38,29 @@ describe("castVote (pglite)", () => {
     expect(r.upvotes).toBe(1); expect(r.downvotes).toBe(1);
     const r2 = await castVote(db, userId, a, null);
     expect(r2.downvotes).toBe(0);
+  });
+});
+
+describe("recomputeAllItemScores (pglite)", () => {
+  it("advances vote decay and the stored trust score without a new vote", async () => {
+    const votedAt = new Date("2026-01-01T00:00:00Z");
+    const [voter] = await db.insert(users).values({ login: "decay-voter", githubId: "decay-voter" }).returning();
+    const [item] = await db.insert(items).values({
+      slug: "decay/clock", owner: "decay", name: "clock", url: "https://example.test/decay/clock",
+      createdAt: votedAt, pushedAt: votedAt, lastReleaseAt: votedAt,
+      packageName: "clock", packageEcosystem: "npm", deprecated: false, advisoriesOpen: 0,
+      openIssues: 0, closedIssues: 100,
+    }).returning();
+    await db.insert(votes).values({ userId: voter.id, itemId: item.id, direction: "up", weight: 2, createdAt: votedAt });
+
+    const refreshed = await recomputeAllItemScores(db, new Date("2026-06-30T00:00:00Z"));
+    const [stored] = await db.select({
+      upvotes: items.upvotes, weightedScore: items.weightedScore,
+      hotScore: items.hotScore, trustScore: items.trustScore,
+    }).from(items).where(eq(items.id, item.id));
+
+    expect(refreshed).toBe(3);
+    expect(stored).toEqual({ upvotes: 1, weightedScore: 1, hotScore: 0, trustScore: 95 });
   });
 });
 

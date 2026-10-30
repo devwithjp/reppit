@@ -40,8 +40,9 @@ Set `ANTHROPIC_API_KEY` to have Claude write the one-line "why" per result; othe
 
 The production frontend and agent API deploy independently. After Vercel and Supabase setup,
 run `scripts/deploy-vercel.sh` for the Next.js site and `scripts/deploy-api-vercel.sh` for the
-Rust API. The API keeps `LEGACY_API_URL=https://reppit.dev` as a rollback adapter while catalog
-logic moves to Rust one vertical slice at a time.
+Rust API. The first release is a versioned gateway: it keeps `LEGACY_API_URL=https://reppit.dev`
+and relays catalog search and item actions to the TypeScript service. Catalog logic moves to Rust
+one vertical slice at a time after parity tests pass.
 
 Without a GitHub OAuth app (`GITHUB_ID`/`GITHUB_SECRET`) a dev-only username login is enabled.
 
@@ -65,12 +66,11 @@ being configured. Searches with no matching skill never install anything.
 
 The build-in-public campaign lives in `bip/campaign.json`. Run
 `python3 bip/prepare-campaign.py` to render its 40 comics and review page. A cron entry
-runs `bip/run-campaign.sh` every five minutes. It publishes only when an activated
-schedule is due; `node bip/campaign.mjs status` shows it and
-`node bip/campaign.mjs pause` stops it. The browser must remain signed in as @prakass_ds
-and queued threads are assigned a random Sydney time between 5:15 PM and 9:45 PM.
-and this machine must be awake. Browser typing does not guarantee exemption from X's
-automation rules. An uncertain posting result pauses the campaign for inspection.
+runs `bip/run-campaign.sh` every five minutes. When an activated schedule is due, it
+creates a private local review packet and desktop notification; it never opens or posts
+to X. `node bip/campaign.mjs status` shows the schedule and `pause` stops it. Queued
+threads get a random Sydney time between 5:15 PM and 9:45 PM. After a person publishes
+both posts manually, record their canonical URLs with `mark-posted`.
 
 ```bash
 # Claude Code

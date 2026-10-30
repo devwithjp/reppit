@@ -47,13 +47,14 @@ Exit: the complete feed → item → vote → comment → reply flow passes on d
 ## Phase 3 — agent skill slice
 
 1. [x] Finish the curated nested-skill refresh and configure its nightly workflow.
-2. [x] Define the shared Rust contract and ship health/search as the first backend tracer slice.
+2. [x] Define the shared Rust contract and ship health plus a versioned search relay as the first backend tracer slice.
 3. [x] Replace the TypeScript CLI implementation with a native Rust binary while preserving command behavior and JSON output.
 4. Run representative searches: cinematic video editing, TypeScript integration tests, PDF extraction, and one deliberate miss.
 5. [x] Verify recommendation, JSON, instructions, selection, explicit install, and no-match behavior.
 6. [x] Align MCP tools with the same `/api/v1` contract and sources.
 7. [x] Replace the duplicate TypeScript CLI with a checksum-verifying npm launcher and define five native release targets.
 8. Publish and smoke-test the five native packages, then publish the `reppit` launcher last through npm trusted publishing.
+9. [ ] After launch, move search behind the Rust seam from relay to direct catalog access, with parity tests before switching traffic.
 
 Exit: a fresh agent can get recommendations, inspect one, and explicitly install it without reading a human table.
 

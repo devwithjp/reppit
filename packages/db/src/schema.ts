@@ -217,6 +217,13 @@ export const searchLog = pgTable("search_log", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("search_log_norm_idx").on(t.normalized)]);
 
+/** Shared fixed-window counters used by every web/API instance. */
+export const rateLimitBuckets = pgTable("rate_limit_buckets", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+}, (t) => [index("rate_limit_buckets_reset_at_idx").on(t.resetAt)]);
+
 export type User = typeof users.$inferSelect;
 export type Item = typeof items.$inferSelect;
 export type NewItem = typeof items.$inferInsert;

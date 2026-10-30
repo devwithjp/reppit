@@ -1,4 +1,7 @@
-/** Sliding-window rate limiter with a pluggable store. In-memory by default; Redis-backed in prod. */
+import { sql } from "drizzle-orm";
+import { rateLimitBuckets, type Db } from "@gitit/db";
+
+/** Fixed-window rate limiter with a pluggable store. In-memory by default. */
 export interface RateLimitStore {
   incr(key: string, windowMs: number): Promise<number>;
 }
@@ -18,6 +21,31 @@ export class MemoryStore implements RateLimitStore {
     const b = this.buckets.get(key);
     if (!b || b.resetAt <= now) { this.buckets.set(key, { count: 1, resetAt: now + windowMs }); return 1; }
     b.count += 1; return b.count;
+  }
+}
+
+/** Postgres/PGlite store shared by all application processes. */
+export class DatabaseRateLimitStore implements RateLimitStore {
+  constructor(
+    private getDb: () => Promise<Db>,
+    private now: () => Date = () => new Date(),
+  ) {}
+
+  async incr(key: string, windowMs: number): Promise<number> {
+    const now = this.now();
+    const resetAt = new Date(now.getTime() + windowMs);
+    const db = await this.getDb();
+    const [bucket] = await db.insert(rateLimitBuckets)
+      .values({ key, count: 1, resetAt })
+      .onConflictDoUpdate({
+        target: rateLimitBuckets.key,
+        set: {
+          count: sql<number>`case when ${rateLimitBuckets.resetAt} <= ${now} then 1 else ${rateLimitBuckets.count} + 1 end`,
+          resetAt: sql<Date>`case when ${rateLimitBuckets.resetAt} <= ${now} then ${resetAt} else ${rateLimitBuckets.resetAt} end`,
+        },
+      })
+      .returning({ count: rateLimitBuckets.count });
+    return bucket.count;
   }
 }
 

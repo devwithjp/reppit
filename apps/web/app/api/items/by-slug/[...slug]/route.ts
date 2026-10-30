@@ -1,5 +1,5 @@
-import { eq, and, desc } from "drizzle-orm";
-import { comments, users, agentCompatReports } from "@gitit/db";
+import { eq, and, desc, sql } from "drizzle-orm";
+import { comments, users, votes, agentCompatReports } from "@gitit/db";
 import { castVote, createComment, resolveItemBySlug, writeRefusal, VoteError, CommentError, RULES, type DownvoteReason } from "@gitit/core";
 import { db } from "@/lib/db";
 import { rateLimiter, clientIp } from "@/lib/services";
@@ -37,18 +37,32 @@ export const GET = route<Ctx>("items/by-slug GET", async (req, ctx) => {
   const found = await resolveItemBySlug(d, p.slug);
   if (!found) return err("Not found", 404);
   const { item, viaAlias } = found;
-  const [cmts, compat] = await Promise.all([
+  const [cmts, compatReports, reasonRows, compatRows] = await Promise.all([
     d.select({ id: comments.id, body: comments.body, parentId: comments.parentId, createdAt: comments.createdAt, user: users.login })
       .from(comments).innerJoin(users, eq(users.id, comments.userId)).where(and(eq(comments.itemId, item.id), eq(comments.deleted, false))).orderBy(desc(comments.createdAt)).limit(50),
     d.select({ agent: agentCompatReports.agent, status: agentCompatReports.status, note: agentCompatReports.note, user: users.login, createdAt: agentCompatReports.createdAt })
       .from(agentCompatReports).innerJoin(users, eq(users.id, agentCompatReports.userId)).where(eq(agentCompatReports.itemId, item.id)).orderBy(desc(agentCompatReports.createdAt)).limit(50),
+    d.select({ reason: votes.reason, n: sql<number>`count(*)::int` })
+      .from(votes).where(and(eq(votes.itemId, item.id), eq(votes.direction, "down"))).groupBy(votes.reason),
+    d.select({ agent: agentCompatReports.agent, status: agentCompatReports.status, n: sql<number>`count(*)::int` })
+      .from(agentCompatReports).where(eq(agentCompatReports.itemId, item.id)).groupBy(agentCompatReports.agent, agentCompatReports.status),
   ]);
+  const downvoteReasons: Record<string, number> = {};
+  for (const row of reasonRows) if (row.reason) downvoteReasons[row.reason] = Number(row.n);
+  const compat: Record<string, { works: number; broken: number }> = {};
+  for (const row of compatRows) {
+    const counts = compat[row.agent] ?? { works: 0, broken: 0 };
+    counts[row.status] = Number(row.n);
+    compat[row.agent] = counts;
+  }
   return json({
     ...itemPayload(item),
     canonicalSlug: item.slug,
     redirect: viaAlias ? { from: p.slug, to: item.slug } : null,
     comments: cmts,
-    compatReports: compat,
+    downvoteReasons,
+    compat,
+    compatReports,
   });
 });
 

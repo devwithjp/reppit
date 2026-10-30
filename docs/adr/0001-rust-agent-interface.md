@@ -12,3 +12,7 @@ The original v1 plan kept the HTTP interface in Next.js and shipped a TypeScript
 - The external seam is versioned JSON under `/api/v1`; frontend, CLI, and MCP callers use the same contract.
 - Migration is vertical: health and search first, then item reads, then authenticated community writes.
 - The Rust deployment uses Vercel&rsquo;s container runtime, which is currently beta; the TypeScript adapter remains the rollback path through launch.
+
+## Launch state
+
+The first release is a versioned Rust gateway, not a completed backend rewrite. Rust owns health and the public `/api/v1` seam, while search and item actions relay to the TypeScript service through `LEGACY_API_URL`. Direct Rust-owned catalog access ships only after parity tests pass; launch copy must not describe that migration as finished.

@@ -443,14 +443,17 @@ async fn show(client: &Client, slug: &str, as_json: bool) -> Result<()> {
         return Ok(());
     }
     println!(
-        "{} ({}) — {}\n{}\nvotes +{}/-{} · ★{}\ninstall: {}",
+        "{} ({}) — {}\n{}\n{}\nvotes +{}/-{} · ★{}{}{}\ninstall: {}",
         value_string(&item, "slug").unwrap_or(slug),
         value_string(&item, "kind").unwrap_or("unknown"),
         value_string(&item, "url").unwrap_or(""),
         value_string(&item, "description").unwrap_or(""),
+        trust_line(&item),
         value_number(&item, "upvotes"),
         value_number(&item, "downvotes"),
         value_number(&item, "stars"),
+        fact_line("flags", flag_facts(&item, &item)),
+        fact_line("agents", compat_facts(&item)),
         install_command(&item)
     );
     Ok(())
@@ -652,18 +655,129 @@ fn print_results(results: &[Value]) {
         let item = result.get("item").unwrap_or(&Value::Null);
         let net = value_number(item, "upvotes") - value_number(item, "downvotes");
         println!(
-            "{}. {} ({}) — {}\n   {}\n   why: {}\n   votes {:+} · ★{}\n   install: {}{}",
+            "{}. {} ({}) — {}\n   {}\n   why: {}\n   {}{}{}{}\n   votes {:+} · ★{}\n   install: {}{}",
             index + 1,
             value_string(item, "slug").unwrap_or("unknown"),
             value_string(item, "kind").unwrap_or("unknown"),
             value_string(item, "url").unwrap_or(""),
             value_string(item, "description").unwrap_or(""),
             value_string(result, "why").unwrap_or("community-ranked match"),
+            trust_line(result),
+            fact_line("maintenance", maintenance_facts(result)),
+            fact_line("flags", flag_facts(item, result)),
+            fact_line("agents", compat_facts(result)),
             net,
             value_number(item, "stars"),
             install_command(item),
             if index + 1 == results.len() { "" } else { "\n" }
         );
+    }
+}
+
+fn trust_line(facts: &Value) -> String {
+    let Some(trust) = facts.get("trust") else {
+        return "trust not measured".to_owned();
+    };
+    let score = trust.get("score").and_then(Value::as_i64);
+    let reason = value_string(trust, "reason");
+    let measured = value_number(trust, "measured");
+    let applicable = value_number(trust, "applicable");
+    let score = score
+        .map(|value| format!("trust {value}/100"))
+        .unwrap_or_else(|| format!("trust {}", reason.unwrap_or("not measured")));
+    let suffix = match reason {
+        Some("too little measured") | None => String::new(),
+        Some(value) => format!(" · {value}"),
+    };
+    format!("{score} · {measured} of {applicable} measured{suffix}")
+}
+
+fn maintenance_facts(facts: &Value) -> Vec<String> {
+    facts
+        .get("trust")
+        .and_then(|trust| trust.get("cells"))
+        .and_then(Value::as_array)
+        .map(|cells| {
+            cells
+                .iter()
+                .filter(|cell| matches!(value_string(cell, "key"), Some("push" | "release")))
+                .filter(|cell| {
+                    !matches!(
+                        value_string(cell, "state"),
+                        Some("unknown" | "not_applicable")
+                    )
+                })
+                .filter_map(|cell| value_string(cell, "label").map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn flag_facts(item: &Value, facts: &Value) -> Vec<String> {
+    let mut flags = Vec::new();
+    if item.get("archived").and_then(Value::as_bool) == Some(true) {
+        flags.push("archived".to_owned());
+    }
+    if item.get("deprecated").and_then(Value::as_bool) == Some(true) {
+        flags.push("deprecated".to_owned());
+    }
+    let mut reasons = facts
+        .get("downvoteReasons")
+        .and_then(Value::as_object)
+        .map(|reasons| {
+            reasons
+                .iter()
+                .filter_map(|(reason, count)| {
+                    let count = count.as_i64()?;
+                    (count > 0).then_some((reason.as_str(), count))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    reasons.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+    flags.extend(
+        reasons
+            .into_iter()
+            .map(|(reason, count)| format!("{reason} {count}")),
+    );
+    flags
+}
+
+fn compat_facts(facts: &Value) -> Vec<String> {
+    let mut agents = facts
+        .get("compat")
+        .and_then(Value::as_object)
+        .map(|compat| {
+            compat
+                .iter()
+                .filter_map(|(agent, counts)| {
+                    let works = value_number(counts, "works");
+                    let broken = value_number(counts, "broken");
+                    let total = works + broken;
+                    if total == 0 {
+                        return None;
+                    }
+                    let (state, winning) = if works > broken {
+                        ("works", works)
+                    } else if broken > works {
+                        ("breaks", broken)
+                    } else {
+                        ("unclear", works)
+                    };
+                    Some(format!("{agent} {state} {winning}/{total}"))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    agents.sort();
+    agents
+}
+
+fn fact_line(label: &str, facts: Vec<String>) -> String {
+    if facts.is_empty() {
+        String::new()
+    } else {
+        format!("\n   {label}: {}", facts.join("; "))
     }
 }
 

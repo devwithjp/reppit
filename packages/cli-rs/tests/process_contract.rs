@@ -60,6 +60,120 @@ async fn get_skills_returns_ranked_recommendations_as_json() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn readable_search_prints_the_shared_trust_facts() {
+    let app = Router::new().route(
+        "/api/v1/search",
+        get(|| async {
+            Json(json!({
+                "results": [{
+                    "item": {
+                        "id": "skill-1",
+                        "kind": "skill",
+                        "slug": "acme/cinematic-video",
+                        "url": "https://github.com/acme/cinematic-video/tree/0123456789abcdef0123456789abcdef01234567/skills/cinematic-video",
+                        "description": "Plan and edit cinematic videos",
+                        "stars": 42,
+                        "upvotes": 12,
+                        "downvotes": 3,
+                        "archived": false,
+                        "deprecated": false
+                    },
+                    "why": "Matches cinematic video editing",
+                    "trust": {
+                        "score": 87,
+                        "measured": 4,
+                        "applicable": 6,
+                        "cells": [
+                            { "key": "push", "state": "good", "label": "last push 4 days ago" },
+                            { "key": "release", "state": "slipping", "label": "last release 8 months ago" }
+                        ]
+                    },
+                    "downvoteReasons": { "unmaintained": 2, "misleading": 1 },
+                    "compat": {
+                        "claude-code": { "works": 3, "broken": 0 },
+                        "codex": { "works": 1, "broken": 2 }
+                    }
+                }],
+                "notIndexed": false,
+                "cached": false
+            }))
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+    let output = Command::new(env!("CARGO_BIN_EXE_reppit"))
+        .args(["find", "cinematic", "video", "--kind", "skill"])
+        .env("REPPIT_API_URL", format!("http://{address}"))
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("trust 87/100 · 4 of 6 measured"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("maintenance: last push 4 days ago; last release 8 months ago"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("flags: unmaintained 2; misleading 1"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("agents: claude-code works 3/3; codex breaks 2/3"),
+        "{stdout}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn readable_show_prints_trust_and_decisive_flags() {
+    let app = Router::new().route(
+        "/api/v1/items/by-slug/acme/old-tool",
+        get(|| async {
+            Json(json!({
+                "kind": "repo",
+                "slug": "acme/old-tool",
+                "url": "https://github.com/acme/old-tool",
+                "description": "An old tool",
+                "stars": 5,
+                "upvotes": 1,
+                "downvotes": 2,
+                "archived": true,
+                "deprecated": false,
+                "trust": { "score": 22, "reason": "archived", "measured": 5, "applicable": 6 },
+                "downvoteReasons": { "unmaintained": 2 },
+                "compat": { "codex": { "works": 0, "broken": 1 } }
+            }))
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+    let output = Command::new(env!("CARGO_BIN_EXE_reppit"))
+        .args(["show", "acme/old-tool"])
+        .env("REPPIT_API_URL", format!("http://{address}"))
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("trust 22/100 · 5 of 6 measured · archived"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("flags: archived; unmaintained 2"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("agents: codex breaks 1/1"), "{stdout}");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_skills_can_select_a_result_and_fetch_its_instructions() {
     let app = Router::new()
         .route(

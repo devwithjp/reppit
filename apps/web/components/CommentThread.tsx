@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ago } from "./trust";
@@ -51,6 +51,22 @@ export function CommentThread({ initial, slug, href, signedIn }: {
     for (const group of map.values()) sort(group);
     return map;
   }, [rows, order]);
+
+  const visibleIds = useMemo(() => {
+    const visible = new Set<string>();
+    const visiting = new Set<string>();
+    const hasVisibleReply = (comment: DiscussionComment): boolean => {
+      if (!comment.deleted) { visible.add(comment.id); return true; }
+      if (visiting.has(comment.id)) return false;
+      visiting.add(comment.id);
+      const keep = (children.get(comment.id) ?? []).some(hasVisibleReply);
+      visiting.delete(comment.id);
+      if (keep) visible.add(comment.id);
+      return keep;
+    };
+    for (const row of rows) hasVisibleReply(row);
+    return visible;
+  }, [children, rows]);
 
   const loginHref = buildLoginHref(href, "#comments");
 
@@ -104,9 +120,9 @@ export function CommentThread({ initial, slug, href, signedIn }: {
   }
 
   function branch(parentId: string | null, depth = 0): React.ReactNode {
-    return (children.get(parentId) ?? []).map((comment) => {
+    return (children.get(parentId) ?? []).filter((comment) => visibleIds.has(comment.id)).map((comment) => {
       const score = comment.upvotes - comment.downvotes;
-      const hasChildren = (children.get(comment.id)?.length ?? 0) > 0;
+      const hasChildren = (children.get(comment.id) ?? []).some((child) => visibleIds.has(child.id));
       return (
         <article className={`comment${depth ? " is-reply" : ""}`} key={comment.id} data-testid="comment">
           <div className="comment-vote" aria-label={`Comment score ${score}`}>
@@ -146,7 +162,7 @@ export function CommentThread({ initial, slug, href, signedIn }: {
         <label>Sort <select value={order} onChange={(event) => setOrder(event.target.value as Order)}><option value="best">Best</option><option value="new">New</option></select></label>
       </div>
       {error && <p className="vote-msg" role="alert">{error}</p>}
-      {rows.length ? <div className="comment-list">{branch(null)}</div> : (
+      {visibleIds.size ? <div className="comment-list">{branch(null)}</div> : (
         <div className="nothing"><h3>No comments yet.</h3><p>Share what happened when you used it, including setup problems or a better alternative.</p></div>
       )}
     </>
