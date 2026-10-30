@@ -1,11 +1,11 @@
-# reppit skill (@gitit/skill)
+# reppit skill
 
 Claude Code plugin (this directory) and a portable `SKILL.md` that also works in Codex, Cursor and any agentskills.io-compatible harness.
 
 ## Claude Code
 ```
-/plugin marketplace add jp/gitit
-/plugin install reppit@gitit
+/plugin marketplace add devwithjp/reppit
+/plugin install reppit@reppit
 ```
 Or from a local checkout: `claude --plugin-dir ./packages/skill`.
 
@@ -23,5 +23,5 @@ env = { REPPIT_API_KEY = "<personal token from reppit.dev/account, only needed f
 
 ## Any agent via skills CLI
 ```
-npx skills add jp/gitit/packages/skill/skills/find-repo
+npx skills add devwithjp/reppit/packages/skill/skills/find-repo
 ```

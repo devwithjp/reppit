@@ -532,8 +532,7 @@ so that I find out before the install, not after.
    "reppit search limit reached for this hour" rather than an exception.
 6. The streamable HTTP mode answers at `/mcp`; any other path returns 404.
 
-Note: the server currently registers as `gitit` and reports "health n%". Both change before launch: the
-name to `reppit`, the health figure to `trust nn/100`.
+The server registers as `reppit` and reports the shared `trust nn/100` facts.
 
 ### F-27 MCP server: `get_repo` and `install_skill` — `v1`
 
@@ -573,7 +572,7 @@ report it, so that I do not have to switch to a browser.
 **Story.** As a developer in a terminal without MCP, I want the same lookups as a command, so that any
 agent that can run a shell can use reppit.
 
-**Surface.** `npx reppit` (package currently `gitit-cli`).
+**Surface.** `npx reppit`.
 
 **Acceptance criteria**
 1. `reppit find "<problem>" [--lang x] [--kind repo|skill|mcp] [-n 5]` prints the same results as F-26
@@ -866,7 +865,7 @@ Each line is a yes/no check made on the production deployment, not on a laptop.
 - [ ] Rate-limit counters are on the shared store (F-31 criterion 5).
 
 ### Naming
-- [ ] Every user-visible string says reppit: site, MCP server name, CLI binary, skill text, email
+- [x] Every user-visible string says reppit: site, MCP server name, CLI binary, skill text, email
       sender, environment variable documentation. No `gitit` remains in anything a user reads.
 - [ ] `npx -y reppit-mcp` and `npx reppit` resolve to published packages owned by us.
 
@@ -883,7 +882,7 @@ Decisions needed before launch. Each one blocks at least one acceptance criterio
    allow linking a GitHub account to raise weight, or weight by reppit account age and activity. This
    decides F-09, F-25 criterion 1, F-32 and the sock-puppet story.
 2. **How do MCP and CLI writes authenticate if API keys are v2?** `vote` and `report_compat` require
-   `GITIT_API_KEY`. Scope says API keys are v2 and their UI is hidden. Without a credential, the
+   `REPPIT_API_KEY`. Scope says API keys are v2 and their UI is hidden. Without a credential, the
    in-agent compatibility report, which is the one thing nobody else collects and is meant to come from
    inside the agent, cannot be submitted from inside the agent. Options: ship a minimal personal token
    on the Account page in v1, a device-code sign-in for the CLI and MCP, or make in-agent writes v2 and
@@ -898,8 +897,8 @@ Decisions needed before launch. Each one blocks at least one acceptance criterio
    points, and no score at three or more unknowns).
 
 Smaller ones, noted so they are not lost:
-- The product is reppit; the packages, MCP server name, env vars and default API URL say gitit
-  (`gitit.dev`). Rename before launch or keep a compatibility alias?
+- Public product surfaces use reppit. Old `GITIT_*` environment variables remain read-only
+  compatibility aliases for early local users.
 - Does an upvote take a reason? The design labels it "works as described". This spec treats that as the
   label, not a tag, and lets an upvote carry an optional note.
 - Who tags compatibility failure causes ("failed on missing Ghostscript") in v1? This spec says the

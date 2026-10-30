@@ -7,7 +7,7 @@ export class GitHubClient {
 
   async get<T>(path: string, accept = "application/vnd.github+json"): Promise<T | null> {
     const res = await fetch(`${this.base}${path}`, {
-      headers: { accept, "user-agent": "gitit-ingest", ...(this.token ? { authorization: `Bearer ${this.token}` } : {}) },
+      headers: { accept, "user-agent": "reppit-ingest", ...(this.token ? { authorization: `Bearer ${this.token}` } : {}) },
     });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`github ${path} ${res.status}: ${await res.text()}`);
@@ -19,7 +19,7 @@ export class GitHubClient {
   }
   async readme(owner: string, name: string): Promise<string | null> {
     const res = await fetch(`${this.base}/repos/${owner}/${name}/readme`, {
-      headers: { accept: "application/vnd.github.raw+json", "user-agent": "gitit-ingest", ...(this.token ? { authorization: `Bearer ${this.token}` } : {}) },
+      headers: { accept: "application/vnd.github.raw+json", "user-agent": "reppit-ingest", ...(this.token ? { authorization: `Bearer ${this.token}` } : {}) },
     });
     if (!res.ok) return null;
     return (await res.text()).slice(0, README_MAX_CHARS);
@@ -116,7 +116,7 @@ export async function ingestSkillsFromRepo(
   const out: NewItem[] = [];
   for (const e of entries) {
     const folder = e.path.slice(0, -"/SKILL.md".length);
-    const res = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${revision}/${e.path}`, { headers: { "user-agent": "gitit-ingest" }, signal: AbortSignal.timeout(15000) });
+    const res = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${revision}/${e.path}`, { headers: { "user-agent": "reppit-ingest" }, signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`Skill ${e.path}: HTTP ${res.status}`);
     const md = await res.text();
     const fm = parseFrontmatter(md);

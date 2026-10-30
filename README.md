@@ -6,7 +6,7 @@ Describe a problem, get the top GitHub repos, agent skills or MCP servers, ranke
 
 - **Vote with reasons.** Downvotes must carry a tag: `unmaintained`, `insecure`, `broken-on-agent`, `misleading`, `low-quality`. Tags show up in search results.
 - **Agent compatibility reports.** "Works on Claude Code", "broken on Codex": the signal star counts and install counts can't give you.
-- **Problem-first search.** `gitit find "parse PDF tables in Python"` returns the same ranked, explained answer as the website.
+- **Problem-first search.** `npx reppit find "parse PDF tables in Python"` returns the same ranked, explained answer as the website.
 - **Open-core.** Everything in this repo is MIT. The hosted index (votes, comments, embeddings) is the product. See `DECISIONS.md`.
 
 ## Layout
@@ -17,7 +17,7 @@ Describe a problem, get the top GitHub repos, agent skills or MCP servers, ranke
 | `apps/api` | Rust agent API, versioned under `/api/v1` (`api.reppit.dev`) |
 | `packages/db` | Drizzle schema, migrations, PGlite (dev) / Postgres+pgvector (prod) client |
 | `packages/core` | Ranking, vote weighting, rate limits, embeddings, GitHub ingestion, search pipeline. Pure functions, tested. |
-| `packages/mcp-server` | `@gitit/mcp-server`: MCP tools `search_repos`, `get_repo`, `vote`, `report_compat`, `install_skill` |
+| `packages/mcp-server` | `reppit-mcp`: MCP tools `search_repos`, `get_repo`, `vote`, `report_compat`, `install_skill` |
 | `packages/cli-rs` | Native `reppit` CLI (`get skills`, `find`, `show`, `add`, `vote`, `compat`) |
 | `packages/cli` | Temporary TypeScript CLI compatibility adapter |
 | `packages/skill` | Claude Code plugin + portable `SKILL.md` (`find-repo`) for Codex, Cursor and any agentskills.io harness |
@@ -76,7 +76,7 @@ both posts manually, record their canonical URLs with `mark-posted`.
 # Claude Code
 claude --plugin-dir ./packages/skill          # or: /plugin marketplace add <this repo>
 # Any MCP client
-GITIT_API_URL=http://localhost:3100 node packages/mcp-server/dist/index.js
+REPPIT_API_URL=http://localhost:3100 node packages/mcp-server/dist/index.js
 # Terminal (run apps/api locally on port 3000 first)
 REPPIT_API_URL=http://localhost:3000 cargo run --manifest-path packages/cli-rs/Cargo.toml -- find "ORM for TypeScript with Postgres"
 ```
