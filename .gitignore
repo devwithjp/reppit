@@ -18,3 +18,5 @@ bip/campaign-assets/app-*-local.png
 bip/campaign-assets/app-*-social.png
 bip/review/
 atlas/
+.env*
+**/supabase/.temp/

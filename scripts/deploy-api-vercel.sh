@@ -23,7 +23,7 @@ vc() { npx --yes "vercel@$VERCEL_CLI_VERSION" "$@"; }
 
 if [ -f "$HOME/.cargo/env" ]; then . "$HOME/.cargo/env"; fi
 command -v cargo >/dev/null 2>&1 || { echo "Rust is missing: install it from https://rustup.rs"; exit 1; }
-vc whoami --format json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{if(!JSON.parse(s).loggedIn)process.exit(1)})' \
+vc whoami --format json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);if(j.loggedIn!==true&&!j.username)process.exit(1)})' \
   || { echo "not logged in: run npx vercel@$VERCEL_CLI_VERSION login"; exit 1; }
 
 cargo fmt --manifest-path apps/api/Cargo.toml --check
@@ -39,7 +39,7 @@ LEGACY_API_URL="${LEGACY_API_URL:-https://reppit.dev}"
   INSPECT=$(vc project inspect --json --yes)
   PROJECT_NAME=$(printf '%s' "$INSPECT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);process.stdout.write(j.name??j.project?.name??"")})')
   [ "$PROJECT_NAME" = reppit-api ] || { echo "linked Vercel project is '$PROJECT_NAME', expected 'reppit-api'"; exit 1; }
-  vc env add LEGACY_API_URL --environment "$DEPLOY_CONTEXT" --value "$LEGACY_API_URL" --force --yes --no-sensitive >/dev/null
+  vc env add LEGACY_API_URL --environment "$DEPLOY_CONTEXT" --value="$LEGACY_API_URL" --force --yes --no-sensitive >/dev/null
 
   if [ "$DEPLOY_CONTEXT" = preview ]; then
     URL=$(vc deploy --yes)
