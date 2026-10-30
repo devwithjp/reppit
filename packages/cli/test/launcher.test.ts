@@ -71,11 +71,11 @@ process.exit(23);
 
   test("explains how to recover when npm omitted the native package", async () => {
     const expectedPackage = new Map([
-      ["darwin-arm64", "@reppit/cli-darwin-arm64"],
-      ["darwin-x64", "@reppit/cli-darwin-x64"],
-      ["linux-arm64", "@reppit/cli-linux-arm64"],
-      ["linux-x64", "@reppit/cli-linux-x64"],
-      ["win32-x64", "@reppit/cli-win32-x64"],
+      ["darwin-arm64", "reppit-cli-darwin-arm64"],
+      ["darwin-x64", "reppit-cli-darwin-x64"],
+      ["linux-arm64", "reppit-cli-linux-arm64"],
+      ["linux-x64", "reppit-cli-linux-x64"],
+      ["win32-x64", "reppit-cli-win32-x64"],
     ]).get(`${process.platform}-${process.arch}`);
 
     if (!expectedPackage) return;
@@ -100,8 +100,7 @@ process.exit(23);
     const nativeDirectory = join(
       directory,
       "node_modules",
-      "@reppit",
-      "cli-linux-x64",
+      "reppit-cli-linux-x64",
       "bin",
     );
     await mkdir(launcherDirectory, { recursive: true });
@@ -121,7 +120,7 @@ process.exit(23);
     );
     await writeFile(
       join(directory, "checksums.json"),
-      JSON.stringify({ "@reppit/cli-linux-x64": sha256(fixture) }),
+      JSON.stringify({ "reppit-cli-linux-x64": sha256(fixture) }),
     );
 
     const result = await runFile(
@@ -142,8 +141,7 @@ process.exit(23);
     const nativeDirectory = join(
       directory,
       "node_modules",
-      "@reppit",
-      "cli-linux-x64",
+      "reppit-cli-linux-x64",
       "bin",
     );
     await mkdir(launcherDirectory, { recursive: true });

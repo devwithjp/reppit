@@ -228,7 +228,7 @@ The product is ready to link only when all of these pass:
 | Vercel/Supabase deployment | Two linked Vercel projects exist and deploy scripts now stage, verify, then promote; Vercel and Supabase CLI authorization plus a clean production Supabase project are still required |
 | Domain | `reppit.dev` was available at USD 13 for one year with USD 13 renewal on 30 Oct 2026; it was not premium and no purchase has been made |
 | Rust migration | The native CLI and versioned Rust gateway are built and contract-tested locally. Search and item actions still relay to the TypeScript service; direct Rust-owned catalog logic remains post-launch migration work, not a completed launch claim |
-| npm CLI and MCP publication | Public source and release workflows are live at `github.com/devwithjp/reppit`; npm authentication, owned native-package scope, and publication remain |
+| npm CLI and MCP publication | Public source and release workflows are live at `github.com/devwithjp/reppit`; the five available unscoped native package names remove the organization dependency; npm authentication and publication remain |
 | 20-day X scheduler and comics | First thread posted. Future randomized nights use a local review-packet reminder; prohibited Playwright posting was removed |
 | Live screenshots and demo video | Local desktop/phone screenshots and a checked 49.9-second H.264 demo candidate exist; both must be recaptured against the verified deployment before posting |
 
@@ -236,5 +236,5 @@ The product is ready to link only when all of these pass:
 
 - Complete Supabase CLI authorization, create or select the clean production project, then run migrations, RLS checks, function deployment, and seed.
 - Connect the new Supabase project to the created Vercel `reppit` project.
-- Configure npm trusted publishing for `reppit` plus the owned native-package scope.
+- Configure npm trusted publishing for `reppit`, `reppit-mcp`, and the five native packages.
 - Recheck and explicitly approve the live `reppit.dev` purchase quote before any charge.

@@ -23,11 +23,11 @@
     "prepack": "node ../../scripts/verify-cli-release.mjs && pnpm build"
   },
   "optionalDependencies": {
-    "@reppit/cli-darwin-arm64": "0.1.0",
-    "@reppit/cli-darwin-x64": "0.1.0",
-    "@reppit/cli-linux-arm64": "0.1.0",
-    "@reppit/cli-linux-x64": "0.1.0",
-    "@reppit/cli-win32-x64": "0.1.0"
+    "reppit-cli-darwin-arm64": "0.1.0",
+    "reppit-cli-darwin-x64": "0.1.0",
+    "reppit-cli-linux-arm64": "0.1.0",
+    "reppit-cli-linux-x64": "0.1.0",
+    "reppit-cli-win32-x64": "0.1.0"
   },
   "publishConfig": {
     "access": "public",
