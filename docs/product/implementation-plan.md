@@ -111,6 +111,7 @@ Exit: the public story moves from problem to proof, and every proof links to a w
 1. Complete the in-progress Supabase CLI authorization, select the clean production project, and capture fresh project credentials.
 2. Run production migrations, RLS, embedding function deployment, and index seed.
 3. Deploy preview, verify the complete signed-in story, then promote.
-4. Create the public release repository, configure npm trusted publishing, and publish the MCP/native/launcher packages in dependency order.
-5. Recapture the prepared screenshots and demo against production, then verify the final frames contain the live URL and published CLI state.
-6. Add the live URL and demo to the reviewed campaign posts.
+4. [x] Create and push the public release repository at `github.com/devwithjp/reppit`.
+5. Configure npm trusted publishing, and publish the MCP/native/launcher packages in dependency order.
+6. Recapture the prepared screenshots and demo against production, then verify the final frames contain the live URL and published CLI state.
+7. Add the live URL and demo to the reviewed campaign posts.
